@@ -534,7 +534,10 @@ import MainLayout from '../layouts/MainLayout.astro';
       document.getElementById('no-data-msg').classList.add('hidden');
       document.getElementById('table-wrapper').classList.remove('hidden');
 
-      var cols = customerHeaders.map(function (h) {
+      var HIDDEN_COLS = ['Waiver form (old)'];
+      var visibleHeaders = customerHeaders.filter(function (h) { return HIDDEN_COLS.indexOf(h) === -1; });
+
+      var cols = visibleHeaders.map(function (h) {
         return {
           title: escHtml(h),
           data: (function (key) {
@@ -543,9 +546,9 @@ import MainLayout from '../layouts/MainLayout.astro';
           defaultContent: ''
         };
       });
-      // Handle special Punch Card columns
+      // Handle special Punch Card / Membership columns
       var finalCols = cols.map(function (col, i) {
-        var h = customerHeaders[i];
+        var h = visibleHeaders[i];
         if (h === 'Punch Card') {
           return Object.assign({}, col, {
             render: function (val, type, row) {
