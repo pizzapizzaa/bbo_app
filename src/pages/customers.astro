@@ -19,24 +19,29 @@ function parseLine(line: string): string[] {
   return row;
 }
 
-const csvText = readFileSync(resolve('./priv_data/customer-database.csv'), 'utf-8');
-const lines = csvText.split(/\r\n|\n|\r/).filter((l: string) => l.trim());
+// priv_data/ is gitignored so the CSV won't exist on Vercel or CI.
+// Gracefully fall back to empty arrays so the build always succeeds.
+let headers: string[] = [];
+let builtRows: Record<string, string>[] = [];
+try {
+  const csvText = readFileSync(resolve('./priv_data/customer-database.csv'), 'utf-8');
+  const lines = csvText.split(/\r\n|\n|\r/).filter((l: string) => l.trim());
 
-// Detect named columns (skip empty-header columns)
-const rawH = parseLine(lines[0]).map((h: string) => h.replace(/^["']|["']$/g, '').trim());
-const hIdx: number[] = [];
-const headers: string[] = [];
-rawH.forEach((h: string, i: number) => { if (h) { headers.push(h); hIdx.push(i); } });
+  const rawH = parseLine(lines[0]).map((h: string) => h.replace(/^["']|["']$/g, '').trim());
+  const hIdx: number[] = [];
+  rawH.forEach((h: string, i: number) => { if (h) { headers.push(h); hIdx.push(i); } });
 
-const builtRows = lines.slice(1).map((line: string, idx: number) => {
-  const cols = parseLine(line);
-  const obj: Record<string, string> = { _id: `cust-${idx}` };
-  headers.forEach((h: string, i: number) => { obj[h] = cols[hIdx[i]] ?? ''; });
-  return obj;
-});
+  builtRows = lines.slice(1).map((line: string, idx: number) => {
+    const cols = parseLine(line);
+    const obj: Record<string, string> = { _id: `cust-${idx}` };
+    headers.forEach((h: string, i: number) => { obj[h] = cols[hIdx[i]] ?? ''; });
+    return obj;
+  });
+} catch (_) {
+  // CSV not present (e.g. Vercel / CI) — customers page will start empty;
+  // staff can import via the CSV upload button at runtime.
+}
 
-// Serialise for data attributes — Astro HTML-encodes attribute values;
-// the browser always decodes them back via getAttribute(), keeping JSON valid.
 const headersAttr = JSON.stringify(headers);
 const rowsAttr    = JSON.stringify(builtRows);
 ---
