@@ -100,68 +100,78 @@ import MainLayout from '../layouts/MainLayout.astro';
   </div>
 
   <script is:inline>
+    function apiFetch(url) {
+      var token = sessionStorage.getItem('bbo_token') || '';
+      return fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
+    }
+
     $(document).ready(function () {
-      var today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      var today = new Date().toISOString().slice(0, 10);
 
-      // ── Customers ──
-      var customers = JSON.parse(localStorage.getItem('bbo_customers') || '[]');
-      document.getElementById('stat-customers').textContent = customers.length;
+      // Load all three in parallel
+      Promise.all([
+        apiFetch('/api/customers').then(function (r) { return r.json(); }).catch(function () { return {}; }),
+        apiFetch('/api/checkins?date=' + today).then(function (r) { return r.json(); }).catch(function () { return {}; }),
+        apiFetch('/api/schedule').then(function (r) { return r.json(); }).catch(function () { return {}; })
+      ]).then(function (results) {
+        var custData  = results[0];
+        var ciData    = results[1];
+        var schedData = results[2];
 
-      // ── Check-ins ──
-      var checkins = JSON.parse(localStorage.getItem('bbo_checkins') || '[]');
-      var todayCI  = checkins.filter(function (c) { return c.date === today; });
+        // ── Customers stat ──
+        var totalCustomers = (custData.rows || []).length;
+        document.getElementById('stat-customers').textContent = totalCustomers;
 
-      document.getElementById('stat-checkins').textContent = todayCI.length;
+        // ── Check-ins ──
+        var todayCI = ciData.checkins || [];
+        document.getElementById('stat-checkins').textContent = todayCI.length;
+        var revenue = todayCI.reduce(function (s, c) { return s + (parseFloat(c.amount) || 0); }, 0);
+        document.getElementById('stat-revenue').textContent = Math.round(revenue).toLocaleString('vi-VN') + ' ₫';
 
-      var revenue = todayCI.reduce(function (sum, c) {
-        return sum + (parseFloat(c.amount) || 0);
-      }, 0);
-      document.getElementById('stat-revenue').textContent = Math.round(revenue).toLocaleString('vi-VN') + ' ₫';
+        // ── Recent check-ins table ──
+        var recent = todayCI.slice(-8).reverse();
+        var tbody  = document.getElementById('recent-checkins');
+        if (recent.length) {
+          tbody.innerHTML = recent.map(function (c) {
+            return '<tr class="border-b border-gray-50 last:border-0">' +
+              '<td class="py-2.5 px-1 text-gray-600">' + (c.time || '').slice(0, 5) + '</td>' +
+              '<td class="py-2.5 px-1 font-medium text-gray-800">' + escHtml(c.customer_name) + '</td>' +
+              '<td class="py-2.5 px-1"><span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ' +
+                payBadge(c.payment_method) + '">' + escHtml(c.payment_method) + '</span></td>' +
+              '<td class="py-2.5 px-1 text-right text-gray-700">' +
+                (c.amount ? Math.round(parseFloat(c.amount)).toLocaleString('vi-VN') + ' ₫' : '—') + '</td>' +
+            '</tr>';
+          }).join('');
+        }
 
-      // ── Recent check-ins table ──
-      var recent = todayCI.slice().reverse().slice(0, 8);
-      var tbody   = document.getElementById('recent-checkins');
-      if (recent.length) {
-        tbody.innerHTML = recent.map(function (c) {
-          return '<tr class="border-b border-gray-50 last:border-0">' +
-            '<td class="py-2.5 px-1 text-gray-600">' + c.time + '</td>' +
-            '<td class="py-2.5 px-1 font-medium text-gray-800">' + escHtml(c.customerName) + '</td>' +
-            '<td class="py-2.5 px-1"><span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ' +
-              payBadge(c.paymentMethod) + '">' + escHtml(c.paymentMethod) + '</span></td>' +
-            '<td class="py-2.5 px-1 text-right text-gray-700">' +
-              (c.amount ? Math.round(parseFloat(c.amount)).toLocaleString('vi-VN') + ' ₫' : '—') + '</td>' +
-          '</tr>';
-        }).join('');
-      }
+        // ── Schedule ──
+        var allEntries  = schedData.entries || [];
+        var todaySched  = allEntries.filter(function (s) { return s.date === today; });
+        document.getElementById('stat-staff').textContent = todaySched.length;
 
-      // ── Schedule ──
-      var schedule = JSON.parse(localStorage.getItem('bbo_schedule') || '[]');
-      var todaySched = schedule.filter(function (s) { return s.date === today; });
-      document.getElementById('stat-staff').textContent = todaySched.length;
-
-      var schedDiv = document.getElementById('today-schedule');
-      if (todaySched.length) {
-        schedDiv.innerHTML = todaySched.map(function (s) {
-          return '<div class="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">' +
-            '<div class="flex items-center gap-3">' +
-              '<div class="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center ' +
-                   'text-purple-600 text-xs font-bold shrink-0">' +
-                s.staffName.charAt(0).toUpperCase() +
+        var schedDiv = document.getElementById('today-schedule');
+        if (todaySched.length) {
+          schedDiv.innerHTML = todaySched.map(function (s) {
+            var initial = (s.staff_name || '?').charAt(0).toUpperCase();
+            return '<div class="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">' +
+              '<div class="flex items-center gap-3">' +
+                '<div class="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center ' +
+                     'text-purple-600 text-xs font-bold shrink-0">' + initial + '</div>' +
+                '<span class="text-sm font-medium text-gray-800">' + escHtml(s.staff_name) + '</span>' +
               '</div>' +
-              '<span class="text-sm font-medium text-gray-800">' + escHtml(s.staffName) + '</span>' +
-            '</div>' +
-            '<div class="text-sm text-gray-500">' + escHtml(s.startTime) + ' – ' + escHtml(s.endTime) + '</div>' +
-          '</div>';
-        }).join('');
-      }
+              '<div class="text-sm text-gray-500">' + escHtml(s.start_time) + ' – ' + escHtml(s.end_time) + '</div>' +
+            '</div>';
+          }).join('');
+        }
+      });
 
       function escHtml(str) {
         return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       }
       function payBadge(pm) {
-        var m = { 'Cash': 'bg-green-100 text-green-700', 'Card': 'bg-blue-100 text-blue-700',
-                  'Digital Wallet': 'bg-indigo-100 text-indigo-700', 'Complimentary': 'bg-gray-100 text-gray-600' };
-        return m[pm] || 'bg-gray-100 text-gray-600';
+        return { 'Cash': 'bg-green-100 text-green-700', 'Card': 'bg-blue-100 text-blue-700',
+                 'Digital Wallet': 'bg-indigo-100 text-indigo-700', 'Complimentary': 'bg-gray-100 text-gray-600' }[pm]
+               || 'bg-gray-100 text-gray-600';
       }
     });
   </script>

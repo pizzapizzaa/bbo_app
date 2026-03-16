@@ -1,59 +1,8 @@
 ---
 import MainLayout from '../layouts/MainLayout.astro';
-import { readFileSync } from 'fs';
-import { resolve } from 'path';
-
-// ── Parse CSV at build time ──
-function parseLine(line: string): string[] {
-  const row: string[] = [];
-  let cur = '', inQ = false;
-  for (let i = 0; i < line.length; i++) {
-    const c = line[i];
-    if (c === '"') {
-      if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
-      else { inQ = !inQ; }
-    } else if (c === ',' && !inQ) { row.push(cur.trim()); cur = ''; }
-    else { cur += c; }
-  }
-  row.push(cur.trim());
-  return row;
-}
-
-// priv_data/ is gitignored so the CSV won't exist on Vercel or CI.
-// Gracefully fall back to empty arrays so the build always succeeds.
-let headers: string[] = [];
-let builtRows: Record<string, string>[] = [];
-try {
-  const csvText = readFileSync(resolve('./priv_data/customer-database.csv'), 'utf-8');
-  const lines = csvText.split(/\r\n|\n|\r/).filter((l: string) => l.trim());
-
-  const rawH = parseLine(lines[0]).map((h: string) => h.replace(/^["']|["']$/g, '').trim());
-  const hIdx: number[] = [];
-  rawH.forEach((h: string, i: number) => { if (h) { headers.push(h); hIdx.push(i); } });
-
-  builtRows = lines.slice(1).map((line: string, idx: number) => {
-    const cols = parseLine(line);
-    const obj: Record<string, string> = { _id: `cust-${idx}` };
-    headers.forEach((h: string, i: number) => { obj[h] = cols[hIdx[i]] ?? ''; });
-    return obj;
-  });
-} catch (_) {
-  // CSV not present (e.g. Vercel / CI) — customers page will start empty;
-  // staff can import via the CSV upload button at runtime.
-}
-
-const headersAttr = JSON.stringify(headers);
-const rowsAttr    = JSON.stringify(builtRows);
 ---
 
 <MainLayout title="Customers" activePage="customers">
-
-  <!-- Build-time customer database embedded as data attributes.
-       Astro HTML-encodes the JSON; getAttribute() decodes it back.
-       No script timing issues — data is always ready when JS runs. -->
-  <div id="db-seed" hidden
-       data-headers={headersAttr}
-       data-rows={rowsAttr}></div>
 
   <!-- Action bar -->
   <div class="flex flex-wrap items-center gap-3 mb-6">
@@ -120,12 +69,20 @@ const rowsAttr    = JSON.stringify(builtRows);
     var customerHeaders = [];
     var customerRows = [];
 
-    $(document).ready(function () {
-      loadFromStorage();
-      if (customerRows.length > 0) {
-        renderTable();
+    // ── API helper ──
+    function apiFetch(url, options) {
+      var token = sessionStorage.getItem('bbo_token') || '';
+      var defaults = { headers: { 'Authorization': 'Bearer ' + token } };
+      if (options && options.body) {
+        defaults.headers['Content-Type'] = 'application/json';
       }
-      updateCount();
+      return fetch(url, Object.assign({}, defaults, options, {
+        headers: Object.assign(defaults.headers, options && options.headers)
+      }));
+    }
+
+    $(document).ready(function () {
+      loadCustomers();
 
       // CSV file input
       document.getElementById('csv-upload').addEventListener('change', function (e) {
@@ -140,19 +97,35 @@ const rowsAttr    = JSON.stringify(builtRows);
           processCSV(ev.target.result, file.name);
         };
         reader.readAsText(file, 'UTF-8');
-        // Reset input so same file can be re-selected
         e.target.value = '';
       });
     });
 
-    // ── CSV Parsing ──
+    // ── Load customers from API ──
+    function loadCustomers() {
+      showStatus('Loading customers…', 'info', true);
+      apiFetch('/api/customers')
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          document.getElementById('upload-status').classList.add('hidden');
+          if (data.error) { showStatus(data.error, 'error'); return; }
+          customerHeaders = data.headers || [];
+          customerRows    = data.rows    || [];
+          if (customerRows.length) renderTable();
+          updateCount();
+        })
+        .catch(function (err) {
+          showStatus('Failed to load customers: ' + err.message, 'error');
+        });
+    }
+
+    // ── CSV Parsing (client-side read only) ──
     function parseCSV(text) {
       var rows = [];
       var lines = text.split(/\r\n|\n|\r/);
       for (var i = 0; i < lines.length; i++) {
-        var line = lines[i];
-        if (!line.trim()) continue;
-        rows.push(parseCSVLine(line));
+        if (!lines[i].trim()) continue;
+        rows.push(parseCSVLine(lines[i]));
       }
       return rows;
     }
@@ -165,11 +138,8 @@ const rowsAttr    = JSON.stringify(builtRows);
           if (inQ && line[i + 1] === '"') { current += '"'; i++; }
           else { inQ = !inQ; }
         } else if (ch === ',' && !inQ) {
-          row.push(current.trim());
-          current = '';
-        } else {
-          current += ch;
-        }
+          row.push(current.trim()); current = '';
+        } else { current += ch; }
       }
       row.push(current.trim());
       return row;
@@ -181,47 +151,47 @@ const rowsAttr    = JSON.stringify(builtRows);
         showStatus('The CSV file appears to be empty or has only headers.', 'error');
         return;
       }
-
-      var headers = rows[0].map(function (h) { return h.replace(/^["']|["']$/g, '').trim(); })
-                           .filter(function (h) { return h; }); // drop empty header cols
+      var headers = rows[0].map(function (h) {
+        return h.replace(/^["']|["']$/g, '').trim();
+      }).filter(Boolean);
       if (!headers.length) {
         showStatus('No valid column headers found in the CSV.', 'error');
         return;
       }
 
-      var data = rows.slice(1).map(function (row, idx) {
-        var obj = { _id: 'cust-' + Date.now() + '-' + idx };
-        headers.forEach(function (h, i) {
-          obj[h] = row[i] !== undefined ? row[i] : '';
-        });
+      var csvRows = rows.slice(1).map(function (row) {
+        var obj = {};
+        headers.forEach(function (h, i) { obj[h] = row[i] !== undefined ? row[i] : ''; });
         return obj;
       });
 
-      customerHeaders = headers;
-      customerRows    = data;
+      showStatus('Uploading ' + csvRows.length + ' customer(s)…', 'info', true);
+      var btn = document.querySelector('[onclick="exportCustomers()"]');
+      if (btn) btn.disabled = true;
 
-      // Render FIRST — so a storage quota error never blocks the table from showing
-      renderTable();
-      updateCount();
-
-      // Persist to localStorage (best-effort — quota errors are non-fatal)
-      saveToStorage();
-
-      showStatus(
-        'Imported <strong>' + data.length + '</strong> customer(s) from <strong>' + escHtml(filename) + '</strong>.',
-        'success'
-      );
+      apiFetch('/api/customers', {
+        method: 'POST',
+        body: JSON.stringify({ rows: csvRows })
+      })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if (btn) btn.disabled = false;
+          if (data.error) { showStatus(data.error, 'error'); return; }
+          showStatus(
+            'Imported <strong>' + data.count + '</strong> customer(s) from <strong>' + escHtml(filename) + '</strong>.',
+            'success'
+          );
+          loadCustomers();
+        })
+        .catch(function (err) {
+          if (btn) btn.disabled = false;
+          showStatus('Upload failed: ' + err.message, 'error');
+        });
     }
 
     function renderTable() {
-      if (!customerHeaders.length) {
-        showStatus('No customer headers found — check that the CSV was parsed correctly.', 'error');
-        return;
-      }
+      if (!customerHeaders.length) return;
 
-      // Destroy any existing DataTables instance before re-initialising.
-      // Use isDataTable() rather than checking customerTable — it's the source
-      // of truth even if a previous init partially failed.
       if ($.fn.DataTable.isDataTable('#customer-table')) {
         $('#customer-table').DataTable().destroy();
       }
@@ -232,20 +202,15 @@ const rowsAttr    = JSON.stringify(builtRows);
       document.getElementById('no-data-msg').classList.add('hidden');
       document.getElementById('table-wrapper').classList.remove('hidden');
 
-      // Build column definitions — use data as a function to avoid DataTables
-      // dot-notation parsing (e.g. "Telephone no." would break as a string key)
       var cols = customerHeaders.map(function (h) {
         return {
           title: escHtml(h),
-          // Use data as a function to avoid DataTables dot-notation parsing
-          // (e.g. "Telephone no." would be misread as nested property access)
           data: (function (key) {
             return function (row) { return row[key] != null ? String(row[key]) : ''; };
           })(h),
           defaultContent: ''
         };
       });
-      // Delete action column
       cols.push({
         title: 'Actions',
         data: null,
@@ -269,14 +234,12 @@ const rowsAttr    = JSON.stringify(builtRows);
           dom: "<'flex flex-wrap items-center justify-between gap-3 mb-3'<'flex gap-2'B><'flex-1 text-right'f>>" +
                "t" +
                "<'flex flex-wrap items-center justify-between mt-3'<'text-sm text-gray-500'i><'flex gap-1'p>>",
-          buttons: [
-            {
-              extend: 'csvHtml5',
-              text: '⬇ Export CSV',
-              title: 'Customer List',
-              exportOptions: { columns: ':not(:last-child)' }
-            }
-          ],
+          buttons: [{
+            extend: 'csvHtml5',
+            text: '⬇ Export CSV',
+            title: 'Customer List',
+            exportOptions: { columns: ':not(:last-child)' }
+          }],
           order: [[0, 'asc']],
           pageLength: 25,
           scrollX: true,
@@ -286,33 +249,47 @@ const rowsAttr    = JSON.stringify(builtRows);
         customerTable = null;
         document.getElementById('table-wrapper').classList.add('hidden');
         document.getElementById('no-data-msg').classList.remove('hidden');
-        // Keep error visible until dismissed — don't auto-hide
-        showStatus('DataTables error: ' + escHtml(err.message) + '<br><small>Open browser console (F12) for details.</small>', 'error', true);
+        showStatus('DataTables error: ' + escHtml(err.message), 'error', true);
       }
     }
 
     function deleteCustomer(id) {
       if (!confirm('Delete this customer? This action cannot be undone.')) return;
-      customerRows = customerRows.filter(function (c) { return c._id !== id; });
-      saveToStorage();
-      customerTable.clear();
-      customerTable.rows.add(customerRows);
-      customerTable.draw();
-      updateCount();
-      showToast('Customer deleted.', 'warning');
+      apiFetch('/api/customers/' + id, { method: 'DELETE' })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if (data.error) { showToast('Delete failed: ' + data.error, 'error'); return; }
+          customerRows = customerRows.filter(function (c) { return c._id !== id; });
+          if (customerTable) {
+            customerTable.clear();
+            customerTable.rows.add(customerRows);
+            customerTable.draw();
+          }
+          updateCount();
+          showToast('Customer deleted.', 'warning');
+        })
+        .catch(function (err) { showToast('Delete failed: ' + err.message, 'error'); });
     }
 
     function clearAllCustomers() {
       if (!confirm('Clear ALL customer data? This cannot be undone.')) return;
-      customerHeaders = [];
-      customerRows    = [];
-      saveToStorage();
-      if (customerTable) { customerTable.destroy(); customerTable = null; }
-      document.querySelector('#customer-table thead tr').innerHTML = '';
-      document.querySelector('#customer-table tbody').innerHTML = '';
-      document.getElementById('no-data-msg').classList.remove('hidden');
-      updateCount();
-      showToast('All customer data cleared.', 'warning');
+      apiFetch('/api/customers', {
+        method: 'POST',
+        body: JSON.stringify({ rows: [] })
+      })
+        .then(function (res) { return res.json(); })
+        .then(function () {
+          customerHeaders = [];
+          customerRows    = [];
+          if (customerTable) { customerTable.destroy(); customerTable = null; }
+          document.querySelector('#customer-table thead tr').innerHTML = '';
+          document.querySelector('#customer-table tbody').innerHTML = '';
+          document.getElementById('table-wrapper').classList.add('hidden');
+          document.getElementById('no-data-msg').classList.remove('hidden');
+          updateCount();
+          showToast('All customer data cleared.', 'warning');
+        })
+        .catch(function (err) { showToast('Clear failed: ' + err.message, 'error'); });
     }
 
     function exportCustomers() {
@@ -320,50 +297,7 @@ const rowsAttr    = JSON.stringify(builtRows);
         showStatus('No customer data to export.', 'error');
         return;
       }
-      if (customerTable) {
-        // Use DataTables built-in export (triggers the CSV button)
-        $('.buttons-csv').trigger('click');
-      }
-    }
-
-    // ── Storage ──
-    function saveToStorage() {
-      try {
-        localStorage.setItem('bbo_customer_headers', JSON.stringify(customerHeaders));
-        localStorage.setItem('bbo_customers',        JSON.stringify(customerRows));
-      } catch (e) {
-        // QuotaExceededError — data stays in memory for this session
-        showStatus('Storage quota exceeded. Customer data is loaded but will not persist after refresh.', 'error');
-      }
-    }
-
-    function loadFromStorage() {
-      // Primary: build-time data embedded in data-* attributes on #db-seed.
-      // getAttribute() always decodes HTML entities back to valid JSON.
-      var el = document.getElementById('db-seed');
-      if (el) {
-        try {
-          var hdrs = JSON.parse(el.getAttribute('data-headers') || '[]');
-          var rws  = JSON.parse(el.getAttribute('data-rows')    || '[]');
-          if (hdrs.length && rws.length) {
-            customerHeaders = hdrs;
-            customerRows    = rws;
-            // Sync to localStorage so the check-in autocomplete can read customer names
-            try {
-              localStorage.setItem('bbo_customer_headers', JSON.stringify(customerHeaders));
-              localStorage.setItem('bbo_customers',        JSON.stringify(customerRows));
-            } catch (e) {}
-            return;
-          }
-        } catch (e) {
-          showStatus('Error reading built-in database: ' + e.message, 'error');
-        }
-      }
-      // Fallback: manually imported CSV (stored in localStorage)
-      try {
-        customerHeaders = JSON.parse(localStorage.getItem('bbo_customer_headers') || '[]');
-        customerRows    = JSON.parse(localStorage.getItem('bbo_customers')         || '[]');
-      } catch (e) { customerHeaders = []; customerRows = []; }
+      if (customerTable) $('.buttons-csv').trigger('click');
     }
 
     function updateCount() {
@@ -373,28 +307,26 @@ const rowsAttr    = JSON.stringify(builtRows);
         : '';
     }
 
-    // ── UI helpers ──
-    // persistent=true keeps the banner visible until the user clicks × to dismiss
     function showStatus(msg, type, persistent) {
       var el = document.getElementById('upload-status');
-      el.className = 'mb-4 px-4 py-3 rounded-xl border text-sm flex items-start justify-between gap-3 ' +
-        (type === 'error'
-          ? 'bg-red-50 border-red-200 text-red-700'
-          : 'bg-green-50 border-green-200 text-green-700');
+      var colorClass = type === 'error'
+        ? 'bg-red-50 border-red-200 text-red-700'
+        : type === 'info'
+        ? 'bg-blue-50 border-blue-200 text-blue-700'
+        : 'bg-green-50 border-green-200 text-green-700';
+      el.className = 'mb-4 px-4 py-3 rounded-xl border text-sm flex items-start justify-between gap-3 ' + colorClass;
       el.innerHTML = '<span>' + msg + '</span>' +
-        '<button onclick="this.closest(\'#upload-status\').classList.add(\'hidden\')"
-                class="shrink-0 font-bold text-lg leading-none opacity-60 hover:opacity-100">&times;</button>';
+        '<button onclick="this.closest(\'#upload-status\').classList.add(\'hidden\')" ' +
+        'class="shrink-0 font-bold text-lg leading-none opacity-60 hover:opacity-100">&times;</button>';
       el.classList.remove('hidden');
-      if (!persistent) {
-        setTimeout(function () { el.classList.add('hidden'); }, 6000);
-      }
+      if (!persistent) setTimeout(function () { el.classList.add('hidden'); }, 6000);
     }
 
     function showToast(msg, type) {
       var t = document.createElement('div');
       t.textContent = msg;
       t.className = 'fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-lg text-sm font-medium shadow-lg ' +
-        (type === 'warning' ? 'bg-yellow-500 text-white' : 'bg-green-500 text-white');
+        (type === 'warning' ? 'bg-yellow-500 text-white' : type === 'error' ? 'bg-red-500 text-white' : 'bg-green-500 text-white');
       document.body.appendChild(t);
       setTimeout(function () { t.remove(); }, 2500);
     }

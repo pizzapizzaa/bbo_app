@@ -1,14 +1,6 @@
 ---
 // Login page — standalone, no shared layout
-import { createHash } from 'crypto';
-
-// Credentials come from .env (gitignored — never committed).
-// The password is hashed here at build time; only the SHA-256 digest
-// is embedded in the HTML. The plaintext never appears in built output.
-const ADMIN_USER  = import.meta.env.ADMIN_USERNAME ?? '';
-const ADMIN_PHASH = createHash('sha256')
-  .update(import.meta.env.ADMIN_PASSWORD ?? '')
-  .digest('hex');
+// Authentication is handled server-side via POST /api/auth/token
 ---
 
 <!DOCTYPE html>
@@ -53,13 +45,6 @@ const ADMIN_PHASH = createHash('sha256')
       <p class="text-gray-400 text-sm mt-1">Point of Sales System</p>
       <p class="text-gray-500 text-xs mt-1">Support Hotline: 096916216</p>
     </div>
-
-    <!-- Auth config: username + SHA-256 password hash embedded at build time.
-         Browser hashes the entered password and compares — plaintext never
-         appears in page source or network traffic. -->
-    <div id="auth-cfg" hidden
-         data-user={ADMIN_USER}
-         data-phash={ADMIN_PHASH}></div>
 
     <!-- Error message (text set dynamically by JS) -->
     <div id="login-error"
@@ -182,7 +167,7 @@ const ADMIN_PHASH = createHash('sha256')
       }
     });
 
-    // ── Login submit — async so we can use crypto.subtle ──
+    // ── Login submit — calls /api/auth/token (server-side credential check) ──
     document.getElementById('login-form').addEventListener('submit', async function (e) {
       e.preventDefault();
 
@@ -196,30 +181,27 @@ const ADMIN_PHASH = createHash('sha256')
       btn.disabled = true;
       btn.textContent = 'Signing in…';
 
-      // Hash the entered password with SHA-256 in the browser,
-      // then compare against the hash embedded at build time.
-      var hashHex;
+      var res, data;
       try {
-        var hashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password));
-        hashHex = Array.from(new Uint8Array(hashBuf))
-          .map(function (b) { return b.toString(16).padStart(2, '0'); })
-          .join('');
+        res  = await fetch('/api/auth/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: username, password: password })
+        });
+        data = await res.json();
       } catch (err) {
-        errEl.textContent = 'Browser crypto unavailable. Please use HTTPS or localhost.';
+        errEl.textContent = 'Network error. Please check your connection.';
         errEl.classList.remove('hidden');
         btn.disabled = false;
         btn.textContent = 'Sign In';
         return;
       }
 
-      var cfg       = document.getElementById('auth-cfg');
-      var validUser = cfg.getAttribute('data-user');
-      var validHash = cfg.getAttribute('data-phash');
-
-      if (username === validUser && hashHex === validHash) {
+      if (res.ok && data.token) {
         sessionStorage.removeItem('bbo_attempts');
         sessionStorage.removeItem('bbo_lock_until');
         sessionStorage.setItem('bbo_auth', 'true');
+        sessionStorage.setItem('bbo_token', data.token);
         sessionStorage.setItem('bbo_admin', username);
         window.location.replace('/dashboard');
       } else {
@@ -236,7 +218,7 @@ const ADMIN_PHASH = createHash('sha256')
         } else {
           sessionStorage.setItem('bbo_attempts', String(attempts));
           var left = MAX_ATTEMPTS - attempts;
-          errEl.textContent = 'Invalid username or password.'
+          errEl.textContent = (data.error || 'Invalid username or password.')
             + (left <= 2 ? ' (' + left + ' attempt' + (left === 1 ? '' : 's') + ' remaining)' : '');
           errEl.classList.remove('hidden');
           btn.disabled = false;

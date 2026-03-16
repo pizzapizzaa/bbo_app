@@ -4,6 +4,7 @@ priv_data/
 # Astro build output
 dist/
 .astro/
+.vercel/
 
 # Node
 node_modules/
