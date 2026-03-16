@@ -1,0 +1,291 @@
+---
+export interface Props {
+  title: string;
+  activePage?: string;
+}
+const { title, activePage = '' } = Astro.props;
+---
+
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-50">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{title} — BBO Gym POS</title>
+  <link rel="icon" href="/assets/favicon.ico" />
+
+  <!-- Inter font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- DataTables CSS -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css" />
+  <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.dataTables.min.css" />
+
+  <!-- jQuery + DataTables JS (synchronous so all page scripts can use $) -->
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+
+  <!-- Auth guard: hide body until verified -->
+  <style>
+    body { display: none; }
+
+    /* ─── DataTables overrides ─── */
+    .dataTables_wrapper { font-family: 'Inter', system-ui, sans-serif; }
+
+    .dataTables_wrapper .dataTables_filter input,
+    .dataTables_wrapper .dataTables_length select {
+      border: 1px solid #d1d5db;
+      border-radius: 0.5rem;
+      padding: 0.35rem 0.65rem;
+      font-size: 0.875rem;
+      outline: none;
+      margin-left: 0.35rem;
+      background: #fff;
+    }
+    .dataTables_wrapper .dataTables_filter input:focus,
+    .dataTables_wrapper .dataTables_length select:focus {
+      border-color: #f97316;
+      box-shadow: 0 0 0 3px rgba(249,115,22,0.15);
+    }
+
+    table.dataTable { width: 100% !important; border-collapse: collapse; }
+    table.dataTable thead tr th {
+      background: #f9fafb;
+      color: #4b5563;
+      font-weight: 600;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 0.75rem 1rem;
+      border-bottom: 2px solid #e5e7eb;
+      border-top: none;
+      white-space: nowrap;
+    }
+    table.dataTable tbody tr { border-bottom: 1px solid #f3f4f6; }
+    table.dataTable tbody tr:hover { background-color: #fff7ed !important; }
+    table.dataTable tbody td {
+      padding: 0.65rem 1rem;
+      font-size: 0.875rem;
+      color: #374151;
+      vertical-align: middle;
+    }
+    table.dataTable.no-footer { border-bottom: 1px solid #e5e7eb; }
+
+    /* Pagination */
+    .dataTables_wrapper .dataTables_paginate { margin-top: 1rem; }
+    .dataTables_wrapper .dataTables_paginate .paginate_button {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 2rem; height: 2rem; padding: 0 0.5rem;
+      border-radius: 0.375rem; font-size: 0.875rem; cursor: pointer;
+      color: #374151;
+    }
+    .dataTables_wrapper .dataTables_paginate .paginate_button:hover:not(.disabled):not(.current) {
+      background: #f3f4f6 !important; color: #111827 !important;
+    }
+    .dataTables_wrapper .dataTables_paginate .paginate_button.current,
+    .dataTables_wrapper .dataTables_paginate .paginate_button.current:hover {
+      background: #f97316 !important; color: #fff !important; border-color: #f97316 !important;
+    }
+    .dataTables_wrapper .dataTables_paginate .paginate_button.disabled,
+    .dataTables_wrapper .dataTables_paginate .paginate_button.disabled:hover {
+      opacity: 0.4; cursor: default; color: #9ca3af !important; background: transparent !important;
+    }
+    .dataTables_wrapper .dataTables_info { font-size: 0.875rem; color: #6b7280; margin-top: 1rem; }
+
+    /* Buttons extension */
+    .dt-buttons { margin-bottom: 1rem; display: flex; gap: 0.5rem; }
+    .dt-button, .dt-button:hover {
+      background: #f97316 !important; color: #fff !important;
+      border: none !important; border-radius: 0.5rem !important;
+      padding: 0.45rem 1rem !important; font-size: 0.875rem !important;
+      font-weight: 500 !important; cursor: pointer !important;
+      box-shadow: none !important; text-shadow: none !important;
+    }
+    .dt-button:hover { background: #ea580c !important; }
+  </style>
+
+  <script is:inline>
+    (function () {
+      if (!sessionStorage.getItem('bbo_auth')) {
+        window.location.replace('/');
+      } else {
+        document.addEventListener('DOMContentLoaded', function () {
+          document.body.style.display = '';
+        });
+      }
+    })();
+  </script>
+</head>
+
+<body class="h-full bg-gray-50 font-sans flex">
+
+  <!-- ──────────── Sidebar ──────────── -->
+  <aside
+    id="sidebar"
+    class="fixed inset-y-0 left-0 z-50 w-64 bg-gray-900 flex flex-col
+           -translate-x-full lg:translate-x-0 transition-transform duration-300"
+  >
+    <!-- Logo -->
+    <div class="flex items-center h-16 px-6 border-b border-gray-700/60 flex-shrink-0">
+      <img
+        src="/assets/bobo_logo_rectangle.png"
+        alt="BBO Gym"
+        class="max-w-[120px] w-auto h-auto object-contain"
+        onerror="this.style.display='none'"
+      />
+
+    </div>
+
+    <!-- Nav -->
+    <nav class="flex-1 px-3 py-5 space-y-0.5 overflow-y-auto">
+
+      <a href="/dashboard"
+         class={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+           ${activePage === 'dashboard'
+             ? 'bg-orange-500 text-white'
+             : 'text-gray-400 hover:bg-gray-700/60 hover:text-white'}`}>
+        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+        </svg>
+        Dashboard
+      </a>
+
+      <a href="/checkin"
+         class={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+           ${activePage === 'checkin'
+             ? 'bg-orange-500 text-white'
+             : 'text-gray-400 hover:bg-gray-700/60 hover:text-white'}`}>
+        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+        </svg>
+        Daily Check-in
+      </a>
+
+      <a href="/customers"
+         class={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+           ${activePage === 'customers'
+             ? 'bg-orange-500 text-white'
+             : 'text-gray-400 hover:bg-gray-700/60 hover:text-white'}`}>
+        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+        </svg>
+        Customers
+      </a>
+
+      <a href="/schedule"
+         class={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+           ${activePage === 'schedule'
+             ? 'bg-orange-500 text-white'
+             : 'text-gray-400 hover:bg-gray-700/60 hover:text-white'}`}>
+        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+        </svg>
+        Staff Schedule
+      </a>
+    </nav>
+
+    <!-- User / Logout -->
+    <div class="px-3 py-4 border-t border-gray-700/60 flex-shrink-0">
+      <div class="flex items-center gap-3 px-3 py-2 rounded-lg">
+        <div id="user-avatar"
+             class="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center
+                    text-white text-sm font-bold shrink-0">
+          A
+        </div>
+        <div class="flex-1 min-w-0">
+          <p id="user-name" class="text-white text-sm font-medium truncate">Admin</p>
+          <p class="text-gray-400 text-xs">Administrator</p>
+        </div>
+        <button onclick="doLogout()" title="Logout"
+                class="text-gray-400 hover:text-white transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Overlay (mobile) -->
+  <div id="sidebar-overlay"
+       class="fixed inset-0 bg-black/50 z-40 hidden lg:hidden"
+       onclick="toggleSidebar()">
+  </div>
+
+  <!-- ──────────── Main area ──────────── -->
+  <div class="lg:ml-64 flex flex-col min-h-screen w-full">
+
+    <!-- Top header -->
+    <header class="bg-white border-b border-gray-200 px-5 py-3.5 flex items-center gap-4 sticky top-0 z-30">
+      <!-- Hamburger (mobile) -->
+      <button onclick="toggleSidebar()" class="lg:hidden text-gray-500 hover:text-gray-700">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+      </button>
+
+      <h1 class="text-lg font-semibold text-gray-800">{title}</h1>
+
+      <div class="ml-auto text-sm text-gray-400" id="hdr-datetime"></div>
+    </header>
+
+    <!-- Page content -->
+    <main class="flex-1 p-5 lg:p-7">
+      <slot />
+    </main>
+
+    <footer class="px-6 py-3 bg-white border-t border-gray-100 text-center text-xs text-gray-400">
+      BBO Gym POS &copy; {new Date().getFullYear()}
+    </footer>
+  </div>
+
+  <!-- ──────────── Global scripts ──────────── -->
+  <script is:inline>
+    // Datetime ticker
+    function refreshDatetime() {
+      var el = document.getElementById('hdr-datetime');
+      if (el) {
+        el.textContent = new Date().toLocaleString('en-US', {
+          weekday: 'short', year: 'numeric', month: 'short',
+          day: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
+      }
+    }
+    refreshDatetime();
+    setInterval(refreshDatetime, 30000);
+
+    // Populate user info
+    var _user = sessionStorage.getItem('bbo_admin') || 'Admin';
+    var _nameEl = document.getElementById('user-name');
+    var _avatarEl = document.getElementById('user-avatar');
+    if (_nameEl) _nameEl.textContent = _user;
+    if (_avatarEl) _avatarEl.textContent = _user.charAt(0).toUpperCase();
+
+    // Logout
+    function doLogout() {
+      if (confirm('Log out?')) {
+        sessionStorage.removeItem('bbo_auth');
+        sessionStorage.removeItem('bbo_admin');
+        window.location.replace('/');
+      }
+    }
+
+    // Mobile sidebar toggle
+    function toggleSidebar() {
+      var sb = document.getElementById('sidebar');
+      var ov = document.getElementById('sidebar-overlay');
+      sb.classList.toggle('-translate-x-full');
+      ov.classList.toggle('hidden');
+    }
+  </script>
+</body>
+</html>

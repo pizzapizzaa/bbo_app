@@ -1,0 +1,369 @@
+---
+import MainLayout from '../layouts/MainLayout.astro';
+---
+
+<MainLayout title="Staff Schedule" activePage="schedule">
+
+  <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+
+    <!-- ── Add Entry Form ── -->
+    <div class="xl:col-span-1">
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h2 class="font-semibold text-gray-800 mb-5">Add Schedule Entry</h2>
+
+        <form id="schedule-form" class="space-y-4" novalidate>
+
+          <!-- Staff Name -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">Staff Name <span class="text-red-400">*</span></label>
+            <input
+              id="f-staff"
+              list="staff-list"
+              type="text"
+              placeholder="Select or type name…"
+              autocomplete="off"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                     focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+            />
+            <!-- Staff name datalist — add your staff names here -->
+            <datalist id="staff-list">
+              <option value="Thanh Tu"></option>
+              <option value="Duyen Ha"></option>
+              <option value="Thu Huyen"></option>
+              <option value="Kim An"></option>
+              <option value="Khue Anh"></option>
+              <option value="Huy Tran"></option>
+            </datalist>
+            <p class="text-xs text-gray-400 mt-1">Staff names can be configured in the source code.</p>
+          </div>
+
+          <!-- Date -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">Date <span class="text-red-400">*</span></label>
+            <input
+              id="f-date"
+              type="date"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                     focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+            />
+          </div>
+
+          <!-- Start / End Time -->
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Start Time <span class="text-red-400">*</span></label>
+              <input
+                id="f-start"
+                type="time"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                       focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">End Time <span class="text-red-400">*</span></label>
+              <input
+                id="f-end"
+                type="time"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                       focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          <!-- Auto-calculated duration -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">Duration</label>
+            <div id="duration-display"
+                 class="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-500">
+              — (auto-calculated)
+            </div>
+          </div>
+
+          <!-- Notes -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">Notes</label>
+            <input
+              id="f-notes"
+              type="text"
+              placeholder="Optional…"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                     focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+            />
+          </div>
+
+          <!-- Form error -->
+          <div id="form-error" class="hidden text-sm text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2"></div>
+
+          <button
+            type="submit"
+            class="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold
+                   py-2.5 rounded-lg text-sm transition active:scale-[0.98]"
+          >
+            Add to Schedule
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- ── Schedule Table ── -->
+    <div class="xl:col-span-2">
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+          <h2 class="font-semibold text-gray-800">All Schedule Entries</h2>
+
+          <!-- Month / Year filter -->
+          <div class="flex items-center gap-2">
+            <select id="filter-month"
+                    class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm
+                           focus:outline-none focus:ring-2 focus:ring-orange-400">
+              <option value="">All Months</option>
+              <option value="01">January</option><option value="02">February</option>
+              <option value="03">March</option><option value="04">April</option>
+              <option value="05">May</option><option value="06">June</option>
+              <option value="07">July</option><option value="08">August</option>
+              <option value="09">September</option><option value="10">October</option>
+              <option value="11">November</option><option value="12">December</option>
+            </select>
+            <select id="filter-year"
+                    class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm
+                           focus:outline-none focus:ring-2 focus:ring-orange-400">
+              <option value="">All Years</option>
+            </select>
+            <button onclick="applyFilter()"
+                    class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition">
+              Filter
+            </button>
+            <button onclick="clearFilter()"
+                    class="px-3 py-1.5 text-gray-400 hover:text-gray-600 rounded-lg text-sm transition">
+              Clear
+            </button>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table id="schedule-table" class="w-full" style="width:100%">
+            <thead>
+              <tr>
+                <th>Staff Name</th>
+                <th>Date</th>
+                <th>Start</th>
+                <th>End</th>
+                <th>Duration</th>
+                <th>Notes</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script is:inline>
+    var scheduleTable;
+    var scheduleData = [];
+
+    $(document).ready(function () {
+      // Set default date to today
+      document.getElementById('f-date').value = new Date().toISOString().slice(0, 10);
+
+      // Populate year filter
+      var yr = new Date().getFullYear();
+      var ysel = document.getElementById('filter-year');
+      for (var y = yr - 1; y <= yr + 2; y++) {
+        var opt = document.createElement('option');
+        opt.value = y;
+        opt.textContent = y;
+        if (y === yr) opt.selected = true;
+        ysel.appendChild(opt);
+      }
+
+      loadSchedule();
+      initTable();
+
+      // Duration auto-calc
+      $('#f-start, #f-end').on('change', calcDuration);
+    });
+
+    function calcDuration() {
+      var s = document.getElementById('f-start').value;
+      var e = document.getElementById('f-end').value;
+      var el = document.getElementById('duration-display');
+      if (s && e) {
+        var sm = timeToMin(s), em = timeToMin(e);
+        var diff = em - sm;
+        if (diff <= 0) diff += 1440;
+        var h = Math.floor(diff / 60), m = diff % 60;
+        el.textContent = h + 'h ' + (m ? m + 'm' : '');
+        el.classList.remove('text-gray-500');
+        el.classList.add('text-gray-800', 'font-medium');
+      } else {
+        el.textContent = '— (auto-calculated)';
+        el.classList.add('text-gray-500');
+        el.classList.remove('text-gray-800', 'font-medium');
+      }
+    }
+
+    function timeToMin(t) {
+      var p = t.split(':');
+      return parseInt(p[0]) * 60 + parseInt(p[1]);
+    }
+
+    function loadSchedule() {
+      scheduleData = JSON.parse(localStorage.getItem('bbo_schedule') || '[]');
+    }
+
+    function saveSchedule() {
+      localStorage.setItem('bbo_schedule', JSON.stringify(scheduleData));
+    }
+
+    function initTable() {
+      scheduleTable = $('#schedule-table').DataTable({
+        data: buildRows(scheduleData),
+        columns: [
+          { title: 'Staff Name' },
+          { title: 'Date' },
+          { title: 'Start' },
+          { title: 'End' },
+          { title: 'Duration' },
+          { title: 'Notes' },
+          { title: 'Actions', orderable: false, searchable: false }
+        ],
+        dom: "<'flex flex-wrap items-center justify-between gap-3 mb-3'<'flex gap-2'B><'flex-1 text-right'f>>" +
+             "t" +
+             "<'flex flex-wrap items-center justify-between mt-3'<'text-sm text-gray-500'i><'flex gap-1'p>>",
+        buttons: [
+          {
+            extend: 'csvHtml5',
+            text: '⬇ Export CSV',
+            title: 'Staff Schedule',
+            className: 'dt-btn-custom'
+          }
+        ],
+        order: [[1, 'desc'], [2, 'asc']],
+        pageLength: 15,
+        language: { emptyTable: 'No schedule entries yet. Add one using the form.' }
+      });
+    }
+
+    function buildRows(data) {
+      return data.map(function (s) {
+        var sm = timeToMin(s.startTime), em = timeToMin(s.endTime);
+        var diff = em - sm; if (diff <= 0) diff += 1440;
+        var h = Math.floor(diff / 60), m = diff % 60;
+        var dur = h + 'h' + (m ? ' ' + m + 'm' : '');
+        return [
+          escHtml(s.staffName),
+          s.date,
+          s.startTime,
+          s.endTime,
+          dur,
+          escHtml(s.notes || ''),
+          '<button onclick="deleteEntry(\'' + s.id + '\')" ' +
+            'class="inline-flex items-center gap-1 text-xs text-red-500 hover:text-red-700 ' +
+            'hover:bg-red-50 px-2 py-1 rounded transition">' +
+            '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" ' +
+            'd="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>' +
+            '</svg>Delete</button>'
+        ];
+      });
+    }
+
+    function refreshTable(data) {
+      scheduleTable.clear();
+      scheduleTable.rows.add(buildRows(data));
+      scheduleTable.draw();
+    }
+
+    // Form submit
+    document.getElementById('schedule-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var errEl = document.getElementById('form-error');
+      errEl.classList.add('hidden');
+
+      var staff = document.getElementById('f-staff').value.trim();
+      var date  = document.getElementById('f-date').value;
+      var start = document.getElementById('f-start').value;
+      var end   = document.getElementById('f-end').value;
+      var notes = document.getElementById('f-notes').value.trim();
+
+      if (!staff || !date || !start || !end) {
+        errEl.textContent = 'Please fill in all required fields.';
+        errEl.classList.remove('hidden');
+        return;
+      }
+
+      var entry = {
+        id: 'sched-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+        staffName: staff,
+        date: date,
+        startTime: start,
+        endTime: end,
+        notes: notes,
+        createdAt: new Date().toISOString()
+      };
+
+      loadSchedule();
+      scheduleData.push(entry);
+      saveSchedule();
+      refreshTable(scheduleData);
+
+      // Reset form (keep date)
+      document.getElementById('f-staff').value = '';
+      document.getElementById('f-start').value = '';
+      document.getElementById('f-end').value = '';
+      document.getElementById('f-notes').value = '';
+      document.getElementById('duration-display').textContent = '— (auto-calculated)';
+      document.getElementById('duration-display').className =
+        'w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-500';
+
+      showToast('Schedule entry added!');
+    });
+
+    function deleteEntry(id) {
+      if (!confirm('Delete this schedule entry?')) return;
+      loadSchedule();
+      scheduleData = scheduleData.filter(function (s) { return s.id !== id; });
+      saveSchedule();
+      refreshTable(scheduleData);
+      showToast('Entry deleted.', 'warning');
+    }
+
+    function applyFilter() {
+      var m = document.getElementById('filter-month').value;
+      var y = document.getElementById('filter-year').value;
+      loadSchedule();
+      var filtered = scheduleData.filter(function (s) {
+        var parts = s.date.split('-'); // YYYY-MM-DD
+        var matches = true;
+        if (y) matches = matches && parts[0] === y;
+        if (m) matches = matches && parts[1] === m;
+        return matches;
+      });
+      refreshTable(filtered);
+    }
+
+    function clearFilter() {
+      document.getElementById('filter-month').value = '';
+      document.getElementById('filter-year').value = '';
+      loadSchedule();
+      refreshTable(scheduleData);
+    }
+
+    function escHtml(str) {
+      return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // Toast notification
+    function showToast(msg, type) {
+      var t = document.createElement('div');
+      t.textContent = msg;
+      t.className = 'fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-lg text-sm font-medium shadow-lg ' +
+        (type === 'warning' ? 'bg-yellow-500 text-white' : 'bg-green-500 text-white');
+      document.body.appendChild(t);
+      setTimeout(function () { t.remove(); }, 2500);
+    }
+  </script>
+</MainLayout>

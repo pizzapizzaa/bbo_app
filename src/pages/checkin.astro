@@ -1,0 +1,417 @@
+---
+import MainLayout from '../layouts/MainLayout.astro';
+---
+
+<MainLayout title="Daily Check-in" activePage="checkin">
+
+  <!-- Date selector + daily stats -->
+  <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+    <div class="flex items-center gap-3">
+      <label class="text-sm font-medium text-gray-600">Viewing date:</label>
+      <input
+        id="view-date"
+        type="date"
+        class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm
+               focus:outline-none focus:ring-2 focus:ring-orange-400"
+      />
+      <button onclick="refreshForDate()"
+              class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700
+                     rounded-lg text-sm font-medium transition">
+        Go
+      </button>
+    </div>
+
+    <!-- Daily stats -->
+    <div class="flex items-center gap-4">
+      <div class="text-center">
+        <p class="text-xs text-gray-500 uppercase tracking-wide">Check-ins</p>
+        <p id="stat-count" class="text-2xl font-bold text-gray-900">0</p>
+      </div>
+      <div class="w-px h-10 bg-gray-200"></div>
+      <div class="text-center">
+        <p class="text-xs text-gray-500 uppercase tracking-wide">Revenue</p>
+        <p id="stat-rev" class="text-2xl font-bold text-orange-500">0 ₫</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+
+    <!-- ── Check-in Form ── -->
+    <div class="xl:col-span-1">
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h2 class="font-semibold text-gray-800 mb-5">New Check-in</h2>
+
+        <form id="checkin-form" class="space-y-4" novalidate>
+
+          <!-- Customer search -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">
+              Customer <span class="text-red-400">*</span>
+            </label>
+            <input
+              id="f-customer"
+              list="customer-datalist"
+              type="text"
+              placeholder="Type to search customer…"
+              autocomplete="off"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                     focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+            />
+            <datalist id="customer-datalist"></datalist>
+            <p id="customer-hint" class="text-xs text-gray-400 mt-1">
+              Load customers on the <a href="/customers" class="text-orange-500 hover:underline">Customers</a> page first.
+            </p>
+          </div>
+
+          <!-- Payment method -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">
+              Payment Method <span class="text-red-400">*</span>
+            </label>
+            <select
+              id="f-payment"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                     focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+            >
+              <option value="">— Select —</option>
+              <option value="Cash">Cash</option>
+              <option value="Card">Card</option>
+              <option value="Digital Wallet">Digital Wallet</option>
+              <option value="Complimentary">Complimentary</option>
+            </select>
+          </div>
+
+          <!-- Amount -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">Amount (VND)</label>
+            <input
+              id="f-amount"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="0.00"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                     focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+            />
+          </div>
+
+          <!-- Notes -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">Notes</label>
+            <input
+              id="f-notes"
+              type="text"
+              placeholder="Optional…"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                     focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+            />
+          </div>
+
+          <!-- Check-in timestamp preview -->
+          <div class="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2">
+            Timestamp: <span id="ts-preview" class="font-medium text-gray-600"></span>
+          </div>
+
+          <!-- Error -->
+          <div id="form-error" class="hidden text-sm text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2"></div>
+
+          <button
+            type="submit"
+            class="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold
+                   py-3 rounded-lg text-sm transition active:scale-[0.98] flex items-center justify-center gap-2"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            Record Check-in
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- ── Check-ins Table ── -->
+    <div class="xl:col-span-2">
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center justify-between mb-5">
+          <h2 class="font-semibold text-gray-800">
+            Check-ins for <span id="table-date-label" class="text-orange-500"></span>
+          </h2>
+          <button onclick="exportCheckins()"
+                  class="inline-flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-800
+                         bg-gray-50 hover:bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-lg transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+            </svg>
+            Export CSV
+          </button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table id="checkin-table" class="w-full" style="width:100%">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Customer</th>
+                <th>Payment</th>
+                <th>Amount (VND)</th>
+                <th>Notes</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script is:inline>
+    var checkinTable;
+    var allCheckins   = [];
+    var activeDate    = '';
+
+    $(document).ready(function () {
+      // Default to today
+      var today = new Date().toISOString().slice(0, 10);
+      document.getElementById('view-date').value     = today;
+      document.getElementById('table-date-label').textContent = formatDateLabel(today);
+      activeDate = today;
+
+      // Live timestamp
+      updateTsPreview();
+      setInterval(updateTsPreview, 10000);
+
+      // Populate customer datalist
+      buildCustomerDatalist();
+
+      // Load and render
+      loadCheckins();
+      initTable();
+      buildTableRows(activeDate);
+      updateStats(activeDate);
+    });
+
+    function updateTsPreview() {
+      var el = document.getElementById('ts-preview');
+      if (el) el.textContent = new Date().toLocaleString('en-MY', {
+        year: 'numeric', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+    }
+
+    function buildCustomerDatalist() {
+      var customers = JSON.parse(localStorage.getItem('bbo_customers') || '[]');
+      var headers   = JSON.parse(localStorage.getItem('bbo_customer_headers') || '[]');
+      var list      = document.getElementById('customer-datalist');
+      list.innerHTML = '';
+
+      // Determine the "name" column: prefer 'Name' or first column
+      // Match any header that contains "name" (covers "Full Name", "Name", etc.)
+      var nameCol = headers.find(function (h) {
+        return /name/i.test(h.trim());
+      }) || headers[0] || null;
+
+      if (customers.length && nameCol) {
+        document.getElementById('customer-hint').classList.add('hidden');
+        customers.forEach(function (c) {
+          var opt = document.createElement('option');
+          opt.value = c[nameCol] || '';
+          list.appendChild(opt);
+        });
+      }
+    }
+
+    function loadCheckins() {
+      allCheckins = JSON.parse(localStorage.getItem('bbo_checkins') || '[]');
+    }
+
+    function saveCheckins() {
+      localStorage.setItem('bbo_checkins', JSON.stringify(allCheckins));
+    }
+
+    function initTable() {
+      checkinTable = $('#checkin-table').DataTable({
+        data: [],
+        columns: [
+          { title: 'Time' },
+          { title: 'Customer' },
+          { title: 'Payment' },
+          { title: 'Amount (VND)' },
+          { title: 'Notes' },
+          { title: 'Actions', orderable: false, searchable: false }
+        ],
+        dom: "<'flex flex-wrap items-center justify-between gap-3 mb-3'<'text-sm text-gray-500'i><'flex-1 text-right'f>>" +
+             "t" +
+             "<'flex flex-wrap items-center justify-between mt-3'<''><'flex gap-1'p>>",
+        order: [[0, 'desc']],
+        pageLength: 20,
+        language: { emptyTable: 'No check-ins for this date.' }
+      });
+    }
+
+    function buildTableRows(date) {
+      loadCheckins();
+      var rows = allCheckins
+        .filter(function (c) { return c.date === date; })
+        .map(function (c) {
+          return [
+            c.time,
+            escHtml(c.customerName),
+            '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ' +
+              payBadge(c.paymentMethod) + '">' + escHtml(c.paymentMethod) + '</span>',
+            c.amount ? Math.round(parseFloat(c.amount)).toLocaleString('vi-VN') + ' ₫' : '—',
+            escHtml(c.notes || ''),
+            '<button onclick="deleteCheckin(\'' + c.id + '\')" ' +
+              'class="inline-flex items-center gap-1 text-xs text-red-500 hover:text-red-700 ' +
+              'hover:bg-red-50 px-2 py-1 rounded transition">' +
+              '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+              '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" ' +
+              'd="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>' +
+              '</svg>Delete</button>'
+          ];
+        });
+
+      checkinTable.clear();
+      checkinTable.rows.add(rows);
+      checkinTable.draw();
+    }
+
+    function updateStats(date) {
+      loadCheckins();
+      var todayCI = allCheckins.filter(function (c) { return c.date === date; });
+      document.getElementById('stat-count').textContent = todayCI.length;
+      var rev = todayCI.reduce(function (s, c) { return s + (parseFloat(c.amount) || 0); }, 0);
+      document.getElementById('stat-rev').textContent = Math.round(rev).toLocaleString('vi-VN') + ' ₫';
+    }
+
+    function refreshForDate() {
+      activeDate = document.getElementById('view-date').value;
+      if (!activeDate) return;
+      document.getElementById('table-date-label').textContent = formatDateLabel(activeDate);
+      buildTableRows(activeDate);
+      updateStats(activeDate);
+    }
+
+    // ── Form submit ──
+    document.getElementById('checkin-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var errEl   = document.getElementById('form-error');
+      errEl.classList.add('hidden');
+
+      var customerName = document.getElementById('f-customer').value.trim();
+      var payment      = document.getElementById('f-payment').value;
+      var amount       = document.getElementById('f-amount').value;
+      var notes        = document.getElementById('f-notes').value.trim();
+
+      if (!customerName) {
+        errEl.textContent = 'Please enter a customer name.';
+        errEl.classList.remove('hidden');
+        return;
+      }
+      if (!payment) {
+        errEl.textContent = 'Please select a payment method.';
+        errEl.classList.remove('hidden');
+        return;
+      }
+
+      var now = new Date();
+      var dateStr  = now.toISOString().slice(0, 10);
+      var timeStr  = now.toTimeString().slice(0, 8);
+
+      var record = {
+        id:           'ci-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+        customerName: customerName,
+        date:         dateStr,
+        time:         timeStr,
+        timestamp:    now.toISOString(),
+        paymentMethod: payment,
+        amount:       amount ? parseFloat(amount) : 0,
+        notes:        notes
+      };
+
+      loadCheckins();
+      allCheckins.push(record);
+      saveCheckins();
+
+      // If currently viewing today, refresh table
+      if (activeDate === dateStr) {
+        buildTableRows(activeDate);
+        updateStats(activeDate);
+      }
+
+      // Reset form
+      document.getElementById('f-customer').value = '';
+      document.getElementById('f-payment').value  = '';
+      document.getElementById('f-amount').value   = '';
+      document.getElementById('f-notes').value    = '';
+
+      showToast('✓ Check-in recorded for ' + customerName + '!');
+      document.getElementById('f-customer').focus();
+    });
+
+    function deleteCheckin(id) {
+      if (!confirm('Delete this check-in record?')) return;
+      loadCheckins();
+      allCheckins = allCheckins.filter(function (c) { return c.id !== id; });
+      saveCheckins();
+      buildTableRows(activeDate);
+      updateStats(activeDate);
+      showToast('Check-in deleted.', 'warning');
+    }
+
+    function exportCheckins() {
+      loadCheckins();
+      var rows = allCheckins.filter(function (c) { return c.date === activeDate; });
+      if (!rows.length) { showToast('No check-ins to export for this date.', 'warning'); return; }
+
+      var headers = ['Date', 'Time', 'Customer Name', 'Payment Method', 'Amount', 'Notes'];
+      var csvContent = [headers].concat(rows.map(function (c) {
+        return [c.date, c.time, c.customerName, c.paymentMethod, Math.round(c.amount || 0), c.notes || ''];
+      })).map(function (row) {
+        return row.map(function (v) {
+          return '"' + String(v).replace(/"/g, '""') + '"';
+        }).join(',');
+      }).join('\n');
+
+      var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      var url  = URL.createObjectURL(blob);
+      var a    = document.createElement('a');
+      a.href   = url;
+      a.download = 'checkins-' + activeDate + '.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // ── Helpers ──
+    function formatDateLabel(dateStr) {
+      var d = new Date(dateStr + 'T00:00:00');
+      return d.toLocaleDateString('en-MY', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+    }
+
+    function payBadge(pm) {
+      var m = {
+        'Cash':           'bg-green-100 text-green-700',
+        'Card':           'bg-blue-100 text-blue-700',
+        'Digital Wallet': 'bg-indigo-100 text-indigo-700',
+        'Complimentary':  'bg-gray-100 text-gray-600'
+      };
+      return m[pm] || 'bg-orange-100 text-orange-700';
+    }
+
+    function escHtml(str) {
+      return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function showToast(msg, type) {
+      var t = document.createElement('div');
+      t.textContent = msg;
+      t.className = 'fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-lg text-sm font-medium shadow-lg ' +
+        (type === 'warning' ? 'bg-yellow-500 text-white' : 'bg-green-500 text-white');
+      document.body.appendChild(t);
+      setTimeout(function () { t.remove(); }, 2500);
+    }
+  </script>
+</MainLayout>

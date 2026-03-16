@@ -1,0 +1,18 @@
+# Private data — never commit to git
+priv_data/
+
+# Astro build output
+dist/
+.astro/
+
+# Node
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env files
+.env
+.env.*
+!.env.example

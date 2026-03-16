@@ -1,0 +1,249 @@
+---
+// Login page — standalone, no shared layout
+import { createHash } from 'crypto';
+
+// Credentials come from .env (gitignored — never committed).
+// The password is hashed here at build time; only the SHA-256 digest
+// is embedded in the HTML. The plaintext never appears in built output.
+const ADMIN_USER  = import.meta.env.ADMIN_USERNAME ?? '';
+const ADMIN_PHASH = createHash('sha256')
+  .update(import.meta.env.ADMIN_PASSWORD ?? '')
+  .digest('hex');
+---
+
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login — BBO Gym POS</title>
+  <link rel="icon" href="/assets/favicon.ico" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- If already logged in, go straight to dashboard -->
+  <script is:inline>
+    if (sessionStorage.getItem('bbo_auth')) {
+      window.location.replace('/dashboard');
+    }
+  </script>
+</head>
+
+<body class="h-full bg-gray-900 font-sans flex items-center justify-center p-4"
+      style="font-family:'Inter',system-ui,sans-serif">
+
+  <!-- Background decoration -->
+  <div class="absolute inset-0 overflow-hidden pointer-events-none">
+    <div class="absolute -top-40 -right-32 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl"></div>
+    <div class="absolute -bottom-40 -left-32 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl"></div>
+  </div>
+
+  <!-- Login card -->
+  <div class="relative w-full max-w-md bg-gray-800 rounded-2xl shadow-2xl shadow-black/40 p-8 border border-gray-700/60">
+
+    <!-- Logo / branding -->
+    <div class="flex flex-col items-center mb-8">
+      <img
+        src="/assets/bobo_logo_rectangle.png"
+        alt="BBO Gym"
+        class="h-20 w-auto object-contain mb-4"
+        onerror="this.style.display='none'; document.getElementById('logo-fallback').style.display='block'"
+      />
+      <span id="logo-fallback" class="text-orange-500 text-4xl font-black mb-4" style="display:none">BB</span>
+      <p class="text-gray-400 text-sm mt-1">Point of Sales System</p>
+      <p class="text-gray-500 text-xs mt-1">Support Hotline: 096916216</p>
+    </div>
+
+    <!-- Auth config: username + SHA-256 password hash embedded at build time.
+         Browser hashes the entered password and compares — plaintext never
+         appears in page source or network traffic. -->
+    <div id="auth-cfg" hidden
+         data-user={ADMIN_USER}
+         data-phash={ADMIN_PHASH}></div>
+
+    <!-- Error message (text set dynamically by JS) -->
+    <div id="login-error"
+         class="hidden mb-4 px-4 py-3 bg-red-500/10 border border-red-500/30 rounded-lg
+                text-red-400 text-sm text-center"></div>
+
+    <!-- Form -->
+    <form id="login-form" class="space-y-5" autocomplete="on">
+      <div>
+        <label for="username" class="block text-sm font-medium text-gray-300 mb-1.5">
+          Username
+        </label>
+        <input
+          id="username"
+          name="username"
+          type="text"
+          required
+          autocomplete="username"
+          placeholder="admin"
+          class="w-full bg-gray-700/60 border border-gray-600 rounded-xl px-4 py-2.5
+                 text-white placeholder-gray-500 text-sm
+                 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent
+                 transition"
+        />
+      </div>
+
+      <div>
+        <label for="password" class="block text-sm font-medium text-gray-300 mb-1.5">
+          Password
+        </label>
+        <div class="relative">
+          <input
+            id="password"
+            name="password"
+            type="password"
+            required
+            autocomplete="current-password"
+            placeholder="••••••••"
+            class="w-full bg-gray-700/60 border border-gray-600 rounded-xl px-4 py-2.5
+                   text-white placeholder-gray-500 text-sm pr-11
+                   focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent
+                   transition"
+          />
+          <!-- Toggle password visibility -->
+          <button type="button" id="pwd-toggle"
+                  class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200">
+            <svg id="pwd-eye" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7
+                   -1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <button
+        type="submit"
+        id="submit-btn"
+        class="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold
+               py-2.5 rounded-xl text-sm transition active:scale-[0.98]"
+      >
+        Sign In
+      </button>
+    </form>
+
+    <p class="mt-6 text-center text-xs text-gray-500">
+      BBO Gym &mdash; Authorized Personnel Only
+    </p>
+  </div>
+
+  <script is:inline>
+    // ── Rate-limit config ──
+    var MAX_ATTEMPTS = 5;
+    var LOCKOUT_MS   = 30 * 1000; // 30 seconds
+    var lockoutTimer = null;
+
+    function getRemainingLockout() {
+      return Math.max(0, parseInt(sessionStorage.getItem('bbo_lock_until') || '0', 10) - Date.now());
+    }
+
+    function startLockoutCountdown() {
+      var btn = document.getElementById('submit-btn');
+      if (lockoutTimer) clearInterval(lockoutTimer);
+      lockoutTimer = setInterval(function () {
+        var rem = Math.ceil(getRemainingLockout() / 1000);
+        if (rem <= 0) {
+          clearInterval(lockoutTimer); lockoutTimer = null;
+          btn.disabled = false;
+          btn.textContent = 'Sign In';
+          document.getElementById('login-error').classList.add('hidden');
+        } else {
+          btn.disabled = true;
+          btn.textContent = 'Try again in ' + rem + 's…';
+        }
+      }, 500);
+    }
+
+    // Check lockout immediately (script runs after DOM is ready)
+    (function () {
+      if (getRemainingLockout() > 0) {
+        var errEl = document.getElementById('login-error');
+        errEl.textContent = 'Too many failed attempts. Please wait.';
+        errEl.classList.remove('hidden');
+        startLockoutCountdown();
+      }
+    })();
+
+    // ── Password visibility toggle ──
+    document.getElementById('pwd-toggle').addEventListener('click', function () {
+      var pwd = document.getElementById('password');
+      var eye = document.getElementById('pwd-eye');
+      if (pwd.type === 'password') {
+        pwd.type = 'text';
+        eye.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>';
+      } else {
+        pwd.type = 'password';
+        eye.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>';
+      }
+    });
+
+    // ── Login submit — async so we can use crypto.subtle ──
+    document.getElementById('login-form').addEventListener('submit', async function (e) {
+      e.preventDefault();
+
+      if (getRemainingLockout() > 0) return; // still locked out
+
+      var username = document.getElementById('username').value.trim();
+      var password = document.getElementById('password').value;
+      var errEl    = document.getElementById('login-error');
+      var btn      = document.getElementById('submit-btn');
+
+      btn.disabled = true;
+      btn.textContent = 'Signing in…';
+
+      // Hash the entered password with SHA-256 in the browser,
+      // then compare against the hash embedded at build time.
+      var hashHex;
+      try {
+        var hashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password));
+        hashHex = Array.from(new Uint8Array(hashBuf))
+          .map(function (b) { return b.toString(16).padStart(2, '0'); })
+          .join('');
+      } catch (err) {
+        errEl.textContent = 'Browser crypto unavailable. Please use HTTPS or localhost.';
+        errEl.classList.remove('hidden');
+        btn.disabled = false;
+        btn.textContent = 'Sign In';
+        return;
+      }
+
+      var cfg       = document.getElementById('auth-cfg');
+      var validUser = cfg.getAttribute('data-user');
+      var validHash = cfg.getAttribute('data-phash');
+
+      if (username === validUser && hashHex === validHash) {
+        sessionStorage.removeItem('bbo_attempts');
+        sessionStorage.removeItem('bbo_lock_until');
+        sessionStorage.setItem('bbo_auth', 'true');
+        sessionStorage.setItem('bbo_admin', username);
+        window.location.replace('/dashboard');
+      } else {
+        document.getElementById('password').value = '';
+        document.getElementById('password').focus();
+
+        var attempts = parseInt(sessionStorage.getItem('bbo_attempts') || '0', 10) + 1;
+        if (attempts >= MAX_ATTEMPTS) {
+          sessionStorage.setItem('bbo_lock_until', String(Date.now() + LOCKOUT_MS));
+          sessionStorage.setItem('bbo_attempts', '0');
+          errEl.textContent = 'Too many failed attempts. Please wait 30 seconds.';
+          errEl.classList.remove('hidden');
+          startLockoutCountdown();
+        } else {
+          sessionStorage.setItem('bbo_attempts', String(attempts));
+          var left = MAX_ATTEMPTS - attempts;
+          errEl.textContent = 'Invalid username or password.'
+            + (left <= 2 ? ' (' + left + ' attempt' + (left === 1 ? '' : 's') + ' remaining)' : '');
+          errEl.classList.remove('hidden');
+          btn.disabled = false;
+          btn.textContent = 'Sign In';
+        }
+      }
+    });
+  </script>
+</body>
+</html>
