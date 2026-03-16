@@ -278,6 +278,8 @@ import MainLayout from '../layouts/MainLayout.astro';
     }
 
     function processCSV(text, filename) {
+      // Strip UTF-8 BOM (Excel/Google Sheets often adds \uFEFF at the start)
+      text = text.replace(/^\uFEFF/, '');
       var rows = parseCSV(text);
       if (rows.length < 2) {
         showStatus('The CSV file appears to be empty or has only headers.', 'error');
@@ -305,7 +307,12 @@ import MainLayout from '../layouts/MainLayout.astro';
         method: 'POST',
         body: JSON.stringify({ rows: csvRows })
       })
-        .then(function (res) { return res.json(); })
+        .then(function (res) {
+          return res.text().then(function (t) {
+            try { return JSON.parse(t); }
+            catch (e) { return { error: 'Server error (HTTP ' + res.status + '): ' + t.slice(0, 120) }; }
+          });
+        })
         .then(function (data) {
           if (btn) btn.disabled = false;
           if (data.error) { showStatus(data.error, 'error'); return; }
