@@ -79,7 +79,24 @@ import MainLayout from '../layouts/MainLayout.astro';
               <option value="Card">Card</option>
               <option value="Digital Wallet">Digital Wallet</option>
               <option value="Complimentary">Complimentary</option>
+              <option value="Punch Card">Punch Card</option>
+              <option value="Valid Membership">Valid Membership</option>
             </select>
+          </div>
+
+          <!-- Use punch from (shown only when Punch Card is selected) -->
+          <div id="punch-from-row" class="hidden">
+            <label class="block text-sm font-medium text-gray-300 mb-1.5">
+              Use punch from <span class="text-red-400">*</span>
+            </label>
+            <select
+              id="f-punch-from"
+              class="w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm
+                     focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+            >
+              <option value="">— Select punch card holder —</option>
+            </select>
+            <p id="punch-from-hint" class="hidden text-xs text-yellow-400 mt-1">No punch card holders with remaining punches found.</p>
           </div>
 
           <!-- Amount -->
@@ -157,6 +174,7 @@ import MainLayout from '../layouts/MainLayout.astro';
                 <th>Customer</th>
                 <th>Payment</th>
                 <th>Amount (VND)</th>
+                <th>Punch From</th>
                 <th>Notes</th>
                 <th>Actions</th>
               </tr>
@@ -172,6 +190,7 @@ import MainLayout from '../layouts/MainLayout.astro';
     var checkinTable;
     var allCheckins = [];
     var activeDate  = '';
+    var allCustomers = [];  // cache with punch card info
 
     // ── API helper ──
     function apiFetch(url, options) {
@@ -208,6 +227,7 @@ import MainLayout from '../layouts/MainLayout.astro';
         .then(function (res) { return res.json(); })
         .then(function (data) {
           var rows = data.rows || [];
+          allCustomers = rows;
           var list = document.getElementById('customer-datalist');
           list.innerHTML = '';
           if (rows.length) {
@@ -218,8 +238,27 @@ import MainLayout from '../layouts/MainLayout.astro';
               list.appendChild(opt);
             });
           }
+          buildPunchCardDropdown(rows);
         })
         .catch(function () { /* datalist is optional — ignore errors */ });
+    }
+
+    function buildPunchCardDropdown(customers) {
+      var select = document.getElementById('f-punch-from');
+      var hint   = document.getElementById('punch-from-hint');
+      // Keep placeholder, rebuild the rest
+      select.innerHTML = '<option value="">— Select punch card holder —</option>';
+      var holders = (customers || allCustomers).filter(function (c) {
+        return c._is_punch_card_holder && c._punches_remaining > 0;
+      });
+      holders.forEach(function (c) {
+        var opt = document.createElement('option');
+        opt.value            = c._id;
+        opt.dataset.holderName = c['Full Name'] || '';
+        opt.textContent      = (c['Full Name'] || '') + ' (' + c._punches_remaining + ' punch' + (c._punches_remaining !== 1 ? 'es' : '') + ' left)';
+        select.appendChild(opt);
+      });
+      hint.classList.toggle('hidden', holders.length > 0);
     }
 
     function loadCheckinsForDate(date) {
@@ -241,6 +280,7 @@ import MainLayout from '../layouts/MainLayout.astro';
           { title: 'Customer' },
           { title: 'Payment' },
           { title: 'Amount (VND)' },
+          { title: 'Punch From' },
           { title: 'Notes' },
           { title: 'Actions', orderable: false, searchable: false }
         ],
@@ -261,6 +301,9 @@ import MainLayout from '../layouts/MainLayout.astro';
           '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ' +
             payBadge(c.payment_method) + '">' + escHtml(c.payment_method) + '</span>',
           c.amount ? Math.round(parseFloat(c.amount)).toLocaleString('vi-VN') + ' ₫' : '—',
+          c.punch_card_holder_name
+            ? '<span class="text-xs text-purple-600 font-medium">' + escHtml(c.punch_card_holder_name) + '</span>'
+            : '<span class="text-gray-300">—</span>',
           escHtml(c.notes || ''),
           '<button onclick="deleteCheckin(\'' + c.id + '\')" ' +
             'class="inline-flex items-center gap-1 text-xs text-red-500 hover:text-red-700 ' +
@@ -292,16 +335,57 @@ import MainLayout from '../layouts/MainLayout.astro';
       loadCheckinsForDate(activeDate);
     }
 
+    // ── Punch card: show/hide punch-from section on payment change ──
+    document.getElementById('f-payment').addEventListener('change', function () {
+      var isPunch = this.value === 'Punch Card';
+      document.getElementById('punch-from-row').classList.toggle('hidden', !isPunch);
+      if (!isPunch) document.getElementById('f-punch-from').value = '';
+    });
+
+    // ── Punch card: auto-select customer in punch dropdown when customer changes ──
+    document.getElementById('f-customer').addEventListener('input', function () {
+      clearTimeout(window._custDebounce);
+      var name = this.value.trim();
+      window._custDebounce = setTimeout(function () {
+        var customer = allCustomers.find(function (c) { return c['Full Name'] === name; });
+        if (!customer) return;
+        var today = new Date().toISOString().slice(0, 10);
+        // Membership takes priority
+        if (customer._membership_type && customer._membership_end_date && customer._membership_end_date >= today) {
+          document.getElementById('f-payment').value = 'Valid Membership';
+          document.getElementById('punch-from-row').classList.add('hidden');
+          document.getElementById('f-punch-from').value = '';
+        } else if (customer._is_punch_card_holder && customer._punches_remaining > 0) {
+          // Auto-switch to Punch Card and pre-select this customer
+          document.getElementById('f-payment').value = 'Punch Card';
+          document.getElementById('punch-from-row').classList.remove('hidden');
+          document.getElementById('f-punch-from').value = customer._id;
+        }
+      }, 300);
+    });
+
     // ── Form submit ──
     document.getElementById('checkin-form').addEventListener('submit', function (e) {
       e.preventDefault();
       var errEl = document.getElementById('form-error');
       errEl.classList.add('hidden');
 
-      var customerName = document.getElementById('f-customer').value.trim();
-      var payment      = document.getElementById('f-payment').value;
-      var amount       = document.getElementById('f-amount').value;
-      var notes        = document.getElementById('f-notes').value.trim();
+      var customerName  = document.getElementById('f-customer').value.trim();
+      var payment        = document.getElementById('f-payment').value;
+      var amount         = document.getElementById('f-amount').value;
+      var notes          = document.getElementById('f-notes').value.trim();
+      var punchFromSel   = document.getElementById('f-punch-from');
+      var punchHolderId  = '';
+      var punchHolderName = '';
+      if (payment === 'Punch Card') {
+        punchHolderId = punchFromSel.value;
+        if (!punchHolderId) {
+          errEl.textContent = 'Please select a punch card holder.';
+          errEl.classList.remove('hidden'); return;
+        }
+        var selectedOpt = punchFromSel.options[punchFromSel.selectedIndex];
+        punchHolderName = (selectedOpt && selectedOpt.dataset.holderName) || selectedOpt.textContent.split(' (')[0];
+      }
 
       if (!customerName) {
         errEl.textContent = 'Please enter a customer name.';
@@ -322,12 +406,14 @@ import MainLayout from '../layouts/MainLayout.astro';
       apiFetch('/api/checkins', {
         method: 'POST',
         body: JSON.stringify({
-          customer_name:  customerName,
-          date:           dateStr,
-          time:           timeStr,
-          payment_method: payment,
-          amount:         amount ? parseFloat(amount) : 0,
-          notes:          notes
+          customer_name:        customerName,
+          date:                 dateStr,
+          time:                 timeStr,
+          payment_method:       payment,
+          amount:               amount ? parseFloat(amount) : 0,
+          notes:                notes,
+          punch_card_holder_id:   punchHolderId   || undefined,
+          punch_card_holder_name: punchHolderName || undefined,
         })
       })
         .then(function (res) { return res.json(); })
@@ -336,10 +422,14 @@ import MainLayout from '../layouts/MainLayout.astro';
           if (data.error) { errEl.textContent = data.error; errEl.classList.remove('hidden'); return; }
           // Reload table if viewing the same date
           if (activeDate === dateStr) loadCheckinsForDate(activeDate);
-          document.getElementById('f-customer').value = '';
-          document.getElementById('f-payment').value  = '';
-          document.getElementById('f-amount').value   = '';
-          document.getElementById('f-notes').value    = '';
+          // Refresh punch card dropdown counts if a punch was used
+          if (punchHolderId) buildCustomerDatalist();
+          document.getElementById('f-customer').value   = '';
+          document.getElementById('f-payment').value    = '';
+          document.getElementById('f-amount').value     = '';
+          document.getElementById('f-notes').value      = '';
+          document.getElementById('f-punch-from').value = '';
+          document.getElementById('punch-from-row').classList.add('hidden');
           showToast('✓ Check-in recorded for ' + customerName + '!');
           document.getElementById('f-customer').focus();
         })
@@ -364,9 +454,10 @@ import MainLayout from '../layouts/MainLayout.astro';
 
     function exportCheckins() {
       if (!allCheckins.length) { showToast('No check-ins to export for this date.', 'warning'); return; }
-      var headers = ['Date', 'Time', 'Customer Name', 'Payment Method', 'Amount', 'Notes'];
+      var headers = ['Date', 'Time', 'Customer Name', 'Payment Method', 'Amount', 'Punch From', 'Notes'];
       var csvContent = [headers].concat(allCheckins.map(function (c) {
-        return [c.date, (c.time || '').slice(0, 5), c.customer_name, c.payment_method, Math.round(c.amount || 0), c.notes || ''];
+        return [c.date, (c.time || '').slice(0, 5), c.customer_name, c.payment_method,
+                Math.round(c.amount || 0), c.punch_card_holder_name || '', c.notes || ''];
       })).map(function (row) {
         return row.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(',');
       }).join('\n');
@@ -386,7 +477,8 @@ import MainLayout from '../layouts/MainLayout.astro';
 
     function payBadge(pm) {
       return { 'Cash': 'bg-green-100 text-green-700', 'Card': 'bg-blue-100 text-blue-700',
-               'Digital Wallet': 'bg-indigo-100 text-indigo-700', 'Complimentary': 'bg-gray-100 text-gray-600' }[pm]
+               'Digital Wallet': 'bg-indigo-100 text-indigo-700', 'Complimentary': 'bg-gray-100 text-gray-600',
+               'Punch Card': 'bg-purple-100 text-purple-700', 'Valid Membership': 'bg-teal-100 text-teal-700' }[pm]
              || 'bg-orange-100 text-orange-700';
     }
 

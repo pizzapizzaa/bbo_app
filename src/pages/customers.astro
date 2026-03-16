@@ -118,6 +118,86 @@ import MainLayout from '../layouts/MainLayout.astro';
     </div>
   </div>
 
+  <!-- Edit Membership Modal -->
+  <div id="edit-membership-modal"
+       class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+       onclick="if(event.target===this)closeEditMembershipModal()">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h2 class="font-semibold text-gray-800 text-lg">Membership — <span id="edit-membership-name" class="text-orange-500"></span></h2>
+        <button onclick="closeEditMembershipModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+      </div>
+      <div class="px-6 py-5 space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Membership Type</label>
+          <select id="edit-membership-type"
+                  class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
+                         focus:outline-none focus:ring-2 focus:ring-orange-300"
+                  onchange="document.getElementById('edit-membership-start-row').classList.toggle('hidden', !this.value)">
+            <option value="">— No membership —</option>
+            <option value="1 Month">1 Month</option>
+            <option value="3 Months">3 Months</option>
+            <option value="6 Months">6 Months</option>
+            <option value="12 Months">12 Months</option>
+          </select>
+        </div>
+        <div id="edit-membership-start-row" class="hidden">
+          <label class="block text-xs font-medium text-gray-600 mb-1">Start Date</label>
+          <input id="edit-membership-start" type="date"
+                 class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
+                        focus:outline-none focus:ring-2 focus:ring-orange-300" />
+          <p class="text-xs text-gray-400 mt-1">End date is calculated automatically.</p>
+        </div>
+        <div id="edit-membership-error"
+             class="hidden text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2"></div>
+        <div class="flex justify-end gap-3 pt-1">
+          <button type="button" onclick="closeEditMembershipModal()"
+                  class="bg-white hover:bg-gray-50 border border-gray-300 text-gray-700
+                         font-medium text-sm px-4 py-2 rounded-lg transition">Cancel</button>
+          <button id="edit-membership-submit" onclick="submitEditMembership()"
+                  class="bg-orange-500 hover:bg-orange-600 text-white font-medium text-sm
+                         px-5 py-2 rounded-lg transition">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Punch Card Modal -->
+  <div id="edit-punch-modal"
+       class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+       onclick="if(event.target===this)closeEditPunchModal()">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h2 class="font-semibold text-gray-800 text-lg">Punch Card — <span id="edit-punch-name" class="text-orange-500"></span></h2>
+        <button onclick="closeEditPunchModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+      </div>
+      <div class="px-6 py-5 space-y-4">
+        <div class="flex items-center gap-3">
+          <input id="edit-punch-holder" type="checkbox"
+                 class="w-4 h-4 rounded accent-orange-500"
+                 onchange="document.getElementById('edit-punch-count-row').classList.toggle('hidden', !this.checked)" />
+          <label for="edit-punch-holder" class="text-sm font-medium text-gray-700">Is Punch Card Holder</label>
+        </div>
+        <div id="edit-punch-count-row" class="hidden">
+          <label class="block text-xs font-medium text-gray-600 mb-1">Punches Remaining</label>
+          <input id="edit-punch-count" type="number" min="0" step="1" value="0"
+                 class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
+                        focus:outline-none focus:ring-2 focus:ring-orange-300" />
+        </div>
+        <div id="edit-punch-error"
+             class="hidden text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2"></div>
+        <div class="flex justify-end gap-3 pt-1">
+          <button type="button" onclick="closeEditPunchModal()"
+                  class="bg-white hover:bg-gray-50 border border-gray-300 text-gray-700
+                         font-medium text-sm px-4 py-2 rounded-lg transition">Cancel</button>
+          <button id="edit-punch-submit" onclick="submitEditPunchCard()"
+                  class="bg-orange-500 hover:bg-orange-600 text-white font-medium text-sm
+                         px-5 py-2 rounded-lg transition">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Customer table -->
   <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 overflow-x-auto">
     <div id="table-wrapper" class="hidden">
@@ -141,6 +221,119 @@ import MainLayout from '../layouts/MainLayout.astro';
     var customerRows = [];
     var DEFAULT_HEADERS = ['Full Name', 'DOB', 'Email', 'Telephone no', 'Emergency contact', 'Note', 'Waiver form (old)'];
 
+    // ── Edit Membership Modal ──
+    var editMembershipId = null;
+
+    function openEditMembership(id) {
+      var row = customerRows.find(function (r) { return r._id === id; });
+      if (!row) return;
+      editMembershipId = id;
+      document.getElementById('edit-membership-name').textContent = row['Full Name'] || '';
+      var mType = row._membership_type || '';
+      document.getElementById('edit-membership-type').value = mType;
+      document.getElementById('edit-membership-start').value = row._membership_start_date || new Date().toISOString().slice(0, 10);
+      document.getElementById('edit-membership-start-row').classList.toggle('hidden', !mType);
+      document.getElementById('edit-membership-error').classList.add('hidden');
+      document.getElementById('edit-membership-modal').classList.remove('hidden');
+    }
+
+    function closeEditMembershipModal() {
+      document.getElementById('edit-membership-modal').classList.add('hidden');
+      editMembershipId = null;
+    }
+
+    function submitEditMembership() {
+      if (!editMembershipId) return;
+      var mType     = document.getElementById('edit-membership-type').value;
+      var startDate = document.getElementById('edit-membership-start').value;
+      var errEl     = document.getElementById('edit-membership-error');
+      var btn       = document.getElementById('edit-membership-submit');
+      errEl.classList.add('hidden');
+      btn.disabled = true; btn.textContent = 'Saving…';
+
+      apiFetch('/api/customers/' + editMembershipId, {
+        method: 'PATCH',
+        body: JSON.stringify({ membership_type: mType, membership_start_date: mType ? startDate : null })
+      })
+        .then(function (res) { return res.json(); })
+        .then(function (result) {
+          btn.disabled = false; btn.textContent = 'Save';
+          if (result.error) { errEl.textContent = result.error; errEl.classList.remove('hidden'); return; }
+          var row = customerRows.find(function (r) { return r._id === editMembershipId; });
+          if (row) {
+            var r = result.row;
+            row['Membership']           = r.membership_type || '';
+            row['Member Until']         = r.membership_end_date || '';
+            row._membership_type        = r.membership_type || '';
+            row._membership_start_date  = r.membership_start_date || '';
+            row._membership_end_date    = r.membership_end_date || '';
+          }
+          if (customerTable) { customerTable.clear(); customerTable.rows.add(customerRows).draw(); }
+          closeEditMembershipModal();
+          showToast('Membership updated.', 'success');
+        })
+        .catch(function (err) {
+          btn.disabled = false; btn.textContent = 'Save';
+          errEl.textContent = 'Failed: ' + err.message; errEl.classList.remove('hidden');
+        });
+    }
+
+    // ── Edit Punch Card Modal ──
+    var editPunchId = null;
+
+    function openEditPunchCard(id) {
+      var row = customerRows.find(function (r) { return r._id === id; });
+      if (!row) return;
+      editPunchId = id;
+      document.getElementById('edit-punch-name').textContent    = row['Full Name'] || '';
+      var isHolder = !!row._is_punch_card_holder;
+      document.getElementById('edit-punch-holder').checked      = isHolder;
+      document.getElementById('edit-punch-count').value         = row._punches_remaining || 0;
+      document.getElementById('edit-punch-count-row').classList.toggle('hidden', !isHolder);
+      document.getElementById('edit-punch-error').classList.add('hidden');
+      document.getElementById('edit-punch-modal').classList.remove('hidden');
+    }
+
+    function closeEditPunchModal() {
+      document.getElementById('edit-punch-modal').classList.add('hidden');
+      editPunchId = null;
+    }
+
+    function submitEditPunchCard() {
+      if (!editPunchId) return;
+      var isHolder  = document.getElementById('edit-punch-holder').checked;
+      var remaining = parseInt(document.getElementById('edit-punch-count').value, 10) || 0;
+      var errEl     = document.getElementById('edit-punch-error');
+      var btn       = document.getElementById('edit-punch-submit');
+      errEl.classList.add('hidden');
+      btn.disabled = true; btn.textContent = 'Saving…';
+
+      apiFetch('/api/customers/' + editPunchId, {
+        method: 'PATCH',
+        body: JSON.stringify({ is_punch_card_holder: isHolder, punches_remaining: remaining })
+      })
+        .then(function (res) { return res.json(); })
+        .then(function (result) {
+          btn.disabled = false; btn.textContent = 'Save';
+          if (result.error) { errEl.textContent = result.error; errEl.classList.remove('hidden'); return; }
+          // Update cached row
+          var row = customerRows.find(function (r) { return r._id === editPunchId; });
+          if (row) {
+            row['Punch Card']           = isHolder ? 'Yes' : 'No';
+            row['Punches']              = isHolder ? remaining : 0;
+            row._is_punch_card_holder   = isHolder;
+            row._punches_remaining      = isHolder ? remaining : 0;
+          }
+          if (customerTable) { customerTable.clear(); customerTable.rows.add(customerRows).draw(); }
+          closeEditPunchModal();
+          showToast('Punch card updated.', 'success');
+        })
+        .catch(function (err) {
+          btn.disabled = false; btn.textContent = 'Save';
+          errEl.textContent = 'Failed: ' + err.message; errEl.classList.remove('hidden');
+        });
+    }
+
     // ── API helper ──
     function apiFetch(url, options) {
       var token = sessionStorage.getItem('bbo_token') || '';
@@ -154,8 +347,7 @@ import MainLayout from '../layouts/MainLayout.astro';
     }
 
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') closeAddModal();
-    });
+      if (e.key === 'Escape') { closeAddModal(); closeEditPunchModal(); closeEditMembershipModal(); }
 
     function openAddModal() {
       document.getElementById('add-customer-form').reset();
@@ -350,26 +542,94 @@ import MainLayout from '../layouts/MainLayout.astro';
           defaultContent: ''
         };
       });
-      cols.push({
+      // Handle special Punch Card columns
+      var finalCols = cols.map(function (col, i) {
+        var h = customerHeaders[i];
+        if (h === 'Punch Card') {
+          return Object.assign({}, col, {
+            render: function (val, type, row) {
+              if (type !== 'display') return val;
+              var yes = row._is_punch_card_holder;
+              return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ' +
+                (yes ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500') + '">' +
+                (yes ? 'Yes' : 'No') + '</span>';
+            }
+          });
+        }
+        if (h === 'Punches') {
+          return Object.assign({}, col, {
+            render: function (val, type, row) {
+              if (type !== 'display') return val;
+              if (!row._is_punch_card_holder) return '<span class="text-gray-300">—</span>';
+              return '<span class="font-semibold ' + (row._punches_remaining > 0 ? 'text-green-600' : 'text-red-500') + '">' +
+                row._punches_remaining + '</span>';
+            }
+          });
+        }
+        if (h === 'Membership') {
+          return Object.assign({}, col, {
+            render: function (val, type, row) {
+              if (type !== 'display') return val;
+              if (!row._membership_type) return '<span class="text-gray-300">—</span>';
+              var end   = row._membership_end_date;
+              var today = new Date().toISOString().slice(0, 10);
+              var active = end && end >= today;
+              return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ' +
+                (active ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-600') + '">' +
+                escHtml(row._membership_type) + '</span>';
+            }
+          });
+        }
+        if (h === 'Member Until') {
+          return Object.assign({}, col, {
+            render: function (val, type, row) {
+              if (type !== 'display') return val;
+              if (!row._membership_end_date) return '<span class="text-gray-300">—</span>';
+              var today  = new Date().toISOString().slice(0, 10);
+              var active = row._membership_end_date >= today;
+              return '<span class="text-xs font-medium ' + (active ? 'text-blue-600' : 'text-red-500') + '">' +
+                escHtml(row._membership_end_date) + '</span>';
+            }
+          });
+        }
+        return col;
+      });
+
+      finalCols.push({
         title: 'Actions',
         data: null,
         orderable: false,
         searchable: false,
         render: function (data, type, row) {
-          return '<button onclick="deleteCustomer(\'' + row._id + '\')" ' +
+          return '<div class="flex items-center gap-1.5">' +
+            '<button onclick="openEditMembership(\'' + row._id + '\')" ' +
+            'class="inline-flex items-center gap-1 text-xs text-teal-500 hover:text-teal-700 ' +
+            'hover:bg-teal-50 px-2 py-1 rounded transition" title="Edit membership">' +
+            '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" ' +
+            'd="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0"/>' +
+            '</svg>Mbr</button>' +
+            '<button onclick="openEditPunchCard(\'' + row._id + '\')" ' +
+            'class="inline-flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700 ' +
+            'hover:bg-blue-50 px-2 py-1 rounded transition" title="Edit punch card">' +
+            '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" ' +
+            'd="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>' +
+            '</svg>Punch</button>' +
+            '<button onclick="deleteCustomer(\'' + row._id + '\')" ' +
             'class="inline-flex items-center gap-1 text-xs text-red-500 hover:text-red-700 ' +
             'hover:bg-red-50 px-2 py-1 rounded transition">' +
             '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
             '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" ' +
             'd="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>' +
-            '</svg>Delete</button>';
+            '</svg>Delete</button></div>';
         }
       });
 
       try {
         customerTable = $('#customer-table').DataTable({
           data: customerRows,
-          columns: cols,
+          columns: finalCols,
           dom: "<'flex flex-wrap items-center gap-3 mb-3'<''f>>" +
                "t" +
                "<'flex flex-wrap items-center justify-between mt-3'<'text-sm text-gray-500'i><'flex gap-1'p>>",
