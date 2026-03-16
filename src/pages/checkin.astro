@@ -39,14 +39,14 @@ import MainLayout from '../layouts/MainLayout.astro';
 
     <!-- ── Check-in Form ── -->
     <div class="xl:col-span-1">
-      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <h2 class="font-semibold text-gray-800 mb-5">New Check-in</h2>
+      <div class="bg-gray-900 rounded-xl shadow-lg p-6">
+        <h2 class="font-semibold text-white mb-5 tracking-wide">New Check-in</h2>
 
         <form id="checkin-form" class="space-y-4" novalidate>
 
           <!-- Customer search -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1.5">
+            <label class="block text-sm font-medium text-gray-300 mb-1.5">
               Customer <span class="text-red-400">*</span>
             </label>
             <input
@@ -55,23 +55,23 @@ import MainLayout from '../layouts/MainLayout.astro';
               type="text"
               placeholder="Type to search customer…"
               autocomplete="off"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+              class="w-full bg-gray-800 border border-gray-600 text-white placeholder-gray-500 rounded-lg px-3 py-2 text-sm
                      focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
             />
             <datalist id="customer-datalist"></datalist>
-            <p id="customer-hint" class="text-xs text-gray-400 mt-1">
-              Load customers on the <a href="/customers" class="text-orange-500 hover:underline">Customers</a> page first.
+            <p id="customer-hint" class="text-xs text-gray-500 mt-1">
+              Load customers on the <a href="/customers" class="text-orange-400 hover:underline">Customers</a> page first.
             </p>
           </div>
 
           <!-- Payment method -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1.5">
+            <label class="block text-sm font-medium text-gray-300 mb-1.5">
               Payment Method <span class="text-red-400">*</span>
             </label>
             <select
               id="f-payment"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+              class="w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm
                      focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
             >
               <option value="">— Select —</option>
@@ -84,37 +84,37 @@ import MainLayout from '../layouts/MainLayout.astro';
 
           <!-- Amount -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1.5">Amount (VND)</label>
+            <label class="block text-sm font-medium text-gray-300 mb-1.5">Amount (VND)</label>
             <input
               id="f-amount"
               type="number"
               min="0"
               step="0.01"
               placeholder="0.00"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+              class="w-full bg-gray-800 border border-gray-600 text-white placeholder-gray-500 rounded-lg px-3 py-2 text-sm
                      focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
             />
           </div>
 
           <!-- Notes -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1.5">Notes</label>
+            <label class="block text-sm font-medium text-gray-300 mb-1.5">Notes</label>
             <input
               id="f-notes"
               type="text"
               placeholder="Optional…"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+              class="w-full bg-gray-800 border border-gray-600 text-white placeholder-gray-500 rounded-lg px-3 py-2 text-sm
                      focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
             />
           </div>
 
           <!-- Check-in timestamp preview -->
-          <div class="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2">
-            Timestamp: <span id="ts-preview" class="font-medium text-gray-600"></span>
+          <div class="text-xs text-gray-400 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2">
+            Timestamp: <span id="ts-preview" class="font-medium text-gray-200"></span>
           </div>
 
           <!-- Error -->
-          <div id="form-error" class="hidden text-sm text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2"></div>
+          <div id="form-error" class="hidden text-sm text-red-400 bg-red-900/40 border border-red-700 rounded-lg px-3 py-2"></div>
 
           <button
             type="submit"

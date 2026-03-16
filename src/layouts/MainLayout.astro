@@ -53,7 +53,9 @@ const { title, activePage = '' } = Astro.props;
       box-shadow: 0 0 0 3px rgba(249,115,22,0.15);
     }
 
-    table.dataTable { width: 100% !important; border-collapse: collapse; }
+    table.dataTable { border-collapse: collapse; }
+    .dataTables_wrapper .dataTables_filter { text-align: left; }
+    .dataTables_scrollBody { overflow-x: auto !important; }
     table.dataTable thead tr th {
       background: #f9fafb;
       color: #4b5563;

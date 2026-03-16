@@ -370,15 +370,9 @@ import MainLayout from '../layouts/MainLayout.astro';
         customerTable = $('#customer-table').DataTable({
           data: customerRows,
           columns: cols,
-          dom: "<'flex flex-wrap items-center justify-between gap-3 mb-3'<'flex gap-2'B><'flex-1 text-right'f>>" +
+          dom: "<'flex flex-wrap items-center gap-3 mb-3'<''f>>" +
                "t" +
                "<'flex flex-wrap items-center justify-between mt-3'<'text-sm text-gray-500'i><'flex gap-1'p>>",
-          buttons: [{
-            extend: 'csvHtml5',
-            text: '⬇ Export CSV',
-            title: 'Customer List',
-            exportOptions: { columns: ':not(:last-child)' }
-          }],
           order: [[0, 'asc']],
           pageLength: 25,
           scrollX: true,
@@ -436,7 +430,20 @@ import MainLayout from '../layouts/MainLayout.astro';
         showStatus('No customer data to export.', 'error');
         return;
       }
-      if (customerTable) $('.buttons-csv').trigger('click');
+      var headers = DEFAULT_HEADERS;
+      var lines = [headers.map(function (h) { return '"' + h.replace(/"/g, '""') + '"'; }).join(',')];
+      customerRows.forEach(function (row) {
+        lines.push(headers.map(function (h) {
+          var v = row[h] != null ? String(row[h]) : '';
+          return '"' + v.replace(/"/g, '""') + '"';
+        }).join(','));
+      });
+      var blob = new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = 'Customer List.csv';
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a); URL.revokeObjectURL(url);
     }
 
     function updateCount() {
