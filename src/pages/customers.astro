@@ -348,6 +348,7 @@ import MainLayout from '../layouts/MainLayout.astro';
 
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') { closeAddModal(); closeEditPunchModal(); closeEditMembershipModal(); }
+    });
 
     function openAddModal() {
       document.getElementById('add-customer-form').reset();
