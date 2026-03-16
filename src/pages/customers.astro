@@ -18,6 +18,16 @@ import MainLayout from '../layouts/MainLayout.astro';
     </label>
     <input type="file" id="csv-upload" accept=".csv" class="hidden" />
 
+    <!-- Add Customer -->
+    <button onclick="openAddModal()"
+            class="inline-flex items-center gap-2 bg-green-500 hover:bg-green-600
+                   text-white font-medium text-sm px-4 py-2.5 rounded-lg transition">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+      </svg>
+      Add Customer
+    </button>
+
     <!-- Export CSV -->
     <button onclick="exportCustomers()"
             class="inline-flex items-center gap-2 bg-white hover:bg-gray-50 border border-gray-300
@@ -47,6 +57,67 @@ import MainLayout from '../layouts/MainLayout.astro';
   <!-- Upload progress / status -->
   <div id="upload-status" class="hidden mb-4"></div>
 
+  <!-- Add Customer Modal -->
+  <div id="add-customer-modal"
+       class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+       onclick="if(event.target===this)closeAddModal()">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h2 class="font-semibold text-gray-800 text-lg">Add Customer</h2>
+        <button onclick="closeAddModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+      </div>
+      <form id="add-customer-form" onsubmit="submitAddCustomer(event)" class="px-6 py-5">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Full Name <span class="text-red-400">*</span></label>
+            <input name="Full Name" type="text" required
+                   class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">DOB</label>
+            <input name="DOB" type="text" placeholder="e.g. 01/01/1990"
+                   class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Email</label>
+            <input name="Email" type="email"
+                   class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Telephone no</label>
+            <input name="Telephone no" type="text"
+                   class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Emergency contact</label>
+            <input name="Emergency contact" type="text"
+                   class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Waiver form (old)</label>
+            <input name="Waiver form (old)" type="text"
+                   class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Note</label>
+            <input name="Note" type="text"
+                   class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+          </div>
+        </div>
+        <div id="add-customer-error"
+             class="hidden mt-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2"></div>
+        <div class="flex justify-end gap-3 mt-5">
+          <button type="button" onclick="closeAddModal()"
+                  class="bg-white hover:bg-gray-50 border border-gray-300 text-gray-700
+                         font-medium text-sm px-4 py-2 rounded-lg transition">Cancel</button>
+          <button type="submit" id="add-customer-submit"
+                  class="bg-orange-500 hover:bg-orange-600 text-white font-medium text-sm
+                         px-5 py-2 rounded-lg transition">Add Customer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Customer table -->
   <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 overflow-x-auto">
     <div id="table-wrapper" class="hidden">
@@ -68,6 +139,7 @@ import MainLayout from '../layouts/MainLayout.astro';
     var customerTable = null;
     var customerHeaders = [];
     var customerRows = [];
+    var DEFAULT_HEADERS = ['Full Name', 'DOB', 'Email', 'Telephone no', 'Emergency contact', 'Note', 'Waiver form (old)'];
 
     // ── API helper ──
     function apiFetch(url, options) {
@@ -79,6 +151,66 @@ import MainLayout from '../layouts/MainLayout.astro';
       return fetch(url, Object.assign({}, defaults, options, {
         headers: Object.assign(defaults.headers, options && options.headers)
       }));
+    }
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeAddModal();
+    });
+
+    function openAddModal() {
+      document.getElementById('add-customer-form').reset();
+      document.getElementById('add-customer-error').classList.add('hidden');
+      document.getElementById('add-customer-modal').classList.remove('hidden');
+      // Focus the Full Name field
+      setTimeout(function () {
+        document.querySelector('#add-customer-form [name="Full Name"]').focus();
+      }, 50);
+    }
+
+    function closeAddModal() {
+      document.getElementById('add-customer-modal').classList.add('hidden');
+    }
+
+    function submitAddCustomer(e) {
+      e.preventDefault();
+      var form = document.getElementById('add-customer-form');
+      var data = new FormData(form);
+      var row = {};
+      DEFAULT_HEADERS.forEach(function (h) { row[h] = data.get(h) || ''; });
+
+      var errEl = document.getElementById('add-customer-error');
+      errEl.classList.add('hidden');
+      var submitBtn = document.getElementById('add-customer-submit');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Adding…';
+
+      apiFetch('/api/customers', { method: 'PUT', body: JSON.stringify({ row: row }) })
+        .then(function (res) { return res.json(); })
+        .then(function (result) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Add Customer';
+          if (result.error) {
+            errEl.textContent = result.error;
+            errEl.classList.remove('hidden');
+            return;
+          }
+          closeAddModal();
+          if (!customerHeaders.length) customerHeaders = DEFAULT_HEADERS.slice();
+          customerRows.push(result.row);
+          if (customerTable) {
+            customerTable.row.add(result.row).draw();
+          } else {
+            renderTable();
+          }
+          updateCount();
+          showToast('Customer added.', 'success');
+        })
+        .catch(function (err) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Add Customer';
+          errEl.textContent = 'Failed: ' + err.message;
+          errEl.classList.remove('hidden');
+        });
     }
 
     $(document).ready(function () {

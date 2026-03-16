@@ -8,7 +8,6 @@
 -- Columns mirror the standard BBO customer spreadsheet.
 CREATE TABLE IF NOT EXISTS customers (
   id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  fade              TEXT        NOT NULL DEFAULT '',   -- member number / ID
   full_name         TEXT        NOT NULL DEFAULT '',
   dob               TEXT        NOT NULL DEFAULT '',   -- stored as text (various formats in CSV)
   email             TEXT        NOT NULL DEFAULT '',

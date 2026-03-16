@@ -6,7 +6,6 @@ import { ok, serverError } from '../../../lib/auth';
 
 // Column map: CSV header → DB column name
 const COL_MAP: Record<string, string> = {
-  'Fade':              'fade',
   'Full Name':         'full_name',
   'DOB':               'dob',
   'Email':             'email',
@@ -17,13 +16,13 @@ const COL_MAP: Record<string, string> = {
 };
 
 // DB column → display header (inverse map)
-const DISPLAY_HEADERS = ['Fade', 'Full Name', 'DOB', 'Email', 'Telephone no', 'Emergency contact', 'Note', 'Waiver form (old)'];
+const DISPLAY_HEADERS = ['Full Name', 'DOB', 'Email', 'Telephone no', 'Emergency contact', 'Note', 'Waiver form (old)'];
 
 /** GET /api/customers — return all customers */
 export const GET: APIRoute = async () => {
   const { data, error } = await db
     .from('customers')
-    .select('id, fade, full_name, dob, email, telephone, emergency_contact, note, waiver_form')
+    .select('id, full_name, dob, email, telephone, emergency_contact, note, waiver_form')
     .order('full_name');
 
   if (error) return serverError(error.message);
@@ -31,7 +30,6 @@ export const GET: APIRoute = async () => {
   // Map DB rows back to the original CSV-style header names for the frontend
   const rows = (data ?? []).map((r: any) => ({
     _id:               r.id,
-    'Fade':             r.fade,
     'Full Name':        r.full_name,
     'DOB':              r.dob,
     'Email':            r.email,
@@ -64,7 +62,6 @@ export const POST: APIRoute = async ({ request }) => {
   const BATCH = 500;
   for (let i = 0; i < csvRows.length; i += BATCH) {
     const batch = csvRows.slice(i, i + BATCH).map((r) => ({
-      fade:              r['Fade']              ?? '',
       full_name:         r['Full Name']         ?? '',
       dob:               r['DOB']               ?? '',
       email:             r['Email']             ?? '',
@@ -78,4 +75,42 @@ export const POST: APIRoute = async ({ request }) => {
   }
 
   return ok({ count: csvRows.length });
+};
+
+/** PUT /api/customers — insert a single new customer */
+export const PUT: APIRoute = async ({ request }) => {
+  let body: { row: Record<string, string> };
+  try { body = await request.json(); }
+  catch { return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400 }); }
+
+  const r = body.row ?? {};
+
+  const { data, error } = await db
+    .from('customers')
+    .insert({
+      full_name:         r['Full Name']         ?? '',
+      dob:               r['DOB']               ?? '',
+      email:             r['Email']             ?? '',
+      telephone:         r['Telephone no']      ?? '',
+      emergency_contact: r['Emergency contact'] ?? '',
+      note:              r['Note']              ?? '',
+      waiver_form:       r['Waiver form (old)'] ?? '',
+    })
+    .select('id, full_name, dob, email, telephone, emergency_contact, note, waiver_form')
+    .single();
+
+  if (error) return serverError(error.message);
+
+  const newRow = {
+    _id:                data.id,
+    'Full Name':        data.full_name,
+    'DOB':              data.dob,
+    'Email':            data.email,
+    'Telephone no':     data.telephone,
+    'Emergency contact':data.emergency_contact,
+    'Note':             data.note,
+    'Waiver form (old)':data.waiver_form,
+  };
+
+  return ok({ row: newRow });
 };
