@@ -3,7 +3,7 @@ import tailwind from '@astrojs/tailwind';
 import vercel from '@astrojs/vercel';
 
 export default defineConfig({
-  output: 'hybrid',          // pages static by default; API routes are serverless
+  output: 'static',          // pages static by default; API routes opt-in with prerender = false
   adapter: vercel(),
   integrations: [tailwind()],
 });
