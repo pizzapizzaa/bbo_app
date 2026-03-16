@@ -20,6 +20,7 @@ const DISPLAY_HEADERS = ['Full Name', 'DOB', 'Email', 'Telephone no', 'Emergency
 
 /** GET /api/customers — return all customers */
 export const GET: APIRoute = async () => {
+  try {
   const { data, error } = await db
     .from('customers')
     .select('id, full_name, dob, email, telephone, emergency_contact, note, waiver_form')
@@ -40,10 +41,12 @@ export const GET: APIRoute = async () => {
   }));
 
   return ok({ headers: DISPLAY_HEADERS, rows });
+  } catch (e: any) { return serverError(e?.message ?? String(e)); }
 };
 
 /** POST /api/customers — bulk import (replaces all existing records) */
 export const POST: APIRoute = async ({ request }) => {
+  try {
   let body: { rows: Record<string, string>[] };
   try { body = await request.json(); }
   catch { return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400 }); }
@@ -75,10 +78,12 @@ export const POST: APIRoute = async ({ request }) => {
   }
 
   return ok({ count: csvRows.length });
+  } catch (e: any) { return serverError(e?.message ?? String(e)); }
 };
 
 /** PUT /api/customers — insert a single new customer */
 export const PUT: APIRoute = async ({ request }) => {
+  try {
   let body: { row: Record<string, string> };
   try { body = await request.json(); }
   catch { return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400 }); }
@@ -113,4 +118,5 @@ export const PUT: APIRoute = async ({ request }) => {
   };
 
   return ok({ row: newRow });
+  } catch (e: any) { return serverError(e?.message ?? String(e)); }
 };
