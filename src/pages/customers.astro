@@ -182,8 +182,14 @@ const rowsAttr    = JSON.stringify(builtRows);
         return;
       }
 
-      var headers = rows[0].map(function (h) { return h.replace(/^["']|["']$/g, '').trim(); });
-      var data    = rows.slice(1).map(function (row, idx) {
+      var headers = rows[0].map(function (h) { return h.replace(/^["']|["']$/g, '').trim(); })
+                           .filter(function (h) { return h; }); // drop empty header cols
+      if (!headers.length) {
+        showStatus('No valid column headers found in the CSV.', 'error');
+        return;
+      }
+
+      var data = rows.slice(1).map(function (row, idx) {
         var obj = { _id: 'cust-' + Date.now() + '-' + idx };
         headers.forEach(function (h, i) {
           obj[h] = row[i] !== undefined ? row[i] : '';
@@ -193,19 +199,16 @@ const rowsAttr    = JSON.stringify(builtRows);
 
       customerHeaders = headers;
       customerRows    = data;
-      saveToStorage();
 
-      if (customerTable) {
-        customerTable.destroy();
-        customerTable = null;
-        document.querySelector('#customer-table thead tr').innerHTML = '';
-        document.querySelector('#customer-table tbody').innerHTML = '';
-      }
-
+      // Render FIRST — so a storage quota error never blocks the table from showing
       renderTable();
       updateCount();
+
+      // Persist to localStorage (best-effort — quota errors are non-fatal)
+      saveToStorage();
+
       showStatus(
-        'Successfully imported ' + data.length + ' customer(s) from <strong>' + filename + '</strong>.',
+        'Imported <strong>' + data.length + '</strong> customer(s) from <strong>' + escHtml(filename) + '</strong>.',
         'success'
       );
     }
@@ -216,11 +219,21 @@ const rowsAttr    = JSON.stringify(builtRows);
         return;
       }
 
+      // Destroy any existing DataTables instance before re-initialising.
+      // Use isDataTable() rather than checking customerTable — it's the source
+      // of truth even if a previous init partially failed.
+      if ($.fn.DataTable.isDataTable('#customer-table')) {
+        $('#customer-table').DataTable().destroy();
+      }
+      customerTable = null;
+      document.querySelector('#customer-table thead tr').innerHTML = '';
+      document.querySelector('#customer-table tbody').innerHTML    = '';
+
       document.getElementById('no-data-msg').classList.add('hidden');
       document.getElementById('table-wrapper').classList.remove('hidden');
 
-      // Build column definitions — use render fn (not data:string) to avoid
-      // DataTables dot-notation issues with names like "Telephone no."
+      // Build column definitions — use data as a function to avoid DataTables
+      // dot-notation parsing (e.g. "Telephone no." would break as a string key)
       var cols = customerHeaders.map(function (h) {
         return {
           title: escHtml(h),
@@ -250,31 +263,31 @@ const rowsAttr    = JSON.stringify(builtRows);
       });
 
       try {
-      customerTable = $('#customer-table').DataTable({
-        data: customerRows,
-        columns: cols,
-        dom: "<'flex flex-wrap items-center justify-between gap-3 mb-3'<'flex gap-2'B><'flex-1 text-right'f>>" +
-             "t" +
-             "<'flex flex-wrap items-center justify-between mt-3'<'text-sm text-gray-500'i><'flex gap-1'p>>",
-        buttons: [
-          {
-            extend: 'csvHtml5',
-            text: '⬇ Export CSV',
-            title: 'Customer List',
-            exportOptions: {
-              columns: ':not(:last-child)'  // exclude the Actions column
+        customerTable = $('#customer-table').DataTable({
+          data: customerRows,
+          columns: cols,
+          dom: "<'flex flex-wrap items-center justify-between gap-3 mb-3'<'flex gap-2'B><'flex-1 text-right'f>>" +
+               "t" +
+               "<'flex flex-wrap items-center justify-between mt-3'<'text-sm text-gray-500'i><'flex gap-1'p>>",
+          buttons: [
+            {
+              extend: 'csvHtml5',
+              text: '⬇ Export CSV',
+              title: 'Customer List',
+              exportOptions: { columns: ':not(:last-child)' }
             }
-          }
-        ],
-        order: [[0, 'asc']],
-        pageLength: 25,
-        scrollX: true,
-        language: { emptyTable: 'No customer records found.' }
-      });
+          ],
+          order: [[0, 'asc']],
+          pageLength: 25,
+          scrollX: true,
+          language: { emptyTable: 'No customer records found.' }
+        });
       } catch (err) {
+        customerTable = null;
         document.getElementById('table-wrapper').classList.add('hidden');
         document.getElementById('no-data-msg').classList.remove('hidden');
-        showStatus('Table error: ' + err.message, 'error');
+        // Keep error visible until dismissed — don't auto-hide
+        showStatus('DataTables error: ' + escHtml(err.message) + '<br><small>Open browser console (F12) for details.</small>', 'error', true);
       }
     }
 
@@ -315,8 +328,13 @@ const rowsAttr    = JSON.stringify(builtRows);
 
     // ── Storage ──
     function saveToStorage() {
-      localStorage.setItem('bbo_customer_headers', JSON.stringify(customerHeaders));
-      localStorage.setItem('bbo_customers', JSON.stringify(customerRows));
+      try {
+        localStorage.setItem('bbo_customer_headers', JSON.stringify(customerHeaders));
+        localStorage.setItem('bbo_customers',        JSON.stringify(customerRows));
+      } catch (e) {
+        // QuotaExceededError — data stays in memory for this session
+        showStatus('Storage quota exceeded. Customer data is loaded but will not persist after refresh.', 'error');
+      }
     }
 
     function loadFromStorage() {
@@ -356,15 +374,20 @@ const rowsAttr    = JSON.stringify(builtRows);
     }
 
     // ── UI helpers ──
-    function showStatus(msg, type) {
+    // persistent=true keeps the banner visible until the user clicks × to dismiss
+    function showStatus(msg, type, persistent) {
       var el = document.getElementById('upload-status');
-      el.className = 'mb-4 px-4 py-3 rounded-xl border text-sm ' +
+      el.className = 'mb-4 px-4 py-3 rounded-xl border text-sm flex items-start justify-between gap-3 ' +
         (type === 'error'
           ? 'bg-red-50 border-red-200 text-red-700'
           : 'bg-green-50 border-green-200 text-green-700');
-      el.innerHTML = msg;
+      el.innerHTML = '<span>' + msg + '</span>' +
+        '<button onclick="this.closest(\'#upload-status\').classList.add(\'hidden\')"
+                class="shrink-0 font-bold text-lg leading-none opacity-60 hover:opacity-100">&times;</button>';
       el.classList.remove('hidden');
-      setTimeout(function () { el.classList.add('hidden'); }, 5000);
+      if (!persistent) {
+        setTimeout(function () { el.classList.add('hidden'); }, 6000);
+      }
     }
 
     function showToast(msg, type) {
