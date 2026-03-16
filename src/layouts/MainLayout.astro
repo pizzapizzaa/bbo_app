@@ -23,11 +23,12 @@ const { title, activePage = '' } = Astro.props;
   <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.dataTables.min.css" />
 
   <!-- jQuery + DataTables JS (synchronous so all page scripts can use $) -->
-  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-  <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
-  <script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+  <!-- is:inline prevents Astro/Vite from converting these to async ES modules -->
+  <script is:inline src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script is:inline src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+  <script is:inline src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+  <script is:inline src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script is:inline src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
 
   <!-- Auth guard: hide body until verified -->
   <style>
