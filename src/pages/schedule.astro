@@ -105,55 +105,44 @@ import MainLayout from '../layouts/MainLayout.astro';
       </div>
     </div>
 
-    <!-- ── Schedule Table ── -->
+    <!-- ── Weekly Calendar ── -->
     <div class="xl:col-span-2">
       <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
-          <h2 class="font-semibold text-gray-800">All Schedule Entries</h2>
 
-          <!-- Month / Year filter -->
-          <div class="flex items-center gap-2">
-            <select id="filter-month"
-                    class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm
-                           focus:outline-none focus:ring-2 focus:ring-orange-400">
-              <option value="">All Months</option>
-              <option value="01">January</option><option value="02">February</option>
-              <option value="03">March</option><option value="04">April</option>
-              <option value="05">May</option><option value="06">June</option>
-              <option value="07">July</option><option value="08">August</option>
-              <option value="09">September</option><option value="10">October</option>
-              <option value="11">November</option><option value="12">December</option>
-            </select>
-            <select id="filter-year"
-                    class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm
-                           focus:outline-none focus:ring-2 focus:ring-orange-400">
-              <option value="">All Years</option>
-            </select>
-            <button onclick="applyFilter()"
-                    class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition">
-              Filter
+        <!-- Header: title + week nav + export -->
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+          <h2 class="font-semibold text-gray-800">Weekly Schedule</h2>
+          <div class="flex items-center gap-2 flex-wrap">
+            <button id="btn-prev-week"
+                    class="px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition">
+              ‹ Prev
             </button>
-            <button onclick="clearFilter()"
-                    class="px-3 py-1.5 text-gray-400 hover:text-gray-600 rounded-lg text-sm transition">
-              Clear
+            <span id="week-label" class="text-sm font-medium text-gray-700 min-w-[190px] text-center px-1"></span>
+            <button id="btn-next-week"
+                    class="px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition">
+              Next ›
+            </button>
+            <button id="btn-today"
+                    class="px-2.5 py-1.5 text-sm bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-lg transition">
+              Today
+            </button>
+            <button onclick="exportCSV()"
+                    class="inline-flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-800
+                           bg-gray-50 hover:bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-lg transition">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+              </svg>
+              Export CSV
             </button>
           </div>
         </div>
 
+        <!-- Calendar grid: one row per staff, 7 day columns -->
         <div class="overflow-x-auto">
-          <table id="schedule-table" class="w-full" style="width:100%">
-            <thead>
-              <tr>
-                <th>Staff Name</th>
-                <th>Date</th>
-                <th>Start</th>
-                <th>End</th>
-                <th>Duration</th>
-                <th>Notes</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
+          <table id="cal-table" class="w-full border-collapse" style="min-width:560px">
+            <thead id="cal-head"></thead>
+            <tbody id="cal-body"></tbody>
           </table>
         </div>
       </div>
@@ -161,8 +150,20 @@ import MainLayout from '../layouts/MainLayout.astro';
   </div>
 
   <script is:inline>
-    var scheduleTable;
     var scheduleData = [];
+    var currentWeekStart;
+
+    var STAFF_NAMES = ['Thanh Tu', 'Duyen Ha', 'Thu Huyen', 'Kim An', 'Khue Anh', 'Huy Tran'];
+    var STAFF_COLORS = [
+      { bg: '#FED7AA', text: '#9A3412', border: '#FB923C' },
+      { bg: '#BFDBFE', text: '#1E40AF', border: '#60A5FA' },
+      { bg: '#BBF7D0', text: '#166534', border: '#4ADE80' },
+      { bg: '#F5D0FE', text: '#7E22CE', border: '#E879F9' },
+      { bg: '#FEF08A', text: '#854D0E', border: '#FACC15' },
+      { bg: '#FECDD3', text: '#9F1239', border: '#FB7185' },
+      { bg: '#CCFBF1', text: '#134E4A', border: '#34D399' },
+      { bg: '#E0E7FF', text: '#3730A3', border: '#818CF8' }
+    ];
 
     // ── API helper ──
     function apiFetch(url, options) {
@@ -174,21 +175,139 @@ import MainLayout from '../layouts/MainLayout.astro';
 
     $(document).ready(function () {
       document.getElementById('f-date').value = new Date().toISOString().slice(0, 10);
+      currentWeekStart = getWeekStart(new Date());
 
-      var yr = new Date().getFullYear();
-      var ysel = document.getElementById('filter-year');
-      for (var y = yr - 1; y <= yr + 2; y++) {
-        var opt = document.createElement('option');
-        opt.value = y; opt.textContent = y;
-        if (y === yr) opt.selected = true;
-        ysel.appendChild(opt);
-      }
+      document.getElementById('btn-prev-week').addEventListener('click', function () {
+        currentWeekStart = addDays(currentWeekStart, -7);
+        renderCalendar();
+      });
+      document.getElementById('btn-next-week').addEventListener('click', function () {
+        currentWeekStart = addDays(currentWeekStart, 7);
+        renderCalendar();
+      });
+      document.getElementById('btn-today').addEventListener('click', function () {
+        currentWeekStart = getWeekStart(new Date());
+        renderCalendar();
+      });
 
-      initTable();
       loadSchedule();
-
       $('#f-start, #f-end').on('change', calcDuration);
     });
+
+    // ── Week helpers ──
+    function getWeekStart(date) {
+      var d = new Date(date);
+      d.setHours(0, 0, 0, 0);
+      var day = d.getDay();
+      d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day)); // Monday
+      return d;
+    }
+
+    function addDays(date, n) {
+      var d = new Date(date);
+      d.setDate(d.getDate() + n);
+      return d;
+    }
+
+    function fmtDate(date) {
+      var y = date.getFullYear();
+      var m = String(date.getMonth() + 1).padStart(2, '0');
+      var dd = String(date.getDate()).padStart(2, '0');
+      return y + '-' + m + '-' + dd;
+    }
+
+    function fmtWeekLabel(start) {
+      var end = addDays(start, 6);
+      var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      return months[start.getMonth()] + ' ' + start.getDate() +
+             ' – ' + months[end.getMonth()] + ' ' + end.getDate() +
+             ', ' + end.getFullYear();
+    }
+
+    function getStaffList() {
+      var list = STAFF_NAMES.slice();
+      scheduleData.forEach(function (s) {
+        if (list.indexOf(s.staff_name) === -1) list.push(s.staff_name);
+      });
+      return list;
+    }
+
+    // ── Render calendar ──
+    function renderCalendar() {
+      var DAY_ABBR = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      var weekDates = [];
+      for (var i = 0; i < 7; i++) weekDates.push(addDays(currentWeekStart, i));
+      var todayIso = fmtDate(new Date());
+
+      document.getElementById('week-label').textContent = fmtWeekLabel(currentWeekStart);
+
+      // Head row
+      var headHtml = '<tr class="border-b-2 border-gray-200">';
+      headHtml += '<th class="w-24 pb-3 pr-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Staff</th>';
+      weekDates.forEach(function (d) {
+        var isToday = fmtDate(d) === todayIso;
+        var abbr    = DAY_ABBR[d.getDay()];
+        var num     = d.getDate();
+        if (isToday) {
+          headHtml += '<th class="pb-3 px-1 text-center">' +
+            '<span class="block text-xs font-semibold text-orange-500 uppercase tracking-wide">' + abbr + '</span>' +
+            '<span class="mt-0.5 w-7 h-7 rounded-full bg-orange-500 text-white text-sm font-bold inline-flex items-center justify-center mx-auto">' + num + '</span>' +
+            '</th>';
+        } else {
+          headHtml += '<th class="pb-3 px-1 text-center">' +
+            '<span class="block text-xs font-semibold text-gray-400 uppercase tracking-wide">' + abbr + '</span>' +
+            '<span class="block text-sm font-medium text-gray-700">' + num + '</span>' +
+            '</th>';
+        }
+      });
+      headHtml += '</tr>';
+      document.getElementById('cal-head').innerHTML = headHtml;
+
+      // Body rows — one per staff
+      var staffList = getStaffList();
+      var bodyHtml  = '';
+      staffList.forEach(function (staffName, rowIdx) {
+        var color  = STAFF_COLORS[rowIdx % STAFF_COLORS.length];
+        var isLast = rowIdx === staffList.length - 1;
+        bodyHtml += '<tr class="' + (isLast ? '' : 'border-b border-gray-100') + ' hover:bg-gray-50/40">';
+        bodyHtml += '<td class="py-2.5 pr-3 align-top w-24">' +
+          '<span class="text-xs font-semibold text-gray-700 leading-tight">' + escHtml(staffName) + '</span>' +
+          '</td>';
+        weekDates.forEach(function (d) {
+          var iso     = fmtDate(d);
+          var isToday = iso === todayIso;
+          var entries = scheduleData.filter(function (s) {
+            return s.staff_name === staffName && s.date === iso;
+          });
+          bodyHtml += '<td class="py-2 px-1 align-top' + (isToday ? ' bg-orange-50/30' : '') + '" style="min-width:80px">';
+          entries.forEach(function (entry) {
+            var start = entry.start_time || '';
+            var end   = entry.end_time   || '';
+            var diff  = timeToMin(end) - timeToMin(start);
+            if (diff <= 0) diff += 1440;
+            var h = Math.floor(diff / 60), m = diff % 60;
+            var dur = h + 'h' + (m ? ' ' + m + 'm' : '');
+            var safeId = escHtml(String(entry.id));
+            bodyHtml +=
+              '<div onclick="deleteEntry(\'' + safeId + '\')" ' +
+              'title="Click to delete&#10;' + escHtml(staffName) + ': ' + start + '–' + end +
+                (entry.notes ? '&#10;Note: ' + escHtml(entry.notes) : '') + '" ' +
+              'class="mb-1 px-2 py-1 rounded-md cursor-pointer text-xs leading-snug border hover:opacity-75 transition-opacity" ' +
+              'style="background:' + color.bg + ';color:' + color.text + ';border-color:' + color.border + '">' +
+              '<div class="font-semibold whitespace-nowrap">' + start + '–' + end + '</div>' +
+              '<div class="opacity-70 truncate">' + dur + (entry.notes ? ' · ' + escHtml(entry.notes) : '') + '</div>' +
+              '</div>';
+          });
+          bodyHtml += '</td>';
+        });
+        bodyHtml += '</tr>';
+      });
+
+      if (!bodyHtml) {
+        bodyHtml = '<tr><td colspan="8" class="py-10 text-center text-gray-400 text-sm">No schedule data yet.</td></tr>';
+      }
+      document.getElementById('cal-body').innerHTML = bodyHtml;
+    }
 
     function calcDuration() {
       var s = document.getElementById('f-start').value;
@@ -209,6 +328,7 @@ import MainLayout from '../layouts/MainLayout.astro';
     }
 
     function timeToMin(t) {
+      if (!t) return 0;
       var p = t.split(':');
       return parseInt(p[0]) * 60 + parseInt(p[1]);
     }
@@ -218,68 +338,9 @@ import MainLayout from '../layouts/MainLayout.astro';
         .then(function (res) { return res.json(); })
         .then(function (data) {
           scheduleData = data.entries || [];
-          refreshTable(scheduleData);
+          renderCalendar();
         })
         .catch(function (err) { showToast('Failed to load schedule: ' + err.message, 'error'); });
-    }
-
-    function initTable() {
-      scheduleTable = $('#schedule-table').DataTable({
-        data: [],
-        columns: [
-          { title: 'Staff Name' },
-          { title: 'Date' },
-          { title: 'Start' },
-          { title: 'End' },
-          { title: 'Duration' },
-          { title: 'Notes' },
-          { title: 'Actions', orderable: false, searchable: false }
-        ],
-        dom: "<'flex flex-wrap items-center justify-between gap-3 mb-3'<'flex gap-2'B><'flex-1 text-right'f>>" +
-             "t" +
-             "<'flex flex-wrap items-center justify-between mt-3'<'text-sm text-gray-500'i><'flex gap-1'p>>",
-        buttons: [{
-          extend: 'csvHtml5',
-          text: '⬇ Export CSV',
-          title: 'Staff Schedule',
-          className: 'dt-btn-custom'
-        }],
-        order: [[1, 'desc'], [2, 'asc']],
-        pageLength: 15,
-        language: { emptyTable: 'No schedule entries yet. Add one using the form.' }
-      });
-    }
-
-    function buildRows(data) {
-      return data.map(function (s) {
-        var startTime = s.start_time || '';
-        var endTime   = s.end_time   || '';
-        var diff = timeToMin(endTime) - timeToMin(startTime);
-        if (diff <= 0) diff += 1440;
-        var h = Math.floor(diff / 60), m = diff % 60;
-        var dur = h + 'h' + (m ? ' ' + m + 'm' : '');
-        return [
-          escHtml(s.staff_name || ''),
-          s.date,
-          startTime,
-          endTime,
-          dur,
-          escHtml(s.notes || ''),
-          '<button onclick="deleteEntry(\'' + s.id + '\')" ' +
-            'class="inline-flex items-center gap-1 text-xs text-red-500 hover:text-red-700 ' +
-            'hover:bg-red-50 px-2 py-1 rounded transition">' +
-            '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" ' +
-            'd="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>' +
-            '</svg>Delete</button>'
-        ];
-      });
-    }
-
-    function refreshTable(data) {
-      scheduleTable.clear();
-      scheduleTable.rows.add(buildRows(data));
-      scheduleTable.draw();
     }
 
     // Form submit
@@ -312,7 +373,9 @@ import MainLayout from '../layouts/MainLayout.astro';
           btn.disabled = false; btn.textContent = 'Add to Schedule';
           if (data.error) { errEl.textContent = data.error; errEl.classList.remove('hidden'); return; }
           scheduleData.unshift(data.entry);
-          refreshTable(scheduleData);
+          // Jump to the week of the newly added entry
+          currentWeekStart = getWeekStart(new Date(date + 'T00:00:00'));
+          renderCalendar();
           document.getElementById('f-staff').value = '';
           document.getElementById('f-start').value = '';
           document.getElementById('f-end').value   = '';
@@ -335,31 +398,32 @@ import MainLayout from '../layouts/MainLayout.astro';
         .then(function (res) { return res.json(); })
         .then(function (data) {
           if (data.error) { showToast('Delete failed: ' + data.error, 'error'); return; }
-          scheduleData = scheduleData.filter(function (s) { return s.id !== id; });
-          refreshTable(scheduleData);
+          scheduleData = scheduleData.filter(function (s) { return String(s.id) !== String(id); });
+          renderCalendar();
           showToast('Entry deleted.', 'warning');
         })
         .catch(function (err) { showToast('Delete failed: ' + err.message, 'error'); });
     }
 
-    function applyFilter() {
-      var m = document.getElementById('filter-month').value;
-      var y = document.getElementById('filter-year').value;
-      var filtered = scheduleData.filter(function (s) {
-        var parts = s.date.split('-');
-        return (!y || parts[0] === y) && (!m || parts[1] === m);
+    function exportCSV() {
+      var rows = [['Staff Name', 'Date', 'Start', 'End', 'Notes']];
+      scheduleData.forEach(function (s) {
+        rows.push([s.staff_name, s.date, s.start_time, s.end_time, s.notes || '']);
       });
-      refreshTable(filtered);
-    }
-
-    function clearFilter() {
-      document.getElementById('filter-month').value = '';
-      document.getElementById('filter-year').value  = '';
-      refreshTable(scheduleData);
+      var csv = rows.map(function (r) {
+        return r.map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(',');
+      }).join('\n');
+      var blob = new Blob([csv], { type: 'text/csv' });
+      var url  = URL.createObjectURL(blob);
+      var a    = document.createElement('a');
+      a.href = url; a.download = 'staff-schedule.csv'; a.click();
+      URL.revokeObjectURL(url);
     }
 
     function escHtml(str) {
-      return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      return String(str || '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
     function showToast(msg, type) {
