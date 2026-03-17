@@ -515,9 +515,13 @@ import MainLayout from '../layouts/MainLayout.astro';
               ticks: {
                 color: '#6b7280',
                 font: { size: 10 },
+                stepSize: 10000000,
                 callback: function (v) {
-                  if (Math.abs(v) >= 1000000) return (v / 1000000).toFixed(1) + 'M';
-                  if (Math.abs(v) >= 1000)    return (v / 1000).toFixed(0) + 'K';
+                  var abs = Math.abs(v);
+                  var sign = v < 0 ? '-' : '';
+                  if (abs >= 1000000000) return sign + (abs / 1000000000).toFixed(1).replace(/\.0$/, '') + 'B';
+                  if (abs >= 1000000)    return sign + (abs / 1000000).toFixed(0) + 'M';
+                  if (abs >= 1000)       return sign + (abs / 1000).toFixed(0) + 'K';
                   return v;
                 }
               },
