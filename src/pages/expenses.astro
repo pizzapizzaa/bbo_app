@@ -577,6 +577,39 @@ import MainLayout from '../layouts/MainLayout.astro';
       });
     }
 
+    var COMMENT_LINES = 3; // lines to show before truncating
+    var LINE_HEIGHT_EM = 1.5;
+
+    function commentCell(text) {
+      if (!text) return '';
+      var safe = escHtml(text);
+      // Heuristic: only add toggle if text is likely > 3 lines (> ~150 chars or contains newlines)
+      var lineCount = (text.match(/\n/g) || []).length + 1;
+      var needsToggle = text.length > 150 || lineCount > COMMENT_LINES;
+      if (!needsToggle) return '<span class="whitespace-pre-wrap text-sm">' + safe + '</span>';
+      return '<div class="comment-cell" style="max-height:' + (COMMENT_LINES * LINE_HEIGHT_EM) + 'em;' +
+             'overflow:hidden;line-height:' + LINE_HEIGHT_EM + 'em;transition:max-height 0.2s ease">' +
+             '<span class="whitespace-pre-wrap text-sm">' + safe + '</span>' +
+             '</div>' +
+             '<button class="comment-toggle text-xs text-orange-500 hover:text-orange-700 font-medium mt-0.5"' +
+             ' data-expanded="false">Read More</button>';
+    }
+
+    // Event delegation — works after every DataTable draw
+    $(document).on('click', '.comment-toggle', function () {
+      var btn  = $(this);
+      var cell = btn.prev('.comment-cell');
+      var expanded = btn.attr('data-expanded') === 'true';
+      if (expanded) {
+        cell.css('max-height', (COMMENT_LINES * LINE_HEIGHT_EM) + 'em');
+        btn.text('Read More').attr('data-expanded', 'false');
+      } else {
+        // expand to full natural height
+        cell.css('max-height', cell[0].scrollHeight + 'px');
+        btn.text('Hide').attr('data-expanded', 'true');
+      }
+    });
+
     function typeBadge(type) {
       var cls = TYPE_COLORS[type] || 'bg-gray-100 text-gray-600';
       return '<span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ' +
@@ -592,7 +625,7 @@ import MainLayout from '../layouts/MainLayout.astro';
           escHtml(e.location || ''),
           escHtml(e.description || ''),
           '<span class="font-medium text-red-500 whitespace-nowrap">- ' + fmtVND(e.amount) + '</span>',
-          escHtml(e.comment || ''),
+          commentCell(e.comment || ''),
           '<button onclick="deleteExpense(\'' + safeId + '\')" ' +
             'class="inline-flex items-center gap-1 text-xs text-red-500 hover:text-red-700 ' +
             'hover:bg-red-50 px-2 py-1 rounded transition">' +
