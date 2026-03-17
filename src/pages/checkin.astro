@@ -66,6 +66,32 @@ import MainLayout from '../layouts/MainLayout.astro';
             </p>
           </div>
 
+          <!-- Check-in Date + Time -->
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-gray-300 mb-1.5">
+                Date <span class="text-red-400">*</span>
+              </label>
+              <input
+                id="f-checkin-date"
+                type="date"
+                class="w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm
+                       focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-300 mb-1.5">
+                Time <span class="text-red-400">*</span>
+              </label>
+              <input
+                id="f-checkin-time"
+                type="time"
+                class="w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm
+                       focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+              />
+            </div>
+          </div>
+
           <!-- Payment method -->
           <div>
             <label class="block text-sm font-medium text-gray-300 mb-1.5">
@@ -203,13 +229,18 @@ import MainLayout from '../layouts/MainLayout.astro';
     }
 
     $(document).ready(function () {
-      var today = new Date().toISOString().slice(0, 10);
-      document.getElementById('view-date').value       = today;
+      var now   = new Date();
+      var today = now.toISOString().slice(0, 10);
+      var timeNow = now.toTimeString().slice(0, 5);
+
+      document.getElementById('view-date').value              = today;
       document.getElementById('table-date-label').textContent = formatDateLabel(today);
+      document.getElementById('f-checkin-date').value         = today;
+      document.getElementById('f-checkin-time').value         = timeNow;
       activeDate = today;
 
       updateTsPreview();
-      setInterval(updateTsPreview, 10000);
+      $('#f-checkin-date, #f-checkin-time').on('change', updateTsPreview);
 
       buildCustomerDatalist();
       initTable();
@@ -217,11 +248,15 @@ import MainLayout from '../layouts/MainLayout.astro';
     });
 
     function updateTsPreview() {
+      var d = document.getElementById('f-checkin-date').value;
+      var t = document.getElementById('f-checkin-time').value;
       var el = document.getElementById('ts-preview');
-      if (el) el.textContent = new Date().toLocaleString('en-MY', {
-        year: 'numeric', month: 'short', day: 'numeric',
-        hour: '2-digit', minute: '2-digit', second: '2-digit'
-      });
+      if (el && d && t) {
+        el.textContent = new Date(d + 'T' + t).toLocaleString('en-MY', {
+          year: 'numeric', month: 'short', day: 'numeric',
+          hour: '2-digit', minute: '2-digit'
+        });
+      }
     }
 
     function buildCustomerDatalist() {
@@ -351,9 +386,9 @@ import MainLayout from '../layouts/MainLayout.astro';
       window._custDebounce = setTimeout(function () {
         var customer = allCustomers.find(function (c) { return c['Full Name'] === name; });
         if (!customer) return;
-        var today = new Date().toISOString().slice(0, 10);
+        var checkinDate = document.getElementById('f-checkin-date').value || new Date().toISOString().slice(0, 10);
         // Membership takes priority
-        if (customer._membership_type && customer._membership_end_date && customer._membership_end_date >= today) {
+        if (customer._membership_type && customer._membership_end_date && customer._membership_end_date >= checkinDate) {
           document.getElementById('f-payment').value = 'Valid Membership';
           document.getElementById('punch-from-row').classList.add('hidden');
           document.getElementById('f-punch-from').value = '';
@@ -399,8 +434,8 @@ import MainLayout from '../layouts/MainLayout.astro';
       }
 
       var now     = new Date();
-      var dateStr = now.toISOString().slice(0, 10);
-      var timeStr = now.toTimeString().slice(0, 5);
+      var dateStr = document.getElementById('f-checkin-date').value || now.toISOString().slice(0, 10);
+      var timeStr = document.getElementById('f-checkin-time').value || now.toTimeString().slice(0, 5);
 
       var btn = e.target.querySelector('[type="submit"]');
       btn.disabled = true;
@@ -422,8 +457,11 @@ import MainLayout from '../layouts/MainLayout.astro';
         .then(function (data) {
           btn.disabled = false;
           if (data.error) { errEl.textContent = data.error; errEl.classList.remove('hidden'); return; }
-          // Reload table if viewing the same date
-          if (activeDate === dateStr) loadCheckinsForDate(activeDate);
+          // Switch viewing date to the submitted date so the new entry is visible
+          activeDate = dateStr;
+          document.getElementById('view-date').value = dateStr;
+          document.getElementById('table-date-label').textContent = formatDateLabel(dateStr);
+          loadCheckinsForDate(activeDate);
           // Refresh punch card dropdown counts if a punch was used
           if (punchHolderId) buildCustomerDatalist();
           document.getElementById('f-customer').value   = '';
@@ -432,6 +470,11 @@ import MainLayout from '../layouts/MainLayout.astro';
           document.getElementById('f-notes').value      = '';
           document.getElementById('f-punch-from').value = '';
           document.getElementById('punch-from-row').classList.add('hidden');
+          // Reset date+time to now for next entry
+          var n = new Date();
+          document.getElementById('f-checkin-date').value = n.toISOString().slice(0, 10);
+          document.getElementById('f-checkin-time').value = n.toTimeString().slice(0, 5);
+          updateTsPreview();
           showToast('✓ Check-in recorded for ' + customerName + '!');
           document.getElementById('f-customer').focus();
         })
