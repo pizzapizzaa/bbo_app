@@ -267,6 +267,12 @@ import MainLayout from '../layouts/MainLayout.astro';
           allCustomers = rows;
           var list = document.getElementById('customer-datalist');
           list.innerHTML = '';
+          // Always prepend fixed entries
+          ['New Customer', 'Other'].forEach(function (label) {
+            var opt = document.createElement('option');
+            opt.value = label;
+            list.appendChild(opt);
+          });
           if (rows.length) {
             document.getElementById('customer-hint').classList.add('hidden');
             rows.forEach(function (c) {
