@@ -191,6 +191,23 @@ import MainLayout from '../layouts/MainLayout.astro';
           </div>
         </div>
 
+        <!-- Divider -->
+        <div class="border-t border-gray-700/60"></div>
+
+        <!-- Monthly trend chart -->
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest">Monthly Trend</p>
+            <!-- period toggle -->
+            <div class="flex gap-1">
+              <button id="chart-btn-6"  onclick="setChartMonths(6)"  class="chart-range-btn px-2.5 py-1 text-xs rounded-md bg-gray-700 text-gray-300 hover:bg-gray-600 transition">6 mo</button>
+              <button id="chart-btn-12" onclick="setChartMonths(12)" class="chart-range-btn px-2.5 py-1 text-xs rounded-md bg-orange-500 text-white transition">12 mo</button>
+              <button id="chart-btn-24" onclick="setChartMonths(24)" class="chart-range-btn px-2.5 py-1 text-xs rounded-md bg-gray-700 text-gray-300 hover:bg-gray-600 transition">24 mo</button>
+            </div>
+          </div>
+          <canvas id="trend-chart" height="180"></canvas>
+        </div>
+
       </div>
     </div>
   </div>
@@ -216,10 +233,14 @@ import MainLayout from '../layouts/MainLayout.astro';
     </div>
   </div>
 
+  <script is:inline src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+
   <script is:inline>
     var expenseTable;
     var expenseData = [];
     var revenueRows = [];
+    var trendChart  = null;
+    var chartMonths = 12;
 
     var TYPE_COLORS = {
       'Construction Setup':    'bg-blue-100 text-blue-700',
@@ -345,6 +366,168 @@ import MainLayout from '../layouts/MainLayout.astro';
       setBalStat('stat-bal-year',    revYear    - expYear);
     }
 
+    // ── Chart helpers ──
+    function buildMonthLabels(n) {
+      var labels = [];
+      var now    = new Date();
+      for (var i = n - 1; i >= 0; i--) {
+        var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        labels.push(MONTHS[d.getMonth()] + ' ' + String(d.getFullYear()).slice(2));
+      }
+      return labels;
+    }
+
+    function buildMonthKeys(n) {
+      var keys = [];
+      var now  = new Date();
+      for (var i = n - 1; i >= 0; i--) {
+        var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        keys.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'));
+      }
+      return keys;
+    }
+
+    function sumByMonth(rows, keys) {
+      var map = {};
+      keys.forEach(function (k) { map[k] = 0; });
+      rows.forEach(function (r) {
+        var k = (r.date || '').slice(0, 7);
+        if (map[k] !== undefined) map[k] += (Number(r.amount) || 0);
+      });
+      return keys.map(function (k) { return map[k]; });
+    }
+
+    function setChartMonths(n) {
+      chartMonths = n;
+      // update button styles
+      [6, 12, 24].forEach(function (v) {
+        var btn = document.getElementById('chart-btn-' + v);
+        if (v === n) {
+          btn.className = 'chart-range-btn px-2.5 py-1 text-xs rounded-md bg-orange-500 text-white transition';
+        } else {
+          btn.className = 'chart-range-btn px-2.5 py-1 text-xs rounded-md bg-gray-700 text-gray-300 hover:bg-gray-600 transition';
+        }
+      });
+      renderChart();
+    }
+
+    function renderChart() {
+      var keys   = buildMonthKeys(chartMonths);
+      var labels = buildMonthLabels(chartMonths);
+      var expVals = sumByMonth(expenseData, keys);
+      var revVals = sumByMonth(revenueRows, keys);
+      var balVals = revVals.map(function (r, i) { return r - expVals[i]; });
+
+      var ctx = document.getElementById('trend-chart').getContext('2d');
+
+      if (trendChart) {
+        trendChart.data.labels             = labels;
+        trendChart.data.datasets[0].data   = expVals;
+        trendChart.data.datasets[1].data   = revVals;
+        trendChart.data.datasets[2].data   = balVals;
+        trendChart.update();
+        return;
+      }
+
+      trendChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Expenses',
+              data: expVals,
+              borderColor:     'rgb(248, 113, 113)',
+              backgroundColor: 'rgba(248, 113, 113, 0.08)',
+              pointBackgroundColor: 'rgb(248, 113, 113)',
+              tension: 0.35,
+              fill: false,
+              pointRadius: 4,
+              pointHoverRadius: 6,
+            },
+            {
+              label: 'Revenue',
+              data: revVals,
+              borderColor:     'rgb(251, 146, 60)',
+              backgroundColor: 'rgba(251, 146, 60, 0.08)',
+              pointBackgroundColor: 'rgb(251, 146, 60)',
+              tension: 0.35,
+              fill: false,
+              pointRadius: 4,
+              pointHoverRadius: 6,
+            },
+            {
+              label: 'Balance',
+              data: balVals,
+              borderColor:     'rgb(52, 211, 153)',
+              backgroundColor: 'rgba(52, 211, 153, 0.08)',
+              pointBackgroundColor: 'rgb(52, 211, 153)',
+              tension: 0.35,
+              fill: false,
+              pointRadius: 4,
+              pointHoverRadius: 6,
+              borderDash: [5, 3],
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: {
+              display: true,
+              position: 'bottom',
+              labels: {
+                color: '#9ca3af',
+                boxWidth: 12,
+                boxHeight: 12,
+                borderRadius: 3,
+                useBorderRadius: true,
+                padding: 18,
+                font: { size: 11, family: 'Inter, system-ui, sans-serif' },
+              }
+            },
+            tooltip: {
+              backgroundColor: '#1f2937',
+              titleColor: '#f3f4f6',
+              bodyColor: '#d1d5db',
+              borderColor: '#374151',
+              borderWidth: 1,
+              padding: 10,
+              callbacks: {
+                label: function (ctx) {
+                  var val = ctx.parsed.y;
+                  var abs = Math.abs(val);
+                  var formatted = new Intl.NumberFormat('vi-VN').format(Math.round(abs)) + ' ₫';
+                  return ' ' + ctx.dataset.label + ': ' + (val < 0 ? '- ' : '') + formatted;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid:  { color: 'rgba(255,255,255,0.05)' },
+              ticks: { color: '#6b7280', font: { size: 10 } },
+              border: { color: 'rgba(255,255,255,0.08)' }
+            },
+            y: {
+              grid:  { color: 'rgba(255,255,255,0.05)' },
+              ticks: {
+                color: '#6b7280',
+                font: { size: 10 },
+                callback: function (v) {
+                  if (Math.abs(v) >= 1000000) return (v / 1000000).toFixed(1) + 'M';
+                  if (Math.abs(v) >= 1000)    return (v / 1000).toFixed(0) + 'K';
+                  return v;
+                }
+              },
+              border: { color: 'rgba(255,255,255,0.08)' }
+            }
+          }
+        }
+      });
+    }
+
     function loadData() {
       apiFetch('/api/expenses')
         .then(function (r) { return r.json(); })
@@ -353,6 +536,7 @@ import MainLayout from '../layouts/MainLayout.astro';
           revenueRows = data.revenue_rows || [];
           refreshTable(expenseData);
           updateStats();
+          renderChart();
         })
         .catch(function (err) { showToast('Failed to load data: ' + err.message, 'error'); });
     }
