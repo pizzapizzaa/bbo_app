@@ -4,8 +4,23 @@ import MainLayout from '../layouts/MainLayout.astro';
 
 <MainLayout title="Daily Check-in" activePage="checkin">
 
-  <!-- Date selector + daily stats -->
+  <!-- Daily stats + Date selector -->
   <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+
+    <!-- Daily stats (left — aligned with check-in card) -->
+    <div class="flex items-center gap-4">
+      <div class="text-center">
+        <p class="text-xs text-gray-500 uppercase tracking-wide">Check-ins</p>
+        <p id="stat-count" class="text-2xl font-bold text-gray-900">0</p>
+      </div>
+      <div class="w-px h-10 bg-gray-200"></div>
+      <div class="text-center">
+        <p class="text-xs text-gray-500 uppercase tracking-wide">Revenue</p>
+        <p id="stat-rev" class="text-2xl font-bold text-orange-500">0 ₫</p>
+      </div>
+    </div>
+
+    <!-- Date selector (right — aligned with check-in list) -->
     <div class="flex items-center gap-3">
       <label class="text-sm font-medium text-gray-600">Viewing date:</label>
       <input
@@ -19,19 +34,6 @@ import MainLayout from '../layouts/MainLayout.astro';
                      rounded-lg text-sm font-medium transition">
         Go
       </button>
-    </div>
-
-    <!-- Daily stats -->
-    <div class="flex items-center gap-4">
-      <div class="text-center">
-        <p class="text-xs text-gray-500 uppercase tracking-wide">Check-ins</p>
-        <p id="stat-count" class="text-2xl font-bold text-gray-900">0</p>
-      </div>
-      <div class="w-px h-10 bg-gray-200"></div>
-      <div class="text-center">
-        <p class="text-xs text-gray-500 uppercase tracking-wide">Revenue</p>
-        <p id="stat-rev" class="text-2xl font-bold text-orange-500">0 ₫</p>
-      </div>
     </div>
   </div>
 
