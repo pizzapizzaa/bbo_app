@@ -119,7 +119,7 @@ import MainLayout from '../layouts/MainLayout.astro';
         var schedData = results[2];
 
         // ── Customers stat ──
-        var totalCustomers = (custData.rows || []).length;
+        var totalCustomers = custData.total != null ? custData.total : (custData.rows || []).length;
         document.getElementById('stat-customers').textContent = totalCustomers;
 
         // ── Check-ins ──

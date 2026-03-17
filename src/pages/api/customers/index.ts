@@ -27,8 +27,10 @@ export const GET: APIRoute = async () => {
 
   const res = await db
     .from('customers')
-    .select('id, full_name, dob, email, telephone, emergency_contact, note, waiver_form, is_punch_card_holder, punches_remaining, membership_type, membership_start_date, membership_end_date')
+    .select('id, full_name, dob, email, telephone, emergency_contact, note, waiver_form, is_punch_card_holder, punches_remaining, membership_type, membership_start_date, membership_end_date', { count: 'exact' })
     .order('full_name');
+
+  let total: number | null = null;
 
   if (res.error) {
     // Column doesn't exist yet — retry without punch card columns
@@ -36,15 +38,17 @@ export const GET: APIRoute = async () => {
       hasPunchCols = false;
       const fallback = await db
         .from('customers')
-        .select('id, full_name, dob, email, telephone, emergency_contact, note, waiver_form')
+        .select('id, full_name, dob, email, telephone, emergency_contact, note, waiver_form', { count: 'exact' })
         .order('full_name');
       if (fallback.error) return serverError(fallback.error.message);
       data = fallback.data ?? [];
+      total = fallback.count;
     } else {
       return serverError(res.error.message);
     }
   } else {
     data = res.data ?? [];
+    total = res.count;
   }
 
   // Map DB rows back to the original CSV-style header names for the frontend
@@ -68,7 +72,7 @@ export const GET: APIRoute = async () => {
     _membership_end_date:   hasPunchCols ? (r.membership_end_date ?? '') : '',
   }));
 
-  return ok({ headers: DISPLAY_HEADERS, rows, _punchColsMissing: !hasPunchCols });
+  return ok({ headers: DISPLAY_HEADERS, rows, total: total ?? rows.length, _punchColsMissing: !hasPunchCols });
   } catch (e: any) { return serverError(e?.message ?? String(e)); }
 };
 
