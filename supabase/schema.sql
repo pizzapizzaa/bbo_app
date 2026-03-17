@@ -58,6 +58,22 @@ CREATE TABLE IF NOT EXISTS checkins (
 
 CREATE INDEX IF NOT EXISTS idx_checkins_date ON checkins (date);
 
+-- ── Expenses ────────────────────────────────────────────────────────────────────────────
+-- One row per logged expense. Amounts are stored as positive integers (VND).
+CREATE TABLE IF NOT EXISTS expenses (
+  id          UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
+  date        DATE            NOT NULL,
+  type        TEXT            NOT NULL,  -- Construction Setup | Construction Material | Holds | Marketing | Rent | Utility | Manpower Cost | Misc
+  description TEXT            NOT NULL DEFAULT '',
+  location    TEXT            NOT NULL DEFAULT '',
+  amount      NUMERIC(15,0)   NOT NULL DEFAULT 0,  -- VND, stored positive, displayed as negative
+  comment     TEXT            NOT NULL DEFAULT '',
+  created_at  TIMESTAMPTZ     NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses (date);
+CREATE INDEX IF NOT EXISTS idx_expenses_type ON expenses (type);
+
 -- ══════════════════════════════════════════════════════════════════════════════
 -- Row Level Security (RLS)
 -- The service key (used only server-side in API routes) bypasses RLS.
