@@ -7,7 +7,7 @@ import { ok, serverError } from '../../../lib/auth';
 const VALID_TYPES = [
   'Construction Setup', 'Construction Material', 'Holds',
   'Marketing', 'Rent', 'Utility', 'Manpower Cost', 'Misc',
-  'Rental Shoes', 'Other',
+  'Operation Cost', 'Rental Shoes', 'Other',
 ];
 
 /**
