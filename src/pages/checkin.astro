@@ -20,19 +20,42 @@ import MainLayout from '../layouts/MainLayout.astro';
       </div>
     </div>
 
-    <!-- Date selector (right — aligned with check-in list) -->
-    <div class="flex items-center gap-3">
-      <label class="text-sm font-medium text-gray-600">Viewing date:</label>
+    <!-- Date range selector (right — aligned with check-in list) -->
+    <div class="flex flex-wrap items-center gap-2">
+      <label class="text-sm font-medium text-gray-600">From:</label>
       <input
-        id="view-date"
+        id="view-from"
         type="date"
         class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm
                focus:outline-none focus:ring-2 focus:ring-orange-400"
       />
-      <button onclick="refreshForDate()"
-              class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700
+      <label class="text-sm font-medium text-gray-600">To:</label>
+      <input
+        id="view-to"
+        type="date"
+        class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm
+               focus:outline-none focus:ring-2 focus:ring-orange-400"
+      />
+      <button onclick="refreshForRange()"
+              class="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white
                      rounded-lg text-sm font-medium transition">
         Go
+      </button>
+      <div class="w-px h-6 bg-gray-200"></div>
+      <button onclick="setQuick('today')"
+              class="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600
+                     rounded-lg text-xs font-medium transition">
+        Today
+      </button>
+      <button onclick="setQuick('week')"
+              class="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600
+                     rounded-lg text-xs font-medium transition">
+        This Week
+      </button>
+      <button onclick="setQuick('month')"
+              class="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600
+                     rounded-lg text-xs font-medium transition">
+        This Month
       </button>
     </div>
   </div>
@@ -181,7 +204,7 @@ import MainLayout from '../layouts/MainLayout.astro';
       <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div class="flex items-center justify-between mb-5">
           <h2 class="font-semibold text-gray-800">
-            Check-ins for <span id="table-date-label" class="text-orange-500"></span>
+            Check-ins: <span id="table-date-label" class="text-orange-500"></span>
           </h2>
           <button onclick="exportCheckins()"
                   class="inline-flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-800
@@ -198,6 +221,7 @@ import MainLayout from '../layouts/MainLayout.astro';
           <table id="checkin-table" class="w-full" style="width:100%">
             <thead>
               <tr>
+                <th>Date</th>
                 <th>Time</th>
                 <th>Customer</th>
                 <th>Payment</th>
@@ -216,8 +240,9 @@ import MainLayout from '../layouts/MainLayout.astro';
 
   <script is:inline>
     var checkinTable;
-    var allCheckins = [];
-    var activeDate  = '';
+    var allCheckins  = [];
+    var activeFrom   = '';
+    var activeTo     = '';
     var allCustomers = [];  // cache with punch card info
 
     // ── API helper ──
@@ -233,18 +258,20 @@ import MainLayout from '../layouts/MainLayout.astro';
       var today = now.toISOString().slice(0, 10);
       var timeNow = now.toTimeString().slice(0, 5);
 
-      document.getElementById('view-date').value              = today;
+      document.getElementById('view-from').value             = today;
+      document.getElementById('view-to').value               = today;
       document.getElementById('table-date-label').textContent = formatDateLabel(today);
       document.getElementById('f-checkin-date').value         = today;
       document.getElementById('f-checkin-time').value         = timeNow;
-      activeDate = today;
+      activeFrom = today;
+      activeTo   = today;
 
       updateTsPreview();
       $('#f-checkin-date, #f-checkin-time').on('change', updateTsPreview);
 
       buildCustomerDatalist();
       initTable();
-      loadCheckinsForDate(today);
+      loadCheckinsForRange(today, today);
     });
 
     function updateTsPreview() {
@@ -304,8 +331,11 @@ import MainLayout from '../layouts/MainLayout.astro';
       hint.classList.toggle('hidden', holders.length > 0);
     }
 
-    function loadCheckinsForDate(date) {
-      apiFetch('/api/checkins?date=' + date)
+    function loadCheckinsForRange(from, to) {
+      var qs = (from === to)
+        ? '?date=' + from
+        : '?from=' + from + '&to=' + to;
+      apiFetch('/api/checkins' + qs)
         .then(function (res) { return res.json(); })
         .then(function (data) {
           allCheckins = data.checkins || [];
@@ -319,6 +349,7 @@ import MainLayout from '../layouts/MainLayout.astro';
       checkinTable = $('#checkin-table').DataTable({
         data: [],
         columns: [
+          { title: 'Date' },
           { title: 'Time' },
           { title: 'Customer' },
           { title: 'Payment' },
@@ -330,15 +361,16 @@ import MainLayout from '../layouts/MainLayout.astro';
         dom: "<'flex flex-wrap items-center justify-between gap-3 mb-3'<'text-sm text-gray-500'i><'flex-1 text-right'f>>" +
              "t" +
              "<'flex flex-wrap items-center justify-between mt-3'<''><'flex gap-1'p>>",
-        order: [[0, 'asc']],
+        order: [[0, 'asc'], [1, 'asc']],
         pageLength: 20,
-        language: { emptyTable: 'No check-ins for this date.' }
+        language: { emptyTable: 'No check-ins for this period.' }
       });
     }
 
     function buildRows(checkins) {
       return checkins.map(function (c) {
         return [
+          c.date || '',
           (c.time || '').slice(0, 5),
           escHtml(c.customer_name || ''),
           '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ' +
@@ -371,11 +403,41 @@ import MainLayout from '../layouts/MainLayout.astro';
       document.getElementById('stat-rev').textContent = Math.round(rev).toLocaleString('vi-VN') + ' ₫';
     }
 
-    function refreshForDate() {
-      activeDate = document.getElementById('view-date').value;
-      if (!activeDate) return;
-      document.getElementById('table-date-label').textContent = formatDateLabel(activeDate);
-      loadCheckinsForDate(activeDate);
+    function refreshForRange() {
+      var from = document.getElementById('view-from').value;
+      var to   = document.getElementById('view-to').value;
+      if (!from || !to) return;
+      if (to < from) {
+        document.getElementById('view-to').value = from;
+        to = from;
+      }
+      activeFrom = from;
+      activeTo   = to;
+      document.getElementById('table-date-label').textContent =
+        from === to ? formatDateLabel(from) : (from + ' → ' + to);
+      loadCheckinsForRange(from, to);
+    }
+
+    function setQuick(period) {
+      var now   = new Date();
+      var today = now.toISOString().slice(0, 10);
+      var from, to;
+      if (period === 'today') {
+        from = to = today;
+      } else if (period === 'week') {
+        var day = now.getDay(); // 0=Sun
+        var mon = new Date(now); mon.setDate(now.getDate() - ((day + 6) % 7));
+        var sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+        from = mon.toISOString().slice(0, 10);
+        to   = sun.toISOString().slice(0, 10);
+      } else if (period === 'month') {
+        from = today.slice(0, 7) + '-01';
+        var lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        to = lastDay.toISOString().slice(0, 10);
+      }
+      document.getElementById('view-from').value = from;
+      document.getElementById('view-to').value   = to;
+      refreshForRange();
     }
 
     // ── Punch card: show/hide punch-from section on payment change ──
@@ -464,10 +526,12 @@ import MainLayout from '../layouts/MainLayout.astro';
           btn.disabled = false;
           if (data.error) { errEl.textContent = data.error; errEl.classList.remove('hidden'); return; }
           // Switch viewing date to the submitted date so the new entry is visible
-          activeDate = dateStr;
-          document.getElementById('view-date').value = dateStr;
+          activeFrom = dateStr;
+          activeTo   = dateStr;
+          document.getElementById('view-from').value = dateStr;
+          document.getElementById('view-to').value   = dateStr;
           document.getElementById('table-date-label').textContent = formatDateLabel(dateStr);
-          loadCheckinsForDate(activeDate);
+          loadCheckinsForRange(dateStr, dateStr);
           // Refresh punch card dropdown counts if a punch was used
           if (punchHolderId) buildCustomerDatalist();
           document.getElementById('f-customer').value   = '';
@@ -497,14 +561,15 @@ import MainLayout from '../layouts/MainLayout.astro';
         .then(function (res) { return res.json(); })
         .then(function (data) {
           if (data.error) { showToast('Delete failed: ' + data.error, 'error'); return; }
-          loadCheckinsForDate(activeDate);
+          loadCheckinsForRange(activeFrom, activeTo);
           showToast('Check-in deleted.', 'warning');
         })
         .catch(function (err) { showToast('Delete failed: ' + err.message, 'error'); });
     }
 
     function exportCheckins() {
-      if (!allCheckins.length) { showToast('No check-ins to export for this date.', 'warning'); return; }
+      if (!allCheckins.length) { showToast('No check-ins to export for this period.', 'warning'); return; }
+      var label = activeFrom === activeTo ? activeFrom : (activeFrom + '_to_' + activeTo);
       var headers = ['Date', 'Time', 'Customer Name', 'Payment Method', 'Amount', 'Punch From', 'Notes'];
       var csvContent = [headers].concat(allCheckins.map(function (c) {
         return [c.date, (c.time || '').slice(0, 5), c.customer_name, c.payment_method,
@@ -516,7 +581,7 @@ import MainLayout from '../layouts/MainLayout.astro';
       var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       var url  = URL.createObjectURL(blob);
       var a    = document.createElement('a');
-      a.href   = url; a.download = 'checkins-' + activeDate + '.csv'; a.click();
+      a.href   = url; a.download = 'checkins-' + label + '.csv'; a.click();
       URL.revokeObjectURL(url);
     }
 

@@ -4,17 +4,28 @@ import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
 import { ok, serverError } from '../../../lib/auth';
 
-/** GET /api/checkins?date=YYYY-MM-DD — return all check-ins for a date */
+/** GET /api/checkins?date=YYYY-MM-DD          — single date
+ *  GET /api/checkins?from=YYYY-MM-DD&to=YYYY-MM-DD — inclusive date range */
 export const GET: APIRoute = async ({ url }) => {
   const date = url.searchParams.get('date');
-  if (!date) return new Response(JSON.stringify({ error: 'Missing date' }), { status: 400 });
+  const from = url.searchParams.get('from');
+  const to   = url.searchParams.get('to');
 
-  const { data, error } = await db
+  let query = db
     .from('checkins')
     .select('*')
-    .eq('date', date)
+    .order('date',          { ascending: true })
     .order('checked_in_at', { ascending: true });
 
+  if (date) {
+    query = query.eq('date', date);
+  } else if (from && to) {
+    query = query.gte('date', from).lte('date', to);
+  } else {
+    return new Response(JSON.stringify({ error: 'Missing date or from/to range' }), { status: 400 });
+  }
+
+  const { data, error } = await query;
   if (error) return serverError(error.message);
   return ok({ checkins: data ?? [] });
 };
