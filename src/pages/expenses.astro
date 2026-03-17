@@ -201,14 +201,26 @@ import MainLayout from '../layouts/MainLayout.astro';
         <div>
           <div class="flex items-center justify-between mb-3">
             <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest">Monthly Trend</p>
-            <!-- period toggle -->
-            <div class="flex gap-1">
-              <button id="chart-btn-6"  onclick="setChartMonths(6)"  class="chart-range-btn px-2.5 py-1 text-xs rounded-md bg-gray-700 text-gray-300 hover:bg-gray-600 transition">6 mo</button>
-              <button id="chart-btn-12" onclick="setChartMonths(12)" class="chart-range-btn px-2.5 py-1 text-xs rounded-md bg-orange-500 text-white transition">12 mo</button>
-              <button id="chart-btn-24" onclick="setChartMonths(24)" class="chart-range-btn px-2.5 py-1 text-xs rounded-md bg-gray-700 text-gray-300 hover:bg-gray-600 transition">24 mo</button>
+            <div class="flex items-center gap-2">
+              <!-- period toggle -->
+              <div id="chart-range-btns" class="flex gap-1">
+                <button id="chart-btn-6"  onclick="setChartMonths(6)"  class="chart-range-btn px-2.5 py-1 text-xs rounded-md bg-gray-700 text-gray-300 hover:bg-gray-600 transition">6 mo</button>
+                <button id="chart-btn-12" onclick="setChartMonths(12)" class="chart-range-btn px-2.5 py-1 text-xs rounded-md bg-orange-500 text-white transition">12 mo</button>
+                <button id="chart-btn-24" onclick="setChartMonths(24)" class="chart-range-btn px-2.5 py-1 text-xs rounded-md bg-gray-700 text-gray-300 hover:bg-gray-600 transition">24 mo</button>
+              </div>
+              <!-- expand/collapse -->
+              <button id="chart-toggle-btn" onclick="toggleChart()"
+                class="flex items-center gap-1 px-2.5 py-1 text-xs rounded-md bg-gray-700 text-gray-300 hover:bg-gray-600 transition">
+                <svg id="chart-toggle-icon" class="w-3.5 h-3.5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>
+                </svg>
+                <span id="chart-toggle-label">Collapse</span>
+              </button>
             </div>
           </div>
-          <canvas id="trend-chart" height="180"></canvas>
+          <div id="chart-body" style="overflow:hidden;transition:max-height 0.25s ease,opacity 0.25s ease;max-height:600px;opacity:1">
+            <canvas id="trend-chart" height="180"></canvas>
+          </div>
         </div>
 
       </div>
@@ -401,6 +413,29 @@ import MainLayout from '../layouts/MainLayout.astro';
         if (map[k] !== undefined) map[k] += (Number(r.amount) || 0);
       });
       return keys.map(function (k) { return map[k]; });
+    }
+
+    var chartExpanded = true;
+
+    function toggleChart() {
+      var body  = document.getElementById('chart-body');
+      var icon  = document.getElementById('chart-toggle-icon');
+      var label = document.getElementById('chart-toggle-label');
+      var rangeBtns = document.getElementById('chart-range-btns');
+      chartExpanded = !chartExpanded;
+      if (chartExpanded) {
+        body.style.maxHeight = '600px';
+        body.style.opacity   = '1';
+        icon.style.transform = 'rotate(0deg)';
+        label.textContent    = 'Collapse';
+        rangeBtns.style.display = '';
+      } else {
+        body.style.maxHeight = '0';
+        body.style.opacity   = '0';
+        icon.style.transform = 'rotate(180deg)';
+        label.textContent    = 'Expand';
+        rangeBtns.style.display = 'none';
+      }
     }
 
     function setChartMonths(n) {
