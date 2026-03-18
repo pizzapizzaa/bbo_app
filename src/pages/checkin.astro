@@ -60,17 +60,17 @@ import MainLayout from '../layouts/MainLayout.astro';
     </div>
   </div>
 
-  <div class="space-y-6">
+  <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
-    <!-- ── Check-in Form (full width) ── -->
-    <div class="bg-gray-900 rounded-xl shadow-lg p-6">
-      <h2 class="font-semibold text-white mb-5 tracking-wide">New Check-in</h2>
+    <!-- ── Check-in Form ── -->
+    <div class="xl:col-span-1">
+      <div class="bg-gray-900 rounded-xl shadow-lg p-6">
+        <h2 class="font-semibold text-white mb-5 tracking-wide">New Check-in</h2>
 
-      <form id="checkin-form" novalidate>
+        <form id="checkin-form" class="space-y-4" novalidate>
 
-        <!-- Row 1: Customer / Date / Time -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-          <div class="sm:col-span-1">
+          <!-- Customer search -->
+          <div>
             <label class="block text-sm font-medium text-gray-300 mb-1.5">
               Customer <span class="text-red-400">*</span>
             </label>
@@ -88,32 +88,34 @@ import MainLayout from '../layouts/MainLayout.astro';
               Load customers on the <a href="/customers" class="text-orange-400 hover:underline">Customers</a> page first.
             </p>
           </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1.5">
-              Date <span class="text-red-400">*</span>
-            </label>
-            <input
-              id="f-checkin-date"
-              type="date"
-              class="w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm
-                     focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-            />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1.5">
-              Time <span class="text-red-400">*</span>
-            </label>
-            <input
-              id="f-checkin-time"
-              type="time"
-              class="w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm
-                     focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-            />
-          </div>
-        </div>
 
-        <!-- Row 2: Check-in Type / Add-ons -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          <!-- Check-in Date + Time -->
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-gray-300 mb-1.5">
+                Date <span class="text-red-400">*</span>
+              </label>
+              <input
+                id="f-checkin-date"
+                type="date"
+                class="w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm
+                       focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-300 mb-1.5">
+                Time <span class="text-red-400">*</span>
+              </label>
+              <input
+                id="f-checkin-time"
+                type="time"
+                class="w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm
+                       focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          <!-- Check-in Type -->
           <div>
             <label class="block text-sm font-medium text-gray-300 mb-1.5">Check-in Type</label>
             <select
@@ -143,39 +145,39 @@ import MainLayout from '../layouts/MainLayout.astro';
               </optgroup>
             </select>
           </div>
+
+          <!-- Add-ons -->
           <div>
             <label class="block text-sm font-medium text-gray-300 mb-1.5">Add-ons</label>
-            <div class="grid grid-cols-3 gap-y-2 gap-x-3 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2.5">
+            <div class="grid grid-cols-2 gap-y-2 gap-x-3 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2.5">
               <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
                 <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Chalk Ball" data-price="75000" />
-                <span>Chalk Ball <span class="text-gray-500 text-xs">75k</span></span>
+                <span>Chalk Ball <span class="text-gray-500 text-xs">75,000 ₫</span></span>
               </label>
               <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
                 <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Liquid Chalk Rental" data-price="25000" />
-                <span>Liquid Chalk <span class="text-gray-500 text-xs">25k</span></span>
+                <span>Liquid Chalk Rental <span class="text-gray-500 text-xs">25,000 ₫</span></span>
               </label>
               <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
                 <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Shoes Rental" data-price="20000" />
-                <span>Shoes Rental <span class="text-gray-500 text-xs">20k</span></span>
+                <span>Shoes Rental <span class="text-gray-500 text-xs">20,000 ₫</span></span>
               </label>
               <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
                 <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Vitani Dasani" data-price="8000" />
-                <span>Vitani Dasani <span class="text-gray-500 text-xs">8k</span></span>
+                <span>Vitani Dasani <span class="text-gray-500 text-xs">8,000 ₫</span></span>
               </label>
               <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
                 <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Ionlife" data-price="10000" />
-                <span>Ionlife <span class="text-gray-500 text-xs">10k</span></span>
+                <span>Ionlife <span class="text-gray-500 text-xs">10,000 ₫</span></span>
               </label>
               <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
                 <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Pocari" data-price="18000" />
-                <span>Pocari <span class="text-gray-500 text-xs">18k</span></span>
+                <span>Pocari <span class="text-gray-500 text-xs">18,000 ₫</span></span>
               </label>
             </div>
           </div>
-        </div>
 
-        <!-- Row 3: Payment / Punch From / Amount / Notes -->
-        <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-4">
+          <!-- Payment method -->
           <div>
             <label class="block text-sm font-medium text-gray-300 mb-1.5">
               Payment Method <span class="text-red-400">*</span>
@@ -195,6 +197,8 @@ import MainLayout from '../layouts/MainLayout.astro';
               <option value="Valid Membership">Valid Membership</option>
             </select>
           </div>
+
+          <!-- Use punch from (shown only when Punch Card is selected) -->
           <div id="punch-from-row" class="hidden">
             <label class="block text-sm font-medium text-gray-300 mb-1.5">
               Use punch from <span class="text-red-400">*</span>
@@ -208,6 +212,8 @@ import MainLayout from '../layouts/MainLayout.astro';
             </select>
             <p id="punch-from-hint" class="hidden text-xs text-yellow-400 mt-1">No punch card holders with remaining punches found.</p>
           </div>
+
+          <!-- Amount -->
           <div>
             <label class="block text-sm font-medium text-gray-300 mb-1.5">
               Amount (VND) <span class="text-gray-500 text-xs font-normal">— auto-calculated</span>
@@ -222,6 +228,8 @@ import MainLayout from '../layouts/MainLayout.astro';
                      focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
             />
           </div>
+
+          <!-- Notes -->
           <div>
             <label class="block text-sm font-medium text-gray-300 mb-1.5">Notes</label>
             <input
@@ -232,18 +240,19 @@ import MainLayout from '../layouts/MainLayout.astro';
                      focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
             />
           </div>
-        </div>
 
-        <!-- Bottom bar: timestamp preview + submit -->
-        <div class="flex flex-wrap items-center gap-4">
-          <div class="text-xs text-gray-400 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 flex-1 min-w-0">
+          <!-- Check-in timestamp preview -->
+          <div class="text-xs text-gray-400 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2">
             Timestamp: <span id="ts-preview" class="font-medium text-gray-200"></span>
           </div>
+
+          <!-- Error -->
           <div id="form-error" class="hidden text-sm text-red-400 bg-red-900/40 border border-red-700 rounded-lg px-3 py-2"></div>
+
           <button
             type="submit"
-            class="bg-orange-500 hover:bg-orange-600 text-white font-semibold
-                   px-8 py-2.5 rounded-lg text-sm transition active:scale-[0.98] flex items-center gap-2 shrink-0"
+            class="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold
+                   py-3 rounded-lg text-sm transition active:scale-[0.98] flex items-center justify-center gap-2"
           >
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -251,13 +260,12 @@ import MainLayout from '../layouts/MainLayout.astro';
             </svg>
             Record Check-in
           </button>
-        </div>
-
-      </form>
+        </form>
+      </div>
     </div>
 
     <!-- ── Check-ins Table ── -->
-    <div>
+    <div class="xl:col-span-2">
       <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div class="flex items-center justify-between mb-5">
           <h2 class="font-semibold text-gray-800">
