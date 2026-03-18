@@ -127,8 +127,9 @@ import MainLayout from '../layouts/MainLayout.astro';
             >
               <option value="">— Select —</option>
               <option value="Cash">Cash</option>
-              <option value="Card">Card</option>
-              <option value="Digital Wallet">Digital Wallet</option>
+              <option value="Local Card">Local Card</option>
+              <option value="International Card">International Card</option>
+              <option value="Local Bank Transfer">Local Bank Transfer</option>
               <option value="Complimentary">Complimentary</option>
               <option value="Punch Card">Punch Card</option>
               <option value="Valid Membership">Valid Membership</option>
@@ -592,8 +593,9 @@ import MainLayout from '../layouts/MainLayout.astro';
     }
 
     function payBadge(pm) {
-      return { 'Cash': 'bg-green-100 text-green-700', 'Card': 'bg-blue-100 text-blue-700',
-               'Digital Wallet': 'bg-indigo-100 text-indigo-700', 'Complimentary': 'bg-gray-100 text-gray-600',
+      return { 'Cash': 'bg-green-100 text-green-700', 'Local Card': 'bg-blue-100 text-blue-700',
+               'International Card': 'bg-cyan-100 text-cyan-700',
+               'Local Bank Transfer': 'bg-indigo-100 text-indigo-700', 'Complimentary': 'bg-gray-100 text-gray-600',
                'Punch Card': 'bg-purple-100 text-purple-700', 'Valid Membership': 'bg-teal-100 text-teal-700' }[pm]
              || 'bg-orange-100 text-orange-700';
     }
