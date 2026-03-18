@@ -3,6 +3,7 @@ export const prerender = false;
 import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
 import { ok, serverError } from '../../../lib/auth';
+import { fetchAllPages } from '../../../lib/paginate';
 
 // Column map: CSV header → DB column name
 const COL_MAP: Record<string, string> = {
@@ -17,23 +18,6 @@ const COL_MAP: Record<string, string> = {
 
 // DB column → display header (inverse map)
 const DISPLAY_HEADERS = ['Full Name', 'DOB', 'Email', 'Telephone no', 'Emergency contact', 'Note', 'Waiver form (old)', 'Punch Card', 'Punches', 'Membership', 'Member Until'];
-
-const PAGE_SIZE = 1000;
-
-/** Fetch all rows from a Supabase table query, bypassing the default 1000-row cap. */
-async function fetchAllPages(selectFn: (from: number, to: number) => PromiseLike<{ data: any[] | null; error: any }>): Promise<{ data: any[]; error: any }> {
-  const all: any[] = [];
-  let from = 0;
-  while (true) {
-    const { data, error } = await selectFn(from, from + PAGE_SIZE - 1);
-    if (error) return { data: [], error };
-    const rows = data ?? [];
-    all.push(...rows);
-    if (rows.length < PAGE_SIZE) break;
-    from += PAGE_SIZE;
-  }
-  return { data: all, error: null };
-}
 
 /** GET /api/customers — return all customers */
 export const GET: APIRoute = async () => {

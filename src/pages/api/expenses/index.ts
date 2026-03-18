@@ -3,6 +3,7 @@ export const prerender = false;
 import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
 import { ok, serverError } from '../../../lib/auth';
+import { fetchAllPages } from '../../../lib/paginate';
 
 const VALID_TYPES = [
   'Construction Setup', 'Construction Material', 'Holds',
@@ -17,14 +18,14 @@ const VALID_TYPES = [
  */
 export const GET: APIRoute = async () => {
   const [expRes, revRes] = await Promise.all([
-    db.from('expenses').select('*').order('date', { ascending: false }),
-    db.from('checkins').select('date, amount'),
+    fetchAllPages((from, to) => db.from('expenses').select('*').order('date', { ascending: false }).range(from, to)),
+    fetchAllPages((from, to) => db.from('checkins').select('date, amount').range(from, to)),
   ]);
 
   if (expRes.error) return serverError(expRes.error.message);
   if (revRes.error) return serverError(revRes.error.message);
 
-  return ok({ expenses: expRes.data ?? [], revenue_rows: revRes.data ?? [] });
+  return ok({ expenses: expRes.data, revenue_rows: revRes.data });
 };
 
 /** POST /api/expenses — log a new expense */

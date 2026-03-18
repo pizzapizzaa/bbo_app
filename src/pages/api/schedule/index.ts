@@ -3,16 +3,16 @@ export const prerender = false;
 import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
 import { ok, serverError } from '../../../lib/auth';
+import { fetchAllPages } from '../../../lib/paginate';
 
 /** GET /api/schedule — return all schedule entries */
 export const GET: APIRoute = async () => {
-  const { data, error } = await db
-    .from('schedule_entries')
-    .select('*')
-    .order('date', { ascending: false });
+  const { data, error } = await fetchAllPages((from, to) =>
+    db.from('schedule_entries').select('*').order('date', { ascending: false }).range(from, to)
+  );
 
   if (error) return serverError(error.message);
-  return ok({ entries: data ?? [] });
+  return ok({ entries: data });
 };
 
 /** POST /api/schedule — add a new entry */

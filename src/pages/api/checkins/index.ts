@@ -3,6 +3,7 @@ export const prerender = false;
 import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
 import { ok, serverError } from '../../../lib/auth';
+import { fetchAllPages } from '../../../lib/paginate';
 
 /** GET /api/checkins?date=YYYY-MM-DD          — single date
  *  GET /api/checkins?from=YYYY-MM-DD&to=YYYY-MM-DD — inclusive date range */
@@ -25,9 +26,9 @@ export const GET: APIRoute = async ({ url }) => {
     return new Response(JSON.stringify({ error: 'Missing date or from/to range' }), { status: 400 });
   }
 
-  const { data, error } = await query;
+  const { data, error } = await fetchAllPages((from, to) => (query as any).range(from, to));
   if (error) return serverError(error.message);
-  return ok({ checkins: data ?? [] });
+  return ok({ checkins: data });
 };
 
 /** POST /api/checkins — add a new check-in */
