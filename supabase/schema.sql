@@ -99,6 +99,8 @@ ALTER TABLE customers
   ADD COLUMN IF NOT EXISTS membership_start_date DATE,
   ADD COLUMN IF NOT EXISTS membership_end_date   DATE;
 
+-- ── Check-in Type & Add-ons Migration ────────────────────────────────────────
+-- Already applied 2026-03-18. Kept for reference.
 ALTER TABLE checkins
-  ADD COLUMN IF NOT EXISTS punch_card_holder_id   UUID REFERENCES customers(id) ON DELETE SET NULL,
-  ADD COLUMN IF NOT EXISTS punch_card_holder_name TEXT NOT NULL DEFAULT '';
+  ADD COLUMN IF NOT EXISTS checkin_type TEXT NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS addons       TEXT NOT NULL DEFAULT '';

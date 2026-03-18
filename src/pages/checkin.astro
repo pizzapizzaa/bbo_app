@@ -115,6 +115,68 @@ import MainLayout from '../layouts/MainLayout.astro';
             </div>
           </div>
 
+          <!-- Check-in Type -->
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1.5">Check-in Type</label>
+            <select
+              id="f-checkin-type"
+              class="w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm
+                     focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+            >
+              <option value="" data-price="0">— Select type —</option>
+              <optgroup label="Day Pass">
+                <option value="Day Pass – Adult" data-price="160000">Day Pass – Adult (160,000 ₫)</option>
+                <option value="Day Pass – Student" data-price="120000">Day Pass – Student (120,000 ₫)</option>
+                <option value="Day Pass – Kid" data-price="100000">Day Pass – Kid (100,000 ₫)</option>
+              </optgroup>
+              <optgroup label="10 Punches">
+                <option value="10 Punches – Adult" data-price="1400000">10 Punches – Adult (1,400,000 ₫)</option>
+                <option value="10 Punches – Student" data-price="1000000">10 Punches – Student (1,000,000 ₫)</option>
+                <option value="10 Punches – Kid" data-price="800000">10 Punches – Kid (800,000 ₫)</option>
+              </optgroup>
+              <optgroup label="20 Punches">
+                <option value="20 Punches – Adult" data-price="2500000">20 Punches – Adult (2,500,000 ₫)</option>
+              </optgroup>
+              <optgroup label="Membership">
+                <option value="Membership – 1 Month" data-price="1250000">Membership – 1 Month (1,250,000 ₫)</option>
+                <option value="Membership – 3 Months" data-price="3050000">Membership – 3 Months (3,050,000 ₫)</option>
+                <option value="Membership – 6 Months" data-price="5650000">Membership – 6 Months (5,650,000 ₫)</option>
+                <option value="Membership – 12 Months" data-price="9850000">Membership – 12 Months (9,850,000 ₫)</option>
+              </optgroup>
+            </select>
+          </div>
+
+          <!-- Add-ons -->
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1.5">Add-ons</label>
+            <div class="grid grid-cols-2 gap-y-2 gap-x-3 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2.5">
+              <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Chalk Ball" data-price="75000" />
+                <span>Chalk Ball <span class="text-gray-500 text-xs">75,000 ₫</span></span>
+              </label>
+              <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Liquid Chalk Rental" data-price="25000" />
+                <span>Liquid Chalk Rental <span class="text-gray-500 text-xs">25,000 ₫</span></span>
+              </label>
+              <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Shoes Rental" data-price="20000" />
+                <span>Shoes Rental <span class="text-gray-500 text-xs">20,000 ₫</span></span>
+              </label>
+              <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Vitani Dasani" data-price="8000" />
+                <span>Vitani Dasani <span class="text-gray-500 text-xs">8,000 ₫</span></span>
+              </label>
+              <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Ionlife" data-price="10000" />
+                <span>Ionlife <span class="text-gray-500 text-xs">10,000 ₫</span></span>
+              </label>
+              <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Pocari" data-price="18000" />
+                <span>Pocari <span class="text-gray-500 text-xs">18,000 ₫</span></span>
+              </label>
+            </div>
+          </div>
+
           <!-- Payment method -->
           <div>
             <label class="block text-sm font-medium text-gray-300 mb-1.5">
@@ -153,7 +215,9 @@ import MainLayout from '../layouts/MainLayout.astro';
 
           <!-- Amount -->
           <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1.5">Amount (VND)</label>
+            <label class="block text-sm font-medium text-gray-300 mb-1.5">
+              Amount (VND) <span class="text-gray-500 text-xs font-normal">— auto-calculated</span>
+            </label>
             <input
               id="f-amount"
               type="number"
@@ -225,8 +289,10 @@ import MainLayout from '../layouts/MainLayout.astro';
                 <th>Date</th>
                 <th>Time</th>
                 <th>Customer</th>
+                <th>Type</th>
                 <th>Payment</th>
                 <th>Amount (VND)</th>
+                <th>Add-ons</th>
                 <th>Punch From</th>
                 <th>Notes</th>
                 <th>Actions</th>
@@ -353,8 +419,10 @@ import MainLayout from '../layouts/MainLayout.astro';
           { title: 'Date' },
           { title: 'Time' },
           { title: 'Customer' },
+          { title: 'Type' },
           { title: 'Payment' },
           { title: 'Amount (VND)' },
+          { title: 'Add-ons' },
           { title: 'Punch From' },
           { title: 'Notes' },
           { title: 'Actions', orderable: false, searchable: false }
@@ -374,9 +442,15 @@ import MainLayout from '../layouts/MainLayout.astro';
           c.date || '',
           (c.time || '').slice(0, 5),
           escHtml(c.customer_name || ''),
+          c.checkin_type
+            ? '<span class="text-xs font-medium text-gray-700">' + escHtml(c.checkin_type) + '</span>'
+            : '<span class="text-gray-300">—</span>',
           '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ' +
             payBadge(c.payment_method) + '">' + escHtml(c.payment_method) + '</span>',
           c.amount ? Math.round(parseFloat(c.amount)).toLocaleString('vi-VN') + ' ₫' : '—',
+          c.addons
+            ? '<span class="text-xs text-gray-600">' + escHtml(c.addons) + '</span>'
+            : '<span class="text-gray-300">—</span>',
           c.punch_card_holder_name
             ? '<span class="text-xs text-purple-600 font-medium">' + escHtml(c.punch_card_holder_name) + '</span>'
             : '<span class="text-gray-300">—</span>',
@@ -470,6 +544,23 @@ import MainLayout from '../layouts/MainLayout.astro';
       }, 300);
     });
 
+    // ── Check-in type & add-ons: auto-calculate amount ──
+    function recalcAmount() {
+      var typeSelect  = document.getElementById('f-checkin-type');
+      var selectedOpt = typeSelect.options[typeSelect.selectedIndex];
+      var basePrice   = selectedOpt ? (parseInt(selectedOpt.dataset.price || '0') || 0) : 0;
+      var addonTotal  = 0;
+      document.querySelectorAll('.addon-cb:checked').forEach(function (cb) {
+        addonTotal += parseInt(cb.dataset.price || '0') || 0;
+      });
+      var total = basePrice + addonTotal;
+      document.getElementById('f-amount').value = total > 0 ? total : '';
+    }
+    document.getElementById('f-checkin-type').addEventListener('change', recalcAmount);
+    document.querySelectorAll('.addon-cb').forEach(function (cb) {
+      cb.addEventListener('change', recalcAmount);
+    });
+
     // ── Form submit ──
     document.getElementById('checkin-form').addEventListener('submit', function (e) {
       e.preventDefault();
@@ -480,6 +571,10 @@ import MainLayout from '../layouts/MainLayout.astro';
       var payment        = document.getElementById('f-payment').value;
       var amount         = document.getElementById('f-amount').value;
       var notes          = document.getElementById('f-notes').value.trim();
+      var checkinType    = document.getElementById('f-checkin-type').value;
+      var addonsArr      = [];
+      document.querySelectorAll('.addon-cb:checked').forEach(function (cb) { addonsArr.push(cb.dataset.name); });
+      var addonsStr      = addonsArr.join(', ');
       var punchFromSel   = document.getElementById('f-punch-from');
       var punchHolderId  = '';
       var punchHolderName = '';
@@ -518,6 +613,8 @@ import MainLayout from '../layouts/MainLayout.astro';
           payment_method:       payment,
           amount:               amount ? parseFloat(amount) : 0,
           notes:                notes,
+          checkin_type:         checkinType,
+          addons:               addonsStr,
           punch_card_holder_id:   punchHolderId   || undefined,
           punch_card_holder_name: punchHolderName || undefined,
         })
@@ -537,6 +634,8 @@ import MainLayout from '../layouts/MainLayout.astro';
           if (punchHolderId) buildCustomerDatalist();
           document.getElementById('f-customer').value   = '';
           document.getElementById('f-payment').value    = '';
+          document.getElementById('f-checkin-type').value = '';
+          document.querySelectorAll('.addon-cb').forEach(function (cb) { cb.checked = false; });
           document.getElementById('f-amount').value     = '';
           document.getElementById('f-notes').value      = '';
           document.getElementById('f-punch-from').value = '';
@@ -571,10 +670,10 @@ import MainLayout from '../layouts/MainLayout.astro';
     function exportCheckins() {
       if (!allCheckins.length) { showToast('No check-ins to export for this period.', 'warning'); return; }
       var label = activeFrom === activeTo ? activeFrom : (activeFrom + '_to_' + activeTo);
-      var headers = ['Date', 'Time', 'Customer Name', 'Payment Method', 'Amount', 'Punch From', 'Notes'];
+      var headers = ['Date', 'Time', 'Customer Name', 'Check-in Type', 'Payment Method', 'Amount', 'Add-ons', 'Punch From', 'Notes'];
       var csvContent = [headers].concat(allCheckins.map(function (c) {
-        return [c.date, (c.time || '').slice(0, 5), c.customer_name, c.payment_method,
-                Math.round(c.amount || 0), c.punch_card_holder_name || '', c.notes || ''];
+        return [c.date, (c.time || '').slice(0, 5), c.customer_name, c.checkin_type || '',
+                c.payment_method, Math.round(c.amount || 0), c.addons || '', c.punch_card_holder_name || '', c.notes || ''];
       })).map(function (row) {
         return row.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(',');
       }).join('\n');

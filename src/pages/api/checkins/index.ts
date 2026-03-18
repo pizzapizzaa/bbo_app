@@ -42,12 +42,15 @@ export const POST: APIRoute = async ({ request }) => {
     notes?: string;
     punch_card_holder_id?: string;
     punch_card_holder_name?: string;
+    checkin_type?: string;
+    addons?: string;
   };
   try { body = await request.json(); }
   catch { return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400 }); }
 
   const { customer_name, date, time, payment_method, amount, notes,
-          punch_card_holder_id, punch_card_holder_name } = body;
+          punch_card_holder_id, punch_card_holder_name,
+          checkin_type, addons } = body;
   if (!customer_name || !date || !time || !payment_method) {
     return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400 });
   }
@@ -80,6 +83,8 @@ export const POST: APIRoute = async ({ request }) => {
       notes: notes ?? '',
       punch_card_holder_id:   punch_card_holder_id   || null,
       punch_card_holder_name: punch_card_holder_name || '',
+      checkin_type: checkin_type ?? '',
+      addons:       addons       ?? '',
     })
     .select()
     .single();
