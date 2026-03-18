@@ -18,6 +18,23 @@ const COL_MAP: Record<string, string> = {
 // DB column → display header (inverse map)
 const DISPLAY_HEADERS = ['Full Name', 'DOB', 'Email', 'Telephone no', 'Emergency contact', 'Note', 'Waiver form (old)', 'Punch Card', 'Punches', 'Membership', 'Member Until'];
 
+const PAGE_SIZE = 1000;
+
+/** Fetch all rows from a Supabase table query, bypassing the default 1000-row cap. */
+async function fetchAllPages(selectFn: (from: number, to: number) => PromiseLike<{ data: any[] | null; error: any }>): Promise<{ data: any[]; error: any }> {
+  const all: any[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await selectFn(from, from + PAGE_SIZE - 1);
+    if (error) return { data: [], error };
+    const rows = data ?? [];
+    all.push(...rows);
+    if (rows.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+  return { data: all, error: null };
+}
+
 /** GET /api/customers — return all customers */
 export const GET: APIRoute = async () => {
   try {
@@ -25,31 +42,33 @@ export const GET: APIRoute = async () => {
   let data: any[] | null = null;
   let hasPunchCols = true;
 
-  const res = await db
-    .from('customers')
-    .select('id, full_name, dob, email, telephone, emergency_contact, note, waiver_form, is_punch_card_holder, punches_remaining, membership_type, membership_start_date, membership_end_date', { count: 'exact' })
-    .order('full_name');
-
-  let total: number | null = null;
+  const res = await fetchAllPages((from, to) =>
+    db.from('customers')
+      .select('id, full_name, dob, email, telephone, emergency_contact, note, waiver_form, is_punch_card_holder, punches_remaining, membership_type, membership_start_date, membership_end_date')
+      .order('full_name')
+      .range(from, to)
+  );
 
   if (res.error) {
     // Column doesn't exist yet — retry without punch card columns
     if (res.error.code === '42703' || res.error.message?.includes('is_punch_card_holder') || res.error.message?.includes('punches_remaining') || res.error.message?.includes('membership_type')) {
       hasPunchCols = false;
-      const fallback = await db
-        .from('customers')
-        .select('id, full_name, dob, email, telephone, emergency_contact, note, waiver_form', { count: 'exact' })
-        .order('full_name');
+      const fallback = await fetchAllPages((from, to) =>
+        db.from('customers')
+          .select('id, full_name, dob, email, telephone, emergency_contact, note, waiver_form')
+          .order('full_name')
+          .range(from, to)
+      );
       if (fallback.error) return serverError(fallback.error.message);
-      data = fallback.data ?? [];
-      total = fallback.count;
+      data = fallback.data;
     } else {
       return serverError(res.error.message);
     }
   } else {
-    data = res.data ?? [];
-    total = res.count;
+    data = res.data;
   }
+
+  const total = data!.length;
 
   // Map DB rows back to the original CSV-style header names for the frontend
   const rows = data.map((r: any) => ({
@@ -72,7 +91,7 @@ export const GET: APIRoute = async () => {
     _membership_end_date:   hasPunchCols ? (r.membership_end_date ?? '') : '',
   }));
 
-  return ok({ headers: DISPLAY_HEADERS, rows, total: total ?? rows.length, _punchColsMissing: !hasPunchCols });
+  return ok({ headers: DISPLAY_HEADERS, rows, total, _punchColsMissing: !hasPunchCols });
   } catch (e: any) { return serverError(e?.message ?? String(e)); }
 };
 
