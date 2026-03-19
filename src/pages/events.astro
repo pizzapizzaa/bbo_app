@@ -1,0 +1,731 @@
+---
+// Public-facing Classes & Events Schedule
+// No authentication required to view.
+// Admin controls (add / edit / delete) are shown only to logged-in admins.
+---
+
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Classes &amp; Events Schedule — BBO Gym</title>
+  <link rel="icon" href="/assets/favicon.ico" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    .event-block:hover { opacity: 0.82; }
+    /* Scrollable calendar body on small screens */
+    .cal-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  </style>
+</head>
+
+<body class="bg-gray-50 min-h-full">
+
+  <!-- ── Top Header ─────────────────────────────────────────────────────── -->
+  <header class="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
+
+      <!-- Brand -->
+      <div class="flex items-center gap-3 shrink-0">
+        <img src="/assets/bobo_logo_rectangle.png" alt="BBO Gym"
+             class="h-9 w-auto object-contain"
+             onerror="this.style.display='none'" />
+        <div class="leading-tight">
+          <p class="text-sm font-bold text-gray-900">Classes &amp; Events</p>
+          <p class="text-[11px] text-gray-400">Public Schedule</p>
+        </div>
+      </div>
+
+      <!-- Week nav + admin zone -->
+      <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-end">
+        <button id="btn-prev-week"
+                class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200
+                       hover:bg-gray-50 text-gray-600 transition text-base leading-none">‹</button>
+        <span id="week-label"
+              class="text-sm font-medium text-gray-700 min-w-[140px] sm:min-w-[180px] text-center px-1"></span>
+        <button id="btn-next-week"
+                class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200
+                       hover:bg-gray-50 text-gray-600 transition text-base leading-none">›</button>
+        <button id="btn-today"
+                class="px-3 py-1.5 text-sm bg-orange-500 hover:bg-orange-600 text-white
+                       font-semibold rounded-lg transition">Today</button>
+        <!-- Populated by JS depending on auth state -->
+        <div id="admin-zone" class="flex items-center gap-2 ml-1"></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Main Content ────────────────────────────────────────────────────── -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-5">
+
+    <!-- Legend -->
+    <div class="flex flex-wrap items-center gap-2 mb-5">
+      <span class="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mr-1">Event types:</span>
+      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">
+        <span class="w-2 h-2 rounded-full bg-orange-400 shrink-0"></span>Beginner 101
+      </span>
+      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+        <span class="w-2 h-2 rounded-full bg-blue-400 shrink-0"></span>PT Classes (Thanh Tu)
+      </span>
+      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-700">
+        <span class="w-2 h-2 rounded-full bg-purple-400 shrink-0"></span>JP Classes (Shingo)
+      </span>
+      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-teal-100 text-teal-700">
+        <span class="w-2 h-2 rounded-full bg-teal-400 shrink-0"></span>Other Events
+      </span>
+    </div>
+
+    <!-- Calendar card -->
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+
+      <!-- Sticky day-header row -->
+      <div id="cal-day-headers" class="border-b border-gray-200 bg-white sticky"
+           style="top:64px; z-index:30; display:grid;"></div>
+
+      <!-- Scrollable time body -->
+      <div class="cal-scroll">
+        <div id="cal-grid" style="display:grid; min-width:700px;">
+          <!-- Built by renderCalendar() -->
+        </div>
+      </div>
+
+    </div>
+
+    <p id="cal-status" class="mt-4 text-center text-sm text-gray-400 hidden">Loading schedule…</p>
+  </main>
+
+  <!-- ── Add / Edit Event Modal (admin only) ────────────────────────────── -->
+  <div id="event-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeModal()"></div>
+    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
+
+      <div class="flex items-center justify-between mb-5">
+        <h3 id="modal-title" class="font-bold text-gray-800 text-lg">Add Event</h3>
+        <button onclick="closeModal()"
+                class="text-gray-400 hover:text-gray-600 transition p-1 rounded-lg hover:bg-gray-100">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Event Type -->
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1.5">
+          Event Type <span class="text-red-400">*</span>
+        </label>
+        <select id="m-type"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm
+                       focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent">
+          <option value="">— Select type —</option>
+          <option value="beginner101">Beginner 101</option>
+          <option value="pt_classes">PT Classes (Thanh Tu)</option>
+          <option value="jp_classes">JP Classes (Shingo)</option>
+          <option value="other">Other Event</option>
+        </select>
+      </div>
+
+      <!-- Custom Title -->
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1.5">
+          Custom Title
+          <span class="text-gray-400 font-normal text-xs">(optional — overrides type label)</span>
+        </label>
+        <input id="m-title" type="text"
+               placeholder="e.g. Morning Open Gym…"
+               class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm
+                      focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent" />
+      </div>
+
+      <!-- Date -->
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1.5">
+          Date <span class="text-red-400">*</span>
+        </label>
+        <input id="m-date" type="date"
+               class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm
+                      focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent" />
+      </div>
+
+      <!-- Start / End Time -->
+      <div class="grid grid-cols-2 gap-3 mb-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">
+            Start Time <span class="text-red-400">*</span>
+          </label>
+          <input id="m-start" type="time"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm
+                        focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">
+            End Time <span class="text-red-400">*</span>
+          </label>
+          <input id="m-end" type="time"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm
+                        focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent" />
+        </div>
+      </div>
+
+      <!-- Description -->
+      <div class="mb-5">
+        <label class="block text-sm font-medium text-gray-700 mb-1.5">Description / Notes</label>
+        <textarea id="m-desc" rows="2"
+                  placeholder="Optional — visible to the public…"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm
+                         focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent
+                         resize-none"></textarea>
+      </div>
+
+      <!-- Error -->
+      <div id="m-error"
+           class="hidden text-sm text-red-500 bg-red-50 border border-red-200
+                  rounded-lg px-3 py-2 mb-4"></div>
+
+      <!-- Action buttons -->
+      <div class="flex items-center gap-3">
+        <button id="m-delete-btn"
+                onclick="deleteEvent()"
+                class="hidden px-4 py-2 border border-red-200 text-red-500
+                       hover:bg-red-50 rounded-lg text-sm font-semibold transition">
+          Delete
+        </button>
+        <div class="flex-1"></div>
+        <button onclick="closeModal()"
+                class="px-4 py-2 border border-gray-200 text-gray-600
+                       hover:bg-gray-50 rounded-lg text-sm font-semibold transition">
+          Cancel
+        </button>
+        <button id="m-save-btn"
+                onclick="saveEvent()"
+                class="px-5 py-2 bg-orange-500 hover:bg-orange-600 text-white
+                       font-semibold rounded-lg text-sm transition">
+          Save
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Public Event Detail Modal ──────────────────────────────────────── -->
+  <div id="detail-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeDetailModal()"></div>
+    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+      <div class="flex items-start justify-between mb-4 gap-3">
+        <span id="dm-badge" class="px-3 py-1 rounded-full text-xs font-semibold shrink-0"></span>
+        <button onclick="closeDetailModal()"
+                class="text-gray-400 hover:text-gray-600 transition p-1 rounded-lg hover:bg-gray-100">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <h3 id="dm-title" class="text-base font-bold text-gray-900 mb-2"></h3>
+      <p id="dm-time"  class="text-sm text-gray-500 mb-2 flex items-center gap-1.5">
+        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <span id="dm-time-text"></span>
+      </p>
+      <p id="dm-desc" class="text-sm text-gray-600 leading-relaxed"></p>
+    </div>
+  </div>
+
+  <!-- ── Page Script ─────────────────────────────────────────────────────── -->
+  <script is:inline>
+    // ── Constants ──────────────────────────────────────────────────────────
+    var CAL_START    = 6;   // first visible hour (6 AM)
+    var CAL_END      = 22;  // last  visible hour (10 PM)
+    var PX_PER_HOUR  = 64;  // pixels per 60-minute block
+
+    var EVENT_CFG = {
+      beginner101: {
+        label: 'Beginner 101',
+        bg: '#FED7AA', text: '#9A3412', border: '#FB923C',
+        badgeCls: 'bg-orange-100 text-orange-700',
+      },
+      pt_classes: {
+        label: 'PT Classes (Thanh Tu)',
+        bg: '#BFDBFE', text: '#1E40AF', border: '#60A5FA',
+        badgeCls: 'bg-blue-100 text-blue-700',
+      },
+      jp_classes: {
+        label: 'JP Classes (Shingo)',
+        bg: '#F3E8FF', text: '#7E22CE', border: '#C084FC',
+        badgeCls: 'bg-purple-100 text-purple-700',
+      },
+      other: {
+        label: 'Other Event',
+        bg: '#CCFBF1', text: '#134E4A', border: '#2DD4BF',
+        badgeCls: 'bg-teal-100 text-teal-700',
+      },
+    };
+
+    var DAY_ABBR    = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    var MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    // ── State ──────────────────────────────────────────────────────────────
+    var eventsData       = [];
+    var currentWeekStart = null;
+    var editingId        = null;
+    var isAdmin          = false;
+
+    // ── Auth helpers ───────────────────────────────────────────────────────
+    function checkAdmin() {
+      return !!sessionStorage.getItem('bbo_auth');
+    }
+
+    function getToken() {
+      return sessionStorage.getItem('bbo_token') || '';
+    }
+
+    function apiFetch(url, opts) {
+      var hdrs = { 'Authorization': 'Bearer ' + getToken() };
+      if (opts && opts.body) hdrs['Content-Type'] = 'application/json';
+      return fetch(url, Object.assign({}, opts || {}, { headers: hdrs }));
+    }
+
+    // ── Date / time helpers ────────────────────────────────────────────────
+    function getWeekStart(d) {
+      var dt = new Date(d);
+      dt.setHours(0, 0, 0, 0);
+      var day = dt.getDay();
+      dt.setDate(dt.getDate() + (day === 0 ? -6 : 1 - day)); // Monday
+      return dt;
+    }
+
+    function addDays(d, n) {
+      var dt = new Date(d);
+      dt.setDate(dt.getDate() + n);
+      return dt;
+    }
+
+    function fmtDate(d) {
+      return d.getFullYear() + '-' +
+        String(d.getMonth() + 1).padStart(2, '0') + '-' +
+        String(d.getDate()).padStart(2, '0');
+    }
+
+    function fmtWeekLabel(start) {
+      var end = addDays(start, 6);
+      if (start.getMonth() === end.getMonth()) {
+        return MONTH_NAMES[start.getMonth()] + ' ' +
+          start.getDate() + '–' + end.getDate() + ', ' + end.getFullYear();
+      }
+      return MONTH_NAMES[start.getMonth()] + ' ' + start.getDate() +
+        ' – ' + MONTH_NAMES[end.getMonth()] + ' ' + end.getDate() +
+        ', ' + end.getFullYear();
+    }
+
+    function timeToMin(t) {
+      if (!t) return 0;
+      var p = t.split(':');
+      return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
+    }
+
+    function fmtTime12(t) {
+      if (!t) return '';
+      var p  = t.split(':');
+      var h  = parseInt(p[0], 10);
+      var m  = parseInt(p[1], 10);
+      var pm = h >= 12;
+      return (h % 12 || 12) + (m ? ':' + String(m).padStart(2, '0') : '') + (pm ? ' PM' : ' AM');
+    }
+
+    function escHtml(s) {
+      return String(s || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // ── Render admin zone ──────────────────────────────────────────────────
+    function renderAdminZone() {
+      var zone = document.getElementById('admin-zone');
+      if (isAdmin) {
+        zone.innerHTML =
+          '<button onclick="openAddModal()" ' +
+          'class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 ' +
+          'text-white font-semibold text-sm rounded-lg transition">' +
+          '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>' +
+          '</svg>Add Event</button>' +
+          '<a href="/dashboard" ' +
+          'class="text-xs text-gray-400 hover:text-orange-500 font-medium transition whitespace-nowrap">' +
+          'Admin Panel →</a>';
+      } else {
+        zone.innerHTML =
+          '<a href="/" ' +
+          'class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 ' +
+          'hover:bg-gray-50 text-gray-500 text-xs font-medium rounded-lg transition">' +
+          '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+          '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" ' +
+          'd="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>' +
+          '</svg>Staff Login</a>';
+      }
+    }
+
+    // ── Render calendar ────────────────────────────────────────────────────
+    function renderCalendar() {
+      var todayIso = fmtDate(new Date());
+      document.getElementById('week-label').textContent = fmtWeekLabel(currentWeekStart);
+
+      var weekDates = [];
+      for (var i = 0; i < 7; i++) weekDates.push(addDays(currentWeekStart, i));
+
+      var totalHours = CAL_END - CAL_START;   // 16
+      var totalPx    = totalHours * PX_PER_HOUR; // 1024
+
+      // ── Day header row ──
+      var cols = '56px repeat(7, minmax(0,1fr))';
+      var headEl = document.getElementById('cal-day-headers');
+      headEl.style.gridTemplateColumns = cols;
+      var headHtml = '<div style="border-right:1px solid #e5e7eb; min-height:48px;"></div>';
+
+      weekDates.forEach(function (d) {
+        var iso     = fmtDate(d);
+        var isToday = iso === todayIso;
+        headHtml +=
+          '<div style="' + (isToday ? 'background:#fff7ed;' : '') +
+          'border-right:1px solid #f3f4f6; padding:10px 4px; text-align:center;">' +
+          '<div style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; ' +
+          'color:' + (isToday ? '#f97316' : '#9ca3af') + ';">' + DAY_ABBR[d.getDay()] + '</div>' +
+          (isToday
+            ? '<div style="margin-top:2px; width:28px; height:28px; border-radius:50%; background:#f97316; ' +
+              'color:#fff; font-size:14px; font-weight:700; display:inline-flex; ' +
+              'align-items:center; justify-content:center;">' + d.getDate() + '</div>'
+            : '<div style="font-size:14px; font-weight:500; color:#374151; margin-top:2px;">' + d.getDate() + '</div>'
+          ) +
+          '</div>';
+      });
+      headEl.innerHTML = headHtml;
+
+      // ── Time grid ──
+      var gridEl = document.getElementById('cal-grid');
+      gridEl.style.gridTemplateColumns = cols;
+      var gridHtml = '';
+
+      // Time gutter column
+      gridHtml += '<div style="position:relative; height:' + totalPx + 'px; border-right:1px solid #e5e7eb;">';
+      for (var h = CAL_START; h <= CAL_END; h++) {
+        var topPx = (h - CAL_START) * PX_PER_HOUR;
+        var lbl   = h === 12 ? '12 PM' : h > 12 ? (h - 12) + ' PM' : h + ' AM';
+        gridHtml +=
+          '<div style="position:absolute; top:' + (topPx - 9) + 'px; right:6px; ' +
+          'font-size:10px; color:#9ca3af; white-space:nowrap; user-select:none;">' +
+          escHtml(lbl) + '</div>';
+      }
+      gridHtml += '</div>';
+
+      // Day columns
+      weekDates.forEach(function (d) {
+        var iso       = fmtDate(d);
+        var isToday   = iso === todayIso;
+        var dayEvents = eventsData.filter(function (ev) { return ev.date === iso; });
+
+        gridHtml +=
+          '<div style="position:relative; height:' + totalPx + 'px; ' +
+          'border-right:1px solid #f3f4f6;' +
+          (isToday ? ' background:rgba(255,247,237,0.5);' : '') + '">';
+
+        // Hour grid lines
+        for (var hi = 0; hi < totalHours; hi++) {
+          var lineY = hi * PX_PER_HOUR;
+          gridHtml +=
+            '<div style="position:absolute; left:0; right:0; top:' + lineY + 'px; ' +
+            'border-top:1px solid ' + (hi === 0 ? '#e5e7eb' : '#f3f4f6') + ';"></div>';
+          // Half-hour dashed line
+          gridHtml +=
+            '<div style="position:absolute; left:8px; right:0; top:' + (lineY + PX_PER_HOUR / 2) + 'px; ' +
+            'border-top:1px dashed #f3f4f6;"></div>';
+        }
+
+        // Current-time indicator (today only)
+        if (isToday) {
+          var now    = new Date();
+          var nowMin = now.getHours() * 60 + now.getMinutes();
+          var nowTop = (nowMin - CAL_START * 60) * PX_PER_HOUR / 60;
+          if (nowTop >= 0 && nowTop <= totalPx) {
+            gridHtml +=
+              '<div style="position:absolute; left:0; right:0; top:' + nowTop + 'px; z-index:10; pointer-events:none;">' +
+              '<div style="position:relative;">' +
+              '<div style="position:absolute; left:-4px; top:-4px; width:8px; height:8px; ' +
+              'border-radius:50%; background:#f97316;"></div>' +
+              '<div style="border-top:2px solid #f97316;"></div>' +
+              '</div></div>';
+          }
+        }
+
+        // Event blocks — resolve overlaps so blocks sit side-by-side
+        var sorted = dayEvents.slice().sort(function (a, b) {
+          return timeToMin(a.start_time) - timeToMin(b.start_time);
+        });
+
+        // Simple single-pass column assignment for overlapping events
+        var cols2 = [];  // array of {endMin}
+        sorted.forEach(function (ev) {
+          var startMin = timeToMin(ev.start_time);
+          var endMin   = timeToMin(ev.end_time);
+          if (endMin <= startMin) endMin += 1440;
+
+          // Find a free column
+          var col = 0;
+          while (col < cols2.length && cols2[col] > startMin) col++;
+          if (col === cols2.length) cols2.push(0);
+          cols2[col] = endMin;
+
+          var totalCols = cols2.length;
+
+          var visStart = Math.max(startMin, CAL_START * 60);
+          var visEnd   = Math.min(endMin,   CAL_END   * 60);
+          if (visStart >= visEnd) return;
+
+          var top    = (visStart - CAL_START * 60) * PX_PER_HOUR / 60;
+          var height = Math.max((visEnd - visStart) * PX_PER_HOUR / 60, 22);
+
+          var cfg   = EVENT_CFG[ev.event_type] || EVENT_CFG.other;
+          var label = ev.title || cfg.label;
+          var timeL = fmtTime12(ev.start_time) + '–' + fmtTime12(ev.end_time);
+
+          // Width & left offset based on column index
+          var widthPct   = 100 / totalCols;
+          var leftPct    = widthPct * col;
+          var innerLeft  = 3 + leftPct + '%';
+          var innerRight = (100 - leftPct - widthPct) + '%';
+          // Adjust inner padding
+          innerLeft  = 'calc(' + leftPct + '% + 3px)';
+          innerRight = 'calc(' + (100 - leftPct - widthPct) + '% + 2px)';
+
+          var clickFn = isAdmin
+            ? 'openEditModal(\'' + ev.id + '\')'
+            : 'openDetailModal(\'' + ev.id + '\')';
+
+          gridHtml +=
+            '<div class="event-block" ' +
+            'onclick="' + clickFn + '" ' +
+            'title="' + escHtml(label) + ': ' + escHtml(timeL) +
+              (ev.description ? '\n' + escHtml(ev.description) : '') + '" ' +
+            'style="position:absolute; top:' + top + 'px; height:' + height + 'px; ' +
+            'left:' + innerLeft + '; right:' + innerRight + '; ' +
+            'background:' + cfg.bg + '; color:' + cfg.text + '; ' +
+            'border-left:3px solid ' + cfg.border + '; border-radius:5px; ' +
+            'padding:3px 5px; cursor:pointer; overflow:hidden; z-index:5; ' +
+            'font-size:11px; line-height:1.35;">' +
+            '<div style="font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' +
+              escHtml(label) + '</div>' +
+            (height > 34
+              ? '<div style="opacity:0.8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' +
+                escHtml(timeL) + '</div>'
+              : '') +
+            '</div>';
+        });
+
+        gridHtml += '</div>';
+      });
+
+      gridEl.innerHTML = gridHtml;
+    }
+
+    // ── Load events ────────────────────────────────────────────────────────
+    function loadEvents() {
+      var statusEl = document.getElementById('cal-status');
+      statusEl.textContent = 'Loading schedule…';
+      statusEl.classList.remove('hidden');
+
+      fetch('/api/events')
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          eventsData = data.entries || [];
+          renderCalendar();
+          statusEl.classList.add('hidden');
+        })
+        .catch(function () {
+          statusEl.textContent = 'Could not load schedule. Please refresh the page.';
+        });
+    }
+
+    // ── Add / Edit modal ───────────────────────────────────────────────────
+    function openAddModal() {
+      editingId = null;
+      document.getElementById('modal-title').textContent = 'Add Event';
+      document.getElementById('m-type').value  = '';
+      document.getElementById('m-title').value = '';
+      document.getElementById('m-date').value  = fmtDate(new Date());
+      document.getElementById('m-start').value = '';
+      document.getElementById('m-end').value   = '';
+      document.getElementById('m-desc').value  = '';
+      document.getElementById('m-error').classList.add('hidden');
+      document.getElementById('m-delete-btn').classList.add('hidden');
+      document.getElementById('event-modal').classList.remove('hidden');
+    }
+
+    function openEditModal(id) {
+      var ev = eventsData.find(function (e) { return String(e.id) === String(id); });
+      if (!ev) return;
+      editingId = id;
+      document.getElementById('modal-title').textContent = 'Edit Event';
+      document.getElementById('m-type').value  = ev.event_type  || '';
+      document.getElementById('m-title').value = ev.title        || '';
+      document.getElementById('m-date').value  = ev.date         || '';
+      document.getElementById('m-start').value = ev.start_time  || '';
+      document.getElementById('m-end').value   = ev.end_time    || '';
+      document.getElementById('m-desc').value  = ev.description || '';
+      document.getElementById('m-error').classList.add('hidden');
+      document.getElementById('m-delete-btn').classList.remove('hidden');
+      document.getElementById('event-modal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('event-modal').classList.add('hidden');
+    }
+
+    // ── Public detail modal ────────────────────────────────────────────────
+    function openDetailModal(id) {
+      var ev = eventsData.find(function (e) { return String(e.id) === String(id); });
+      if (!ev) return;
+      var cfg   = EVENT_CFG[ev.event_type] || EVENT_CFG.other;
+      var badge = document.getElementById('dm-badge');
+      badge.textContent = cfg.label;
+      badge.className   = 'px-3 py-1 rounded-full text-xs font-semibold shrink-0 ' + cfg.badgeCls;
+      document.getElementById('dm-title').textContent    = ev.title || cfg.label;
+      document.getElementById('dm-time-text').textContent =
+        ev.date + '  ·  ' + fmtTime12(ev.start_time) + ' – ' + fmtTime12(ev.end_time);
+      var descEl = document.getElementById('dm-desc');
+      descEl.textContent = ev.description || '';
+      descEl.style.display = ev.description ? '' : 'none';
+      document.getElementById('detail-modal').classList.remove('hidden');
+    }
+
+    function closeDetailModal() {
+      document.getElementById('detail-modal').classList.add('hidden');
+    }
+
+    // ── Save event (add or edit) ───────────────────────────────────────────
+    function saveEvent() {
+      var typeVal  = document.getElementById('m-type').value;
+      var dateVal  = document.getElementById('m-date').value;
+      var startVal = document.getElementById('m-start').value;
+      var endVal   = document.getElementById('m-end').value;
+      var errEl    = document.getElementById('m-error');
+      errEl.classList.add('hidden');
+
+      if (!typeVal || !dateVal || !startVal || !endVal) {
+        errEl.textContent = 'Please fill in all required fields (type, date, start & end time).';
+        errEl.classList.remove('hidden');
+        return;
+      }
+      if (timeToMin(endVal) <= timeToMin(startVal)) {
+        errEl.textContent = 'End time must be later than start time.';
+        errEl.classList.remove('hidden');
+        return;
+      }
+
+      var body = {
+        event_type:  typeVal,
+        title:       document.getElementById('m-title').value.trim(),
+        date:        dateVal,
+        start_time:  startVal,
+        end_time:    endVal,
+        description: document.getElementById('m-desc').value.trim(),
+      };
+
+      var btn = document.getElementById('m-save-btn');
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+
+      var url    = editingId ? '/api/events/' + editingId : '/api/events';
+      var method = editingId ? 'PATCH' : 'POST';
+
+      apiFetch(url, { method: method, body: JSON.stringify(body) })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          btn.disabled = false;
+          btn.textContent = 'Save';
+          if (data.error) {
+            errEl.textContent = data.error;
+            errEl.classList.remove('hidden');
+            return;
+          }
+          if (editingId) {
+            eventsData = eventsData.map(function (e) {
+              return String(e.id) === String(editingId) ? data.entry : e;
+            });
+          } else {
+            eventsData.push(data.entry);
+            // Navigate to the week of the new event
+            currentWeekStart = getWeekStart(new Date(body.date + 'T00:00:00'));
+          }
+          closeModal();
+          renderCalendar();
+          showToast(editingId ? 'Event updated.' : 'Event added!');
+        })
+        .catch(function (err) {
+          btn.disabled = false;
+          btn.textContent = 'Save';
+          errEl.textContent = 'Save failed: ' + err.message;
+          errEl.classList.remove('hidden');
+        });
+    }
+
+    // ── Delete event ───────────────────────────────────────────────────────
+    function deleteEvent() {
+      if (!editingId || !confirm('Delete this event? This cannot be undone.')) return;
+
+      apiFetch('/api/events/' + editingId, { method: 'DELETE' })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if (data.error) { showToast('Delete failed: ' + data.error, 'error'); return; }
+          eventsData = eventsData.filter(function (e) { return String(e.id) !== String(editingId); });
+          closeModal();
+          renderCalendar();
+          showToast('Event deleted.', 'warning');
+        })
+        .catch(function (err) { showToast('Delete failed: ' + err.message, 'error'); });
+    }
+
+    // ── Toast ──────────────────────────────────────────────────────────────
+    function showToast(msg, type) {
+      var t = document.createElement('div');
+      t.textContent = msg;
+      t.style.cssText =
+        'position:fixed; bottom:24px; right:24px; z-index:9999; ' +
+        'padding:10px 18px; border-radius:10px; font-size:13px; font-weight:600; ' +
+        'box-shadow:0 4px 20px rgba(0,0,0,0.18); font-family:Inter,system-ui,sans-serif;';
+      t.style.background =
+        type === 'error' ? '#ef4444' : type === 'warning' ? '#f59e0b' : '#22c55e';
+      t.style.color = '#fff';
+      document.body.appendChild(t);
+      setTimeout(function () { t.style.opacity = '0'; t.style.transition = 'opacity 0.4s'; }, 2600);
+      setTimeout(function () { t.remove(); }, 3000);
+    }
+
+    // ── Boot ───────────────────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', function () {
+      isAdmin          = checkAdmin();
+      currentWeekStart = getWeekStart(new Date());
+
+      renderAdminZone();
+
+      document.getElementById('btn-prev-week').addEventListener('click', function () {
+        currentWeekStart = addDays(currentWeekStart, -7);
+        renderCalendar();
+      });
+      document.getElementById('btn-next-week').addEventListener('click', function () {
+        currentWeekStart = addDays(currentWeekStart, 7);
+        renderCalendar();
+      });
+      document.getElementById('btn-today').addEventListener('click', function () {
+        currentWeekStart = getWeekStart(new Date());
+        renderCalendar();
+      });
+
+      loadEvents();
+    });
+  </script>
+
+</body>
+</html>

@@ -80,9 +80,41 @@ CREATE INDEX IF NOT EXISTS idx_expenses_type ON expenses (type);
 -- Enabling RLS and denying the anon key means the database cannot be accessed
 -- directly from the browser even if the anon key is discovered.
 -- ══════════════════════════════════════════════════════════════════════════════
+-- ── Events / Classes Schedule ─────────────────────────────────────────────
+-- Public-facing schedule for classes and events.
+-- event_type: 'beginner101' | 'pt_classes' | 'jp_classes' | 'other'
+CREATE TABLE IF NOT EXISTS event_entries (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_type  TEXT        NOT NULL,
+  title       TEXT        NOT NULL DEFAULT '',
+  date        DATE        NOT NULL,
+  start_time  TEXT        NOT NULL,  -- stored as HH:MM
+  end_time    TEXT        NOT NULL,  -- stored as HH:MM
+  description TEXT        NOT NULL DEFAULT '',
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_event_entries_date      ON event_entries (date);
+CREATE INDEX IF NOT EXISTS idx_event_entries_type_date ON event_entries (event_type, date);
+
 ALTER TABLE customers        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE schedule_entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE checkins         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE event_entries    ENABLE ROW LEVEL SECURITY;
+
+-- Allow public (anon key) SELECT on event_entries so the public schedule page
+-- can read events directly. Writes still require the service key (admin only).
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename  = 'event_entries'
+      AND policyname = 'public can view events'
+  ) THEN
+    CREATE POLICY "public can view events"
+      ON event_entries FOR SELECT USING (true);
+  END IF;
+END $$;
 
 -- Deny all access via the anon/public key (service key bypasses RLS entirely)
 -- No policies = no access for anon key. This is the correct secure default.
