@@ -196,8 +196,7 @@ const { title, activePage = '' } = Astro.props;
 
       <a href="/events"
          class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
-           text-gray-400 hover:bg-gray-700/60 hover:text-white"
-         target="_blank" rel="noopener">
+           text-gray-400 hover:bg-gray-700/60 hover:text-white">
         <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
             d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
@@ -304,7 +303,11 @@ const { title, activePage = '' } = Astro.props;
     function doLogout() {
       if (confirm('Log out?')) {
         sessionStorage.removeItem('bbo_auth');
+        sessionStorage.removeItem('bbo_token');
         sessionStorage.removeItem('bbo_admin');
+        localStorage.removeItem('bbo_auth');
+        localStorage.removeItem('bbo_token');
+        localStorage.removeItem('bbo_admin');
         window.location.replace('/');
       }
     }
