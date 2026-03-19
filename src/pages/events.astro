@@ -21,35 +21,34 @@
   </style>
 </head>
 
-<body class="bg-gray-50 min-h-full">
+<body class="bg-gray-50 h-screen flex flex-col overflow-hidden">
 
   <!-- ── Top Header ─────────────────────────────────────────────────────── -->
-  <header class="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
+  <header class="bg-gray-900 border-b border-gray-700 shrink-0 z-40 shadow-lg">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 h-12 flex items-center justify-between gap-3">
 
       <!-- Brand -->
       <div class="flex items-center gap-3 shrink-0">
         <img src="/assets/bobo_logo_rectangle.png" alt="BBO Gym"
-             class="h-9 w-auto object-contain"
+             class="h-7 w-auto object-contain brightness-0 invert"
              onerror="this.style.display='none'" />
-        <div class="leading-tight">
-          <p class="text-sm font-bold text-gray-900">Classes &amp; Events</p>
-          <p class="text-[11px] text-gray-400">Public Schedule</p>
+        <div class="leading-tight hidden sm:block">
+          <p class="text-sm font-bold text-white">Classes &amp; Events</p>
         </div>
       </div>
 
       <!-- Week nav + admin zone -->
       <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-end">
         <button id="btn-prev-week"
-                class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200
-                       hover:bg-gray-50 text-gray-600 transition text-base leading-none">‹</button>
+                class="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-600
+                       hover:bg-gray-700 text-gray-300 transition text-base leading-none">‹</button>
         <span id="week-label"
-              class="text-sm font-medium text-gray-700 min-w-[140px] sm:min-w-[180px] text-center px-1"></span>
+              class="text-sm font-medium text-gray-200 min-w-[140px] sm:min-w-[180px] text-center px-1"></span>
         <button id="btn-next-week"
-                class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200
-                       hover:bg-gray-50 text-gray-600 transition text-base leading-none">›</button>
+                class="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-600
+                       hover:bg-gray-700 text-gray-300 transition text-base leading-none">›</button>
         <button id="btn-today"
-                class="px-3 py-1.5 text-sm bg-orange-500 hover:bg-orange-600 text-white
+                class="px-3 py-1 text-xs bg-orange-500 hover:bg-orange-600 text-white
                        font-semibold rounded-lg transition">Today</button>
         <!-- Populated by JS depending on auth state -->
         <div id="admin-zone" class="flex items-center gap-2 ml-1"></div>
@@ -58,42 +57,41 @@
   </header>
 
   <!-- ── Main Content ────────────────────────────────────────────────────── -->
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-5">
+  <main class="flex-1 flex flex-col min-h-0 px-3 sm:px-5 pt-2 pb-3 max-w-7xl w-full mx-auto">
 
-    <!-- Legend -->
-    <div class="flex flex-wrap items-center gap-2 mb-5">
-      <span class="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mr-1">Event types:</span>
-      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">
-        <span class="w-2 h-2 rounded-full bg-orange-400 shrink-0"></span>Beginner 101
+    <!-- Legend (compact single row) -->
+    <div class="flex flex-wrap items-center gap-1.5 mb-2 shrink-0">
+      <span class="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mr-0.5">Types:</span>
+      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-orange-100 text-orange-700">
+        <span class="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0"></span>Beginner 101
       </span>
-      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
-        <span class="w-2 h-2 rounded-full bg-blue-400 shrink-0"></span>PT Classes (Thanh Tu)
+      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-100 text-blue-700">
+        <span class="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0"></span>PT (Thanh Tu)
       </span>
-      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-700">
-        <span class="w-2 h-2 rounded-full bg-purple-400 shrink-0"></span>JP Classes (Shingo)
+      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100 text-purple-700">
+        <span class="w-1.5 h-1.5 rounded-full bg-purple-400 shrink-0"></span>JP (Shingo)
       </span>
-      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-teal-100 text-teal-700">
-        <span class="w-2 h-2 rounded-full bg-teal-400 shrink-0"></span>Other Events
+      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-teal-100 text-teal-700">
+        <span class="w-1.5 h-1.5 rounded-full bg-teal-400 shrink-0"></span>Other
       </span>
+      <p id="cal-status" class="ml-auto text-xs text-gray-400">Loading…</p>
     </div>
 
-    <!-- Calendar card -->
-    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+    <!-- Calendar card — fills all remaining height, time grid scrolls internally -->
+    <div class="flex-1 min-h-0 bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col overflow-hidden">
 
-      <!-- Sticky day-header row -->
-      <div id="cal-day-headers" class="border-b border-gray-200 bg-white sticky"
-           style="top:64px; z-index:30; display:grid;"></div>
+      <!-- Sticky day-header row (no top offset needed — sits inside the card) -->
+      <div id="cal-day-headers" class="border-b border-gray-200 bg-white shrink-0"
+           style="z-index:30; display:grid;"></div>
 
       <!-- Scrollable time body -->
-      <div class="cal-scroll">
+      <div class="cal-scroll flex-1 overflow-y-auto">
         <div id="cal-grid" style="display:grid; min-width:700px;">
           <!-- Built by renderCalendar() -->
         </div>
       </div>
 
     </div>
-
-    <p id="cal-status" class="mt-4 text-center text-sm text-gray-400 hidden">Loading schedule…</p>
   </main>
 
   <!-- ── Add / Edit Event Modal (admin only) ────────────────────────────── -->
@@ -535,18 +533,17 @@
     // ── Load events ────────────────────────────────────────────────────────
     function loadEvents() {
       var statusEl = document.getElementById('cal-status');
-      statusEl.textContent = 'Loading schedule…';
-      statusEl.classList.remove('hidden');
+      statusEl.textContent = 'Loading…';
 
       fetch('/api/events')
         .then(function (res) { return res.json(); })
         .then(function (data) {
           eventsData = data.entries || [];
           renderCalendar();
-          statusEl.classList.add('hidden');
+          statusEl.style.display = 'none';
         })
         .catch(function () {
-          statusEl.textContent = 'Could not load schedule. Please refresh the page.';
+          statusEl.textContent = 'Could not load schedule. Please refresh.';
         });
     }
 
