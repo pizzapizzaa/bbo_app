@@ -85,7 +85,7 @@
            style="z-index:30; display:grid;"></div>
 
       <!-- Scrollable time body -->
-      <div class="cal-scroll flex-1 overflow-y-auto">
+      <div id="cal-scroll-body" class="cal-scroll flex-1 overflow-y-auto">
         <div id="cal-grid" style="display:grid; min-width:700px;">
           <!-- Built by renderCalendar() -->
         </div>
@@ -235,9 +235,17 @@
   <!-- ── Page Script ─────────────────────────────────────────────────────── -->
   <script is:inline>
     // ── Constants ──────────────────────────────────────────────────────────
-    var CAL_START    = 6;   // first visible hour (6 AM)
-    var CAL_END      = 22;  // last  visible hour (10 PM)
-    var PX_PER_HOUR  = 64;  // pixels per 60-minute block
+    var CAL_START = 9;   // first visible hour (9 AM)
+    var CAL_END   = 22;  // last  visible hour (10 PM)
+
+    // Dynamic px-per-hour: fills the scroll container height exactly.
+    // Minimum 36 px so blocks are still readable on very small screens.
+    function calcPxPerHour() {
+      var el = document.getElementById('cal-scroll-body');
+      var totalHours = CAL_END - CAL_START;
+      var available = el ? el.clientHeight : 520;
+      return Math.max(36, Math.floor(available / totalHours));
+    }
 
     var EVENT_CFG = {
       beginner101: {
@@ -371,14 +379,15 @@
 
     // ── Render calendar ────────────────────────────────────────────────────
     function renderCalendar() {
-      var todayIso = fmtDate(new Date());
+      var todayIso   = fmtDate(new Date());
+      var PX_PER_HOUR = calcPxPerHour();
       document.getElementById('week-label').textContent = fmtWeekLabel(currentWeekStart);
 
       var weekDates = [];
       for (var i = 0; i < 7; i++) weekDates.push(addDays(currentWeekStart, i));
 
-      var totalHours = CAL_END - CAL_START;   // 16
-      var totalPx    = totalHours * PX_PER_HOUR; // 1024
+      var totalHours = CAL_END - CAL_START;   // 13
+      var totalPx    = totalHours * PX_PER_HOUR;
 
       // ── Day header row ──
       var cols = '56px repeat(7, minmax(0,1fr))';
@@ -720,6 +729,13 @@
       document.getElementById('btn-today').addEventListener('click', function () {
         currentWeekStart = getWeekStart(new Date());
         renderCalendar();
+      });
+
+      // Re-render on resize so row height stays proportional to viewport
+      var _resizeTimer;
+      window.addEventListener('resize', function () {
+        clearTimeout(_resizeTimer);
+        _resizeTimer = setTimeout(renderCalendar, 120);
       });
 
       loadEvents();
