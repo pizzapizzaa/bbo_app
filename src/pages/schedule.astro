@@ -6,102 +6,231 @@ import MainLayout from '../layouts/MainLayout.astro';
 
   <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
-    <!-- ── Add Entry Form ── -->
+    <!-- ── Add / Bulk Entry ── -->
     <div class="xl:col-span-1">
       <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <h2 class="font-semibold text-gray-800 mb-5">Add Schedule Entry</h2>
 
-        <form id="schedule-form" class="space-y-4" novalidate>
-
-          <!-- Staff Name -->
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1.5">Staff Name <span class="text-red-400">*</span></label>
-            <input
-              id="f-staff"
-              list="staff-list"
-              type="text"
-              placeholder="Select or type name…"
-              autocomplete="off"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
-                     focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-            />
-            <!-- Staff name datalist — add your staff names here -->
-            <datalist id="staff-list">
-              <option value="Thanh Tu"></option>
-              <option value="Duyen Ha"></option>
-              <option value="Thu Huyen"></option>
-              <option value="Kim An"></option>
-              <option value="Khue Anh"></option>
-              <option value="Huy Tran"></option>
-            </datalist>
-            <p class="text-xs text-gray-400 mt-1">Staff names can be configured in the source code.</p>
-          </div>
-
-          <!-- Date -->
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1.5">Date <span class="text-red-400">*</span></label>
-            <input
-              id="f-date"
-              type="date"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
-                     focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-            />
-          </div>
-
-          <!-- Start / End Time -->
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1.5">Start Time <span class="text-red-400">*</span></label>
-              <input
-                id="f-start"
-                type="time"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
-                       focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-              />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1.5">End Time <span class="text-red-400">*</span></label>
-              <input
-                id="f-end"
-                type="time"
-                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
-                       focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-              />
-            </div>
-          </div>
-
-          <!-- Auto-calculated duration -->
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1.5">Duration</label>
-            <div id="duration-display"
-                 class="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-500">
-              — (auto-calculated)
-            </div>
-          </div>
-
-          <!-- Notes -->
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1.5">Notes</label>
-            <input
-              id="f-notes"
-              type="text"
-              placeholder="Optional…"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
-                     focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-            />
-          </div>
-
-          <!-- Form error -->
-          <div id="form-error" class="hidden text-sm text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2"></div>
-
-          <button
-            type="submit"
-            class="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold
-                   py-2.5 rounded-lg text-sm transition active:scale-[0.98]"
-          >
-            Add to Schedule
+        <!-- Tab bar -->
+        <div class="flex border-b border-gray-200 mb-5 -mx-6 px-6">
+          <button id="tab-single" type="button" onclick="switchTab('single')"
+            class="flex-1 pb-2.5 text-sm font-semibold text-orange-500 border-b-2 border-orange-500 -mb-px transition">
+            Single Entry
           </button>
-        </form>
+          <button id="tab-bulk" type="button" onclick="switchTab('bulk')"
+            class="flex-1 pb-2.5 text-sm font-medium text-gray-400 border-b-2 border-transparent -mb-px hover:text-gray-600 transition">
+            Bulk Add
+          </button>
+        </div>
+
+        <!-- ── Single Entry panel ── -->
+        <div id="panel-single">
+          <form id="schedule-form" class="space-y-4" novalidate>
+
+            <!-- Staff Name -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Staff Name <span class="text-red-400">*</span></label>
+              <input
+                id="f-staff"
+                list="staff-list"
+                type="text"
+                placeholder="Select or type name…"
+                autocomplete="off"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                       focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+              />
+              <!-- Staff name datalist — add your staff names here -->
+              <datalist id="staff-list">
+                <option value="Thanh Tu"></option>
+                <option value="Duyen Ha"></option>
+                <option value="Thu Huyen"></option>
+                <option value="Kim An"></option>
+                <option value="Khue Anh"></option>
+                <option value="Huy Tran"></option>
+              </datalist>
+              <p class="text-xs text-gray-400 mt-1">Staff names can be configured in the source code.</p>
+            </div>
+
+            <!-- Date -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Date <span class="text-red-400">*</span></label>
+              <input
+                id="f-date"
+                type="date"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                       focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+              />
+            </div>
+
+            <!-- Start / End Time -->
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1.5">Start Time <span class="text-red-400">*</span></label>
+                <input
+                  id="f-start"
+                  type="time"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                         focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1.5">End Time <span class="text-red-400">*</span></label>
+                <input
+                  id="f-end"
+                  type="time"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                         focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            <!-- Auto-calculated duration -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Duration</label>
+              <div id="duration-display"
+                   class="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-500">
+                — (auto-calculated)
+              </div>
+            </div>
+
+            <!-- Notes -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Notes</label>
+              <input
+                id="f-notes"
+                type="text"
+                placeholder="Optional…"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                       focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+              />
+            </div>
+
+            <!-- Form error -->
+            <div id="form-error" class="hidden text-sm text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2"></div>
+
+            <button
+              type="submit"
+              class="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold
+                     py-2.5 rounded-lg text-sm transition active:scale-[0.98]"
+            >
+              Add to Schedule
+            </button>
+          </form>
+        </div>
+
+        <!-- ── Bulk Add panel ── -->
+        <div id="panel-bulk" class="hidden">
+          <form id="bulk-form" class="space-y-4" novalidate>
+
+            <!-- Staff checkboxes -->
+            <div>
+              <div class="flex items-center justify-between mb-1.5">
+                <label class="block text-sm font-medium text-gray-700">Staff Members <span class="text-red-400">*</span></label>
+                <button type="button" id="btn-select-all-staff" onclick="toggleSelectAllStaff()"
+                  class="text-xs text-orange-500 hover:text-orange-600 font-medium">
+                  Select All
+                </button>
+              </div>
+              <div id="staff-checkboxes"
+                   class="border border-gray-200 rounded-lg p-3 space-y-2 max-h-44 overflow-y-auto">
+                <!-- populated by JS -->
+              </div>
+            </div>
+
+            <!-- Date range -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Date Range <span class="text-red-400">*</span></label>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <span class="block text-xs text-gray-500 mb-1">From</span>
+                  <input id="b-date-from" type="date"
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                           focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent" />
+                </div>
+                <div>
+                  <span class="block text-xs text-gray-500 mb-1">To</span>
+                  <input id="b-date-to" type="date"
+                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                           focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Days of week -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Days of Week <span class="text-red-400">*</span></label>
+              <div class="flex flex-wrap gap-x-3 gap-y-2">
+                <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input type="checkbox" class="bulk-dow accent-orange-500 w-3.5 h-3.5" value="1" checked />
+                  <span class="text-xs font-medium text-gray-700">Mon</span>
+                </label>
+                <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input type="checkbox" class="bulk-dow accent-orange-500 w-3.5 h-3.5" value="2" checked />
+                  <span class="text-xs font-medium text-gray-700">Tue</span>
+                </label>
+                <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input type="checkbox" class="bulk-dow accent-orange-500 w-3.5 h-3.5" value="3" checked />
+                  <span class="text-xs font-medium text-gray-700">Wed</span>
+                </label>
+                <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input type="checkbox" class="bulk-dow accent-orange-500 w-3.5 h-3.5" value="4" checked />
+                  <span class="text-xs font-medium text-gray-700">Thu</span>
+                </label>
+                <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input type="checkbox" class="bulk-dow accent-orange-500 w-3.5 h-3.5" value="5" checked />
+                  <span class="text-xs font-medium text-gray-700">Fri</span>
+                </label>
+                <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input type="checkbox" class="bulk-dow accent-orange-500 w-3.5 h-3.5" value="6" />
+                  <span class="text-xs font-medium text-gray-700">Sat</span>
+                </label>
+                <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input type="checkbox" class="bulk-dow accent-orange-500 w-3.5 h-3.5" value="0" />
+                  <span class="text-xs font-medium text-gray-700">Sun</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Start / End Time -->
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1.5">Start Time <span class="text-red-400">*</span></label>
+                <input id="b-start" type="time"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                         focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1.5">End Time <span class="text-red-400">*</span></label>
+                <input id="b-end" type="time"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                         focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent" />
+              </div>
+            </div>
+
+            <!-- Live entry count preview -->
+            <div id="bulk-preview"
+                 class="text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-500">
+              Select staff and dates to preview entry count.
+            </div>
+
+            <!-- Notes -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Notes</label>
+              <input id="b-notes" type="text" placeholder="Optional…"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                       focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent" />
+            </div>
+
+            <!-- Bulk error -->
+            <div id="bulk-error" class="hidden text-sm text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2"></div>
+
+            <button type="submit"
+              class="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold
+                     py-2.5 rounded-lg text-sm transition active:scale-[0.98]">
+              Add to Schedule
+            </button>
+          </form>
+        </div>
+
       </div>
     </div>
 
@@ -237,6 +366,14 @@ import MainLayout from '../layouts/MainLayout.astro';
 
       loadSchedule();
       $('#f-start, #f-end').on('change', calcDuration);
+
+      // Bulk panel init
+      initStaffCheckboxes();
+      document.getElementById('b-date-from').addEventListener('change', updateBulkPreview);
+      document.getElementById('b-date-to').addEventListener('change', updateBulkPreview);
+      document.querySelectorAll('.bulk-dow').forEach(function (cb) {
+        cb.addEventListener('change', updateBulkPreview);
+      });
     });
 
     // ── Week helpers ──
@@ -593,8 +730,147 @@ import MainLayout from '../layouts/MainLayout.astro';
       });
     });
 
-    function showToast(msg, type) {
-      var t = document.createElement('div');
+    // ── Tab switching ──
+    function switchTab(tab) {
+      var isSingle = tab === 'single';
+      document.getElementById('panel-single').classList.toggle('hidden', !isSingle);
+      document.getElementById('panel-bulk').classList.toggle('hidden', isSingle);
+      var tSingle = document.getElementById('tab-single');
+      var tBulk   = document.getElementById('tab-bulk');
+      var activeClass   = 'flex-1 pb-2.5 text-sm font-semibold text-orange-500 border-b-2 border-orange-500 -mb-px transition';
+      var inactiveClass = 'flex-1 pb-2.5 text-sm font-medium text-gray-400 border-b-2 border-transparent -mb-px hover:text-gray-600 transition';
+      tSingle.className = isSingle ? activeClass : inactiveClass;
+      tBulk.className   = isSingle ? inactiveClass : activeClass;
+    }
+
+    // ── Staff checkboxes ──
+    function initStaffCheckboxes() {
+      var container = document.getElementById('staff-checkboxes');
+      container.innerHTML = STAFF_NAMES.map(function (name) {
+        return '<label class="flex items-center gap-2 cursor-pointer select-none">' +
+          '<input type="checkbox" class="bulk-staff accent-orange-500 w-3.5 h-3.5" value="' + escHtml(name) + '" />' +
+          '<span class="text-sm text-gray-700">' + escHtml(name) + '</span>' +
+          '</label>';
+      }).join('');
+      container.querySelectorAll('.bulk-staff').forEach(function (cb) {
+        cb.addEventListener('change', updateBulkPreview);
+      });
+    }
+
+    var _allStaffSelected = false;
+
+    function toggleSelectAllStaff() {
+      _allStaffSelected = !_allStaffSelected;
+      document.querySelectorAll('.bulk-staff').forEach(function (cb) { cb.checked = _allStaffSelected; });
+      document.getElementById('btn-select-all-staff').textContent = _allStaffSelected ? 'Deselect All' : 'Select All';
+      updateBulkPreview();
+    }
+
+    function getSelectedStaff() {
+      return Array.from(document.querySelectorAll('.bulk-staff:checked')).map(function (cb) { return cb.value; });
+    }
+
+    function getSelectedDays() {
+      return Array.from(document.querySelectorAll('.bulk-dow:checked')).map(function (cb) { return parseInt(cb.value, 10); });
+    }
+
+    function getDatesInRange(fromISO, toISO, days) {
+      var dates = [];
+      var cur = new Date(fromISO + 'T00:00:00');
+      var end = new Date(toISO  + 'T00:00:00');
+      if (cur > end || !days.length) return dates;
+      while (cur <= end) {
+        if (days.indexOf(cur.getDay()) !== -1) dates.push(fmtDate(cur));
+        cur.setDate(cur.getDate() + 1);
+      }
+      return dates;
+    }
+
+    function updateBulkPreview() {
+      var el      = document.getElementById('bulk-preview');
+      var staff   = getSelectedStaff();
+      var fromISO = document.getElementById('b-date-from').value;
+      var toISO   = document.getElementById('b-date-to').value;
+      var days    = getSelectedDays();
+
+      if (!staff.length || !fromISO || !toISO || !days.length) {
+        el.textContent = 'Select staff, a date range and at least one day to preview entry count.';
+        el.className = 'text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-500';
+        return;
+      }
+      if (fromISO > toISO) {
+        el.textContent = '"To" date must be on or after "From" date.';
+        el.className = 'text-xs bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-red-500';
+        return;
+      }
+      var dates = getDatesInRange(fromISO, toISO, days);
+      var total = staff.length * dates.length;
+      if (!total) {
+        el.textContent = 'No matching dates in the selected range for the chosen days.';
+        el.className = 'text-xs bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2 text-yellow-700';
+        return;
+      }
+      el.textContent = staff.length + ' staff × ' + dates.length + ' day' + (dates.length !== 1 ? 's' : '') +
+                       ' = ' + total + ' entr' + (total !== 1 ? 'ies' : 'y') + ' will be created.';
+      el.className = 'text-xs bg-orange-50 border border-orange-200 rounded-lg px-3 py-2 text-orange-700 font-medium';
+    }
+
+    // ── Bulk form submit ──
+    document.getElementById('bulk-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var errEl = document.getElementById('bulk-error');
+      errEl.classList.add('hidden');
+
+      var staff   = getSelectedStaff();
+      var fromISO = document.getElementById('b-date-from').value;
+      var toISO   = document.getElementById('b-date-to').value;
+      var days    = getSelectedDays();
+      var start   = document.getElementById('b-start').value;
+      var end     = document.getElementById('b-end').value;
+      var notes   = document.getElementById('b-notes').value.trim();
+
+      if (!staff.length)  { errEl.textContent = 'Select at least one staff member.'; errEl.classList.remove('hidden'); return; }
+      if (!fromISO || !toISO) { errEl.textContent = 'Please choose a date range.'; errEl.classList.remove('hidden'); return; }
+      if (fromISO > toISO) { errEl.textContent = '"To" date must be on or after "From" date.'; errEl.classList.remove('hidden'); return; }
+      if (!days.length)   { errEl.textContent = 'Select at least one day of the week.'; errEl.classList.remove('hidden'); return; }
+      if (!start || !end) { errEl.textContent = 'Please fill in start and end times.'; errEl.classList.remove('hidden'); return; }
+
+      var dates = getDatesInRange(fromISO, toISO, days);
+      if (!dates.length)  { errEl.textContent = 'No matching dates in the selected range for the chosen days.'; errEl.classList.remove('hidden'); return; }
+
+      var entries = [];
+      staff.forEach(function (s) {
+        dates.forEach(function (d) {
+          entries.push({ staff_name: s, date: d, start_time: start, end_time: end, notes: notes });
+        });
+      });
+
+      if (entries.length > 100 && !confirm('This will create ' + entries.length + ' entries. Continue?')) return;
+
+      var btn = e.target.querySelector('[type="submit"]');
+      btn.disabled = true;
+      btn.textContent = 'Adding ' + entries.length + ' entr' + (entries.length !== 1 ? 'ies' : 'y') + '…';
+
+      Promise.all(entries.map(function (row) {
+        return apiFetch('/api/schedule', { method: 'POST', body: JSON.stringify(row) })
+          .then(function (res) { return res.json(); });
+      })).then(function (results) {
+        btn.disabled = false; btn.textContent = 'Add to Schedule';
+        var succeeded = results.filter(function (r) { return r.entry; }).map(function (r) { return r.entry; });
+        var failed    = results.filter(function (r) { return r.error; }).length;
+        succeeded.forEach(function (entry) { scheduleData.unshift(entry); });
+        currentWeekStart = getWeekStart(new Date(fromISO + 'T00:00:00'));
+        renderCalendar();
+        if (failed) showToast('Added ' + succeeded.length + ', ' + failed + ' failed.', 'warning');
+        else        showToast('Added ' + succeeded.length + ' schedule entr' + (succeeded.length !== 1 ? 'ies' : 'y') + '!');
+      }).catch(function (err) {
+        btn.disabled = false; btn.textContent = 'Add to Schedule';
+        errEl.textContent = 'Error: ' + err.message;
+        errEl.classList.remove('hidden');
+      });
+    });
+
+    function showToast(msg, type) {      var t = document.createElement('div');
       t.textContent = msg;
       t.className = 'fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-lg text-sm font-medium shadow-lg ' +
         (type === 'warning' ? 'bg-yellow-500 text-white' : type === 'error' ? 'bg-red-500 text-white' : 'bg-green-500 text-white');
