@@ -79,7 +79,7 @@ export const GET: APIRoute = async () => {
   } catch (e: any) { return serverError(e?.message ?? String(e)); }
 };
 
-/** POST /api/customers — bulk import (replaces all existing records) */
+/** POST /api/customers — merge CSV into existing records (additive, no deletes) */
 export const POST: APIRoute = async ({ request }) => {
   try {
   let body: { rows: Record<string, string>[] };
@@ -87,19 +87,39 @@ export const POST: APIRoute = async ({ request }) => {
   catch { return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400 }); }
 
   const csvRows = body.rows ?? [];
+  if (!csvRows.length) return ok({ added: 0, skipped: 0 });
 
-  // Delete all existing customers
-  const { error: delErr } = await db
-    .from('customers')
-    .delete()
-    .not('id', 'is', null);
+  // Fetch all existing emails and names so we can deduplicate.
+  const existing = await fetchAllPages((from, to) =>
+    db.from('customers').select('email, full_name').range(from, to)
+  );
+  if (existing.error) return serverError(existing.error.message);
 
-  if (delErr) return serverError(delErr.message);
+  const existingEmails = new Set(
+    (existing.data ?? [])
+      .map((r: any) => (r.email ?? '').trim().toLowerCase())
+      .filter(Boolean)
+  );
+  const existingNames = new Set(
+    (existing.data ?? [])
+      .map((r: any) => (r.full_name ?? '').trim().toLowerCase())
+      .filter(Boolean)
+  );
 
-  // Insert in batches of 500 to stay within Supabase request limits
+  // Keep only rows not already in the DB (match by email, fall back to name).
+  const newRows = csvRows.filter((r) => {
+    const email = (r['Email'] ?? '').trim().toLowerCase();
+    const name  = (r['Full Name'] ?? '').trim().toLowerCase();
+    if (email && email !== 'na' && email !== 'n/a') return !existingEmails.has(email);
+    return name ? !existingNames.has(name) : false;
+  });
+
+  const skipped = csvRows.length - newRows.length;
+
+  // Insert genuinely new records in batches of 500.
   const BATCH = 500;
-  for (let i = 0; i < csvRows.length; i += BATCH) {
-    const batch = csvRows.slice(i, i + BATCH).map((r) => ({
+  for (let i = 0; i < newRows.length; i += BATCH) {
+    const batch = newRows.slice(i, i + BATCH).map((r) => ({
       full_name:         r['Full Name']         ?? '',
       dob:               r['DOB']               ?? '',
       email:             r['Email']             ?? '',
@@ -112,7 +132,19 @@ export const POST: APIRoute = async ({ request }) => {
     if (error) return serverError(error.message);
   }
 
-  return ok({ count: csvRows.length });
+  return ok({ added: newRows.length, skipped });
+  } catch (e: any) { return serverError(e?.message ?? String(e)); }
+};
+
+/** DELETE /api/customers — wipe all customer records */
+export const DELETE: APIRoute = async () => {
+  try {
+  const { error } = await db
+    .from('customers')
+    .delete()
+    .not('id', 'is', null);
+  if (error) return serverError(error.message);
+  return ok({ cleared: true });
   } catch (e: any) { return serverError(e?.message ?? String(e)); }
 };
 

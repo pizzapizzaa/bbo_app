@@ -77,6 +77,29 @@ import MainLayout from '../layouts/MainLayout.astro';
   <!-- Upload progress / status -->
   <div id="upload-status" class="hidden mb-4"></div>
 
+  <!-- Import Confirmation Modal -->
+  <div id="import-confirm-modal"
+       class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h2 class="font-semibold text-gray-800 text-lg">Confirm CSV Import</h2>
+        <button onclick="closeImportConfirmModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+      </div>
+      <div class="px-6 py-5 space-y-4">
+        <div id="import-confirm-info" class="text-sm text-gray-700"></div>
+        <p class="text-xs text-gray-400">Customers already in the database (matched by email or name) will be skipped. No existing records will be deleted.</p>
+        <div class="flex justify-end gap-3 pt-1">
+          <button type="button" onclick="closeImportConfirmModal()"
+                  class="bg-white hover:bg-gray-50 border border-gray-300 text-gray-700
+                         font-medium text-sm px-4 py-2 rounded-lg transition">Cancel</button>
+          <button id="import-confirm-btn" onclick="confirmImport()"
+                  class="bg-orange-500 hover:bg-orange-600 text-white font-medium text-sm
+                         px-5 py-2 rounded-lg transition">Import</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Add Customer Modal -->
   <div id="add-customer-modal"
        class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
@@ -589,6 +612,37 @@ import MainLayout from '../layouts/MainLayout.astro';
         return obj;
       });
 
+      openImportConfirmModal(csvRows, filename);
+    }
+
+    // ── Import confirmation modal ──
+    var _pendingImportRows = [];
+    var _pendingImportFilename = '';
+
+    function openImportConfirmModal(csvRows, filename) {
+      _pendingImportRows     = csvRows;
+      _pendingImportFilename = filename;
+
+      var csvCount = csvRows.length;
+      var infoEl = document.getElementById('import-confirm-info');
+      infoEl.innerHTML =
+        'Import <strong>' + csvCount + '</strong> customer(s) from ' +
+        '<strong>' + escHtml(filename) + '</strong> into the database.';
+
+      document.getElementById('import-confirm-modal').classList.remove('hidden');
+    }
+
+    function closeImportConfirmModal() {
+      document.getElementById('import-confirm-modal').classList.add('hidden');
+      _pendingImportRows     = [];
+      _pendingImportFilename = '';
+    }
+
+    function confirmImport() {
+      var csvRows  = _pendingImportRows;
+      var filename = _pendingImportFilename;
+      closeImportConfirmModal();
+
       showStatus('Uploading ' + csvRows.length + ' customer(s)…', 'info', true);
       var btn = document.querySelector('[onclick="exportCustomers()"]');
       if (btn) btn.disabled = true;
@@ -606,10 +660,9 @@ import MainLayout from '../layouts/MainLayout.astro';
         .then(function (data) {
           if (btn) btn.disabled = false;
           if (data.error) { showStatus(data.error, 'error'); return; }
-          showStatus(
-            'Imported <strong>' + data.count + '</strong> customer(s) from <strong>' + escHtml(filename) + '</strong>.',
-            'success'
-          );
+          var msg = 'Added <strong>' + data.added + '</strong> new customer(s) from <strong>' + escHtml(filename) + '</strong>.';
+          if (data.skipped > 0) msg += ' <span class="text-gray-500">' + data.skipped + ' duplicate(s) skipped.</span>';
+          showStatus(msg, 'success');
           loadCustomers();
         })
         .catch(function (err) {
@@ -776,10 +829,7 @@ import MainLayout from '../layouts/MainLayout.astro';
 
     function clearAllCustomers() {
       if (!confirm('Clear ALL customer data? This cannot be undone.')) return;
-      apiFetch('/api/customers', {
-        method: 'POST',
-        body: JSON.stringify({ rows: [] })
-      })
+      apiFetch('/api/customers', { method: 'DELETE' })
         .then(function (res) { return res.json(); })
         .then(function () {
           customerHeaders = [];
