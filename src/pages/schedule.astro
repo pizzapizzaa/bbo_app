@@ -465,6 +465,7 @@ import MainLayout from '../layouts/MainLayout.astro';
         bodyHtml += '<td class="py-2.5 pr-3 align-top w-24">' +
           '<span class="text-xs font-semibold text-gray-700 leading-tight">' + escHtml(staffName) + '</span>' +
           '</td>';
+        var weekTotalMin = 0;
         weekDates.forEach(function (d) {
           var iso     = fmtDate(d);
           var isToday = iso === todayIso;
@@ -477,6 +478,7 @@ import MainLayout from '../layouts/MainLayout.astro';
             var end   = entry.end_time   || '';
             var diff  = timeToMin(end) - timeToMin(start);
             if (diff <= 0) diff += 1440;
+            weekTotalMin += diff;
             var h = Math.floor(diff / 60), m = diff % 60;
             var dur = h + 'h' + (m ? ' ' + m + 'm' : '');
             var safeId = escHtml(String(entry.id));
@@ -492,6 +494,13 @@ import MainLayout from '../layouts/MainLayout.astro';
           });
           bodyHtml += '</td>';
         });
+        var th = Math.floor(weekTotalMin / 60), tm = weekTotalMin % 60;
+        var totalLabel = weekTotalMin > 0
+          ? th + 'h' + (tm ? ' ' + tm + 'm' : '')
+          : '<span class="text-gray-300">—</span>';
+        bodyHtml += '<td class="py-2.5 pl-3 align-middle text-right">' +
+          '<span class="text-xs font-semibold text-gray-700 whitespace-nowrap">' + totalLabel + '</span>' +
+          '</td>';
         bodyHtml += '</tr>';
       });
 
