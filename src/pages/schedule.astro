@@ -300,6 +300,15 @@ import MainLayout from '../layouts/MainLayout.astro';
                     class="px-2.5 py-1.5 text-sm bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-lg transition">
               Today
             </button>
+            <button onclick="duplicateToNextWeek()"
+                    class="inline-flex items-center gap-1.5 text-sm text-indigo-600 hover:text-indigo-800
+                           bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-3 py-1.5 rounded-lg transition">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+              </svg>
+              Duplicate to Next Week
+            </button>
             <button onclick="exportCSV()"
                     class="inline-flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-800
                            bg-gray-50 hover:bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-lg transition">
@@ -442,6 +451,7 @@ import MainLayout from '../layouts/MainLayout.astro';
             '</th>';
         }
       });
+      headHtml += '<th class="pb-3 pl-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Total hrs</th>';
       headHtml += '</tr>';
       document.getElementById('cal-head').innerHTML = headHtml;
 
@@ -486,7 +496,7 @@ import MainLayout from '../layouts/MainLayout.astro';
       });
 
       if (!bodyHtml) {
-        bodyHtml = '<tr><td colspan="8" class="py-10 text-center text-gray-400 text-sm">No schedule data yet.</td></tr>';
+        bodyHtml = '<tr><td colspan="9" class="py-10 text-center text-gray-400 text-sm">No schedule data yet.</td></tr>';
       }
       document.getElementById('cal-body').innerHTML = bodyHtml;
     }
@@ -869,6 +879,41 @@ import MainLayout from '../layouts/MainLayout.astro';
         errEl.classList.remove('hidden');
       });
     });
+
+    function duplicateToNextWeek() {
+      // Collect all entries in the currently visible week
+      var weekStart = fmtDate(currentWeekStart);
+      var weekEnd   = fmtDate(addDays(currentWeekStart, 6));
+      var thisWeekEntries = scheduleData.filter(function (s) {
+        return s.date >= weekStart && s.date <= weekEnd;
+      });
+      if (!thisWeekEntries.length) {
+        showToast('No entries in the current week to duplicate.', 'warning');
+        return;
+      }
+      if (!confirm('Duplicate ' + thisWeekEntries.length + ' entr' + (thisWeekEntries.length !== 1 ? 'ies' : 'y') + ' to next week?')) return;
+
+      var entries = thisWeekEntries.map(function (s) {
+        var nextDate = fmtDate(addDays(new Date(s.date + 'T00:00:00'), 7));
+        return { staff_name: s.staff_name, date: nextDate, start_time: s.start_time, end_time: s.end_time, notes: s.notes || '' };
+      });
+
+      Promise.all(entries.map(function (row) {
+        return apiFetch('/api/schedule', { method: 'POST', body: JSON.stringify(row) })
+          .then(function (res) { return res.json(); });
+      })).then(function (results) {
+        var succeeded = results.filter(function (r) { return r.entry; }).map(function (r) { return r.entry; });
+        var failed    = results.filter(function (r) { return r.error; }).length;
+        succeeded.forEach(function (entry) { scheduleData.unshift(entry); });
+        // Navigate to next week so user can see the duplicated entries
+        currentWeekStart = addDays(currentWeekStart, 7);
+        renderCalendar();
+        if (failed) showToast('Duplicated ' + succeeded.length + ', ' + failed + ' failed.', 'warning');
+        else        showToast('Duplicated ' + succeeded.length + ' entr' + (succeeded.length !== 1 ? 'ies' : 'y') + ' to next week!');
+      }).catch(function (err) {
+        showToast('Duplicate failed: ' + err.message, 'error');
+      });
+    }
 
     function showToast(msg, type) {      var t = document.createElement('div');
       t.textContent = msg;
