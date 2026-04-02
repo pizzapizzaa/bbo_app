@@ -282,7 +282,13 @@ import MainLayout from '../layouts/MainLayout.astro';
           </button>
         </div>
 
-        <div class="overflow-x-auto">
+        <!-- Loading spinner -->
+        <div id="checkin-loading" class="hidden py-16 flex flex-col items-center justify-center gap-3">
+          <div class="w-10 h-10 border-4 border-orange-200 border-t-orange-500 rounded-full animate-spin"></div>
+          <p class="text-sm text-gray-400">Loading check-ins…</p>
+        </div>
+
+        <div id="checkin-table-wrap" class="overflow-x-auto">
           <table id="checkin-table" class="w-full" style="width:100%">
             <thead>
               <tr>
@@ -402,14 +408,22 @@ import MainLayout from '../layouts/MainLayout.astro';
       var qs = (from === to)
         ? '?date=' + from
         : '?from=' + from + '&to=' + to;
+      document.getElementById('checkin-loading').classList.remove('hidden');
+      document.getElementById('checkin-table-wrap').classList.add('hidden');
       apiFetch('/api/checkins' + qs)
         .then(function (res) { return res.json(); })
         .then(function (data) {
+          document.getElementById('checkin-loading').classList.add('hidden');
+          document.getElementById('checkin-table-wrap').classList.remove('hidden');
           allCheckins = data.checkins || [];
           renderTable(allCheckins);
           updateStats(allCheckins);
         })
-        .catch(function (err) { showToast('Failed to load check-ins: ' + err.message, 'error'); });
+        .catch(function (err) {
+          document.getElementById('checkin-loading').classList.add('hidden');
+          document.getElementById('checkin-table-wrap').classList.remove('hidden');
+          showToast('Failed to load check-ins: ' + err.message, 'error');
+        });
     }
 
     function initTable() {

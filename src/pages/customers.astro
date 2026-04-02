@@ -243,6 +243,11 @@ import MainLayout from '../layouts/MainLayout.astro';
 
   <!-- Customer table -->
   <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 overflow-x-auto">
+    <!-- Loading spinner -->
+    <div id="table-loading" class="hidden py-16 flex flex-col items-center justify-center gap-3">
+      <div class="w-10 h-10 border-4 border-orange-200 border-t-orange-500 rounded-full animate-spin"></div>
+      <p class="text-sm text-gray-400">Loading customers…</p>
+    </div>
     <div id="table-wrapper" class="hidden">
       <table id="customer-table" class="w-full" style="width:100%">
         <thead><tr></tr></thead>
@@ -548,18 +553,31 @@ import MainLayout from '../layouts/MainLayout.astro';
 
     // ── Load customers from API ──
     function loadCustomers() {
-      showStatus('Loading customers…', 'info', true);
+      document.getElementById('table-loading').classList.remove('hidden');
+      document.getElementById('no-data-msg').classList.add('hidden');
+      document.getElementById('table-wrapper').classList.add('hidden');
       apiFetch('/api/customers')
         .then(function (res) { return res.json(); })
         .then(function (data) {
           document.getElementById('upload-status').classList.add('hidden');
-          if (data.error) { showStatus(data.error, 'error'); return; }
+          document.getElementById('table-loading').classList.add('hidden');
+          if (data.error) {
+            showStatus(data.error, 'error');
+            document.getElementById('no-data-msg').classList.remove('hidden');
+            return;
+          }
           customerHeaders = data.headers || [];
           customerRows    = data.rows    || [];
-          if (customerRows.length) renderTable();
+          if (customerRows.length) {
+            renderTable();
+          } else {
+            document.getElementById('no-data-msg').classList.remove('hidden');
+          }
           updateCount();
         })
         .catch(function (err) {
+          document.getElementById('table-loading').classList.add('hidden');
+          document.getElementById('no-data-msg').classList.remove('hidden');
           showStatus('Failed to load customers: ' + err.message, 'error');
         });
     }
