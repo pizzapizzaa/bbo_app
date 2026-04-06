@@ -103,6 +103,58 @@ export const POST: APIRoute = async ({ request }) => {
     await db.from('customers').insert({ full_name: customer_name });
   }
 
+  // ── Punch card purchase: add punches to the buyer's account ──
+  const PUNCH_ADDS: Record<string, number> = {
+    '10 Punches – Adult':   10,
+    '10 Punches – Student': 10,
+    '10 Punches – Kid':     10,
+    '20 Punches – Adult':   20,
+  };
+  const MEMBERSHIP_TYPE_MAP: Record<string, string> = {
+    'Membership – 1 Month':   '1 Month',
+    'Membership – 3 Months':  '3 Months',
+    'Membership – 6 Months':  '6 Months',
+    'Membership – 12 Months': '12 Months',
+  };
+  const MONTHS_TO_ADD: Record<string, number> = {
+    '1 Month': 1, '3 Months': 3, '6 Months': 6, '12 Months': 12,
+  };
+
+  const punchesToAdd  = checkin_type ? (PUNCH_ADDS[checkin_type] ?? 0) : 0;
+  const newMemberType = checkin_type ? (MEMBERSHIP_TYPE_MAP[checkin_type] ?? '') : '';
+
+  if (punchesToAdd > 0 || newMemberType) {
+    const { data: cust } = await db
+      .from('customers')
+      .select('id, punches_remaining, membership_end_date')
+      .ilike('full_name', customer_name)
+      .limit(1)
+      .maybeSingle();
+
+    if (cust) {
+      if (punchesToAdd > 0) {
+        await db.from('customers').update({
+          is_punch_card_holder: true,
+          punches_remaining: (cust.punches_remaining ?? 0) + punchesToAdd,
+        }).eq('id', cust.id);
+      }
+
+      if (newMemberType) {
+        const checkinDay  = new Date(date);
+        const existingEnd = cust.membership_end_date ? new Date(cust.membership_end_date) : null;
+        // Stack onto existing membership if still active, otherwise start from check-in date
+        const startDate   = (existingEnd && existingEnd > checkinDay) ? existingEnd : checkinDay;
+        const endDate     = new Date(startDate);
+        endDate.setMonth(endDate.getMonth() + MONTHS_TO_ADD[newMemberType]);
+        await db.from('customers').update({
+          membership_type:       newMemberType,
+          membership_start_date: startDate.toISOString().slice(0, 10),
+          membership_end_date:   endDate.toISOString().slice(0, 10),
+        }).eq('id', cust.id);
+      }
+    }
+  }
+
   // Deduct one punch from the punch card holder
   if (punch_card_holder_id) {
     const { data: holder } = await db
