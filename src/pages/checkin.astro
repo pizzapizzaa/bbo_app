@@ -212,11 +212,11 @@ import MainLayout from '../layouts/MainLayout.astro';
                 </label>
                 <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
                   <input type="radio" name="discount" class="discount-rb accent-orange-500 w-4 h-4 cursor-pointer" value="day30" />
-                  <span>30% discount <span class="text-gray-500 text-xs">Day Pass</span></span>
+                  <span>30% discount <span class="text-gray-500 text-xs">Day Pass – setting day (less disturbance)</span></span>
                 </label>
                 <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                  <input type="radio" name="discount" class="discount-rb accent-orange-500 w-4 h-4 cursor-pointer" value="day50" />
-                  <span>50% discount <span class="text-gray-500 text-xs">Day Pass</span></span>
+                  <input type="radio" name="discount" class="discount-rb accent-orange-500 w-4 h-4 cursor-pointer" value="day40" />
+                  <span>40% discount <span class="text-gray-500 text-xs">Day Pass – setting day (more disturbance)</span></span>
                 </label>
                 <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
                   <input type="radio" name="discount" class="discount-rb accent-orange-500 w-4 h-4 cursor-pointer" value="lasthour50" />
@@ -625,8 +625,8 @@ import MainLayout from '../layouts/MainLayout.astro';
       var total;
       if (discountVal === 'day30') {
         total = Math.round(basePrice * 0.7) + addonTotal;
-      } else if (discountVal === 'day50') {
-        total = Math.round(basePrice * 0.5) + addonTotal;
+      } else if (discountVal === 'day40') {
+        total = Math.round(basePrice * 0.6) + addonTotal;
       } else if (discountVal === 'lasthour50') {
         total = Math.round(basePrice * 0.5) + addonTotal;
       } else if (discountVal === 'birthday') {
@@ -671,8 +671,8 @@ import MainLayout from '../layouts/MainLayout.astro';
       var addonsArr      = [];
       document.querySelectorAll('.addon-cb:checked').forEach(function (cb) { addonsArr.push(cb.dataset.name); });
       var DISCOUNT_LABELS = {
-        'day30':      '30% discount – Day Pass',
-        'day50':      '50% discount – Day Pass',
+        'day30':      '30% discount – Day Pass (setting day, less disturbance)',
+        'day40':      '40% discount – Day Pass (setting day, more disturbance)',
         'lasthour50': '50% discount – Day Pass (late entry)',
         'birthday':   'Birthday discount'
       };
