@@ -219,8 +219,8 @@ import MainLayout from '../layouts/MainLayout.astro';
                   <span>50% discount <span class="text-gray-500 text-xs">Day Pass</span></span>
                 </label>
                 <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                  <input type="radio" name="discount" class="discount-rb accent-orange-500 w-4 h-4 cursor-pointer" value="lasthour30" />
-                  <span>30% discount <span class="text-gray-500 text-xs">Last hour entry (9 PM+)</span></span>
+                  <input type="radio" name="discount" class="discount-rb accent-orange-500 w-4 h-4 cursor-pointer" value="lasthour50" />
+                  <span>50% discount <span class="text-gray-500 text-xs">Day Pass (late entry)</span></span>
                 </label>
                 <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
                   <input type="radio" name="discount" class="discount-rb accent-orange-500 w-4 h-4 cursor-pointer" value="birthday" />
@@ -627,8 +627,8 @@ import MainLayout from '../layouts/MainLayout.astro';
         total = Math.round(basePrice * 0.7) + addonTotal;
       } else if (discountVal === 'day50') {
         total = Math.round(basePrice * 0.5) + addonTotal;
-      } else if (discountVal === 'lasthour30') {
-        total = Math.round((basePrice + addonTotal) * 0.7);
+      } else if (discountVal === 'lasthour50') {
+        total = Math.round(basePrice * 0.5) + addonTotal;
       } else if (discountVal === 'birthday') {
         total = Math.max(0, (basePrice + addonTotal) - 20000);
       } else {
@@ -673,7 +673,7 @@ import MainLayout from '../layouts/MainLayout.astro';
       var DISCOUNT_LABELS = {
         'day30':      '30% discount – Day Pass',
         'day50':      '50% discount – Day Pass',
-        'lasthour30': '30% discount – Last hour entry',
+        'lasthour50': '50% discount – Day Pass (late entry)',
         'birthday':   'Birthday discount'
       };
       var discountRbSub  = document.querySelector('.discount-rb:checked');
