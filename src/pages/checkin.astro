@@ -146,42 +146,87 @@ import MainLayout from '../layouts/MainLayout.astro';
             </select>
           </div>
 
-          <!-- Add-ons -->
+          <!-- Add-ons (collapsible) -->
           <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1.5">Add-ons</label>
-            <div class="grid grid-cols-2 gap-y-2 gap-x-3 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2.5">
-              <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Chalk Ball" data-price="75000" />
-                <span>Chalk Ball <span class="text-gray-500 text-xs">75,000 ₫</span></span>
-              </label>
-              <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Liquid Chalk Rental" data-price="25000" />
-                <span>Liquid Chalk Rental <span class="text-gray-500 text-xs">25,000 ₫</span></span>
-              </label>
-              <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Shoes Rental" data-price="20000" />
-                <span>Shoes Rental <span class="text-gray-500 text-xs">20,000 ₫</span></span>
-              </label>
-              <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Vitani Dasani" data-price="8000" />
-                <span>Vitani Dasani <span class="text-gray-500 text-xs">8,000 ₫</span></span>
-              </label>
-              <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Ionlife" data-price="10000" />
-                <span>Ionlife <span class="text-gray-500 text-xs">10,000 ₫</span></span>
-              </label>
-              <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Pocari" data-price="18000" />
-                <span>Pocari <span class="text-gray-500 text-xs">18,000 ₫</span></span>
-              </label>
-              <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Liquid Chalk Small" data-price="70000" />
-                <span>Liquid Chalk Small <span class="text-gray-500 text-xs">70,000 ₫</span></span>
-              </label>
-              <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Liquid Chalk Big" data-price="150000" />
-                <span>Liquid Chalk Big <span class="text-gray-500 text-xs">150,000 ₫</span></span>
-              </label>
+            <button type="button" onclick="toggleAddons()"
+                    class="w-full flex items-center justify-between text-sm font-medium text-gray-300 mb-1.5 focus:outline-none">
+              <span>Add-ons</span>
+              <svg id="addons-chevron" class="w-4 h-4 transition-transform duration-200"
+                   fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </button>
+            <div id="addons-body" class="hidden">
+              <div class="grid grid-cols-2 gap-y-2 gap-x-3 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2.5">
+                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Chalk Ball" data-price="75000" />
+                  <span>Chalk Ball <span class="text-gray-500 text-xs">75,000 ₫</span></span>
+                </label>
+                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Liquid Chalk Rental" data-price="25000" />
+                  <span>Liquid Chalk Rental <span class="text-gray-500 text-xs">25,000 ₫</span></span>
+                </label>
+                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Shoes Rental" data-price="20000" />
+                  <span>Shoes Rental <span class="text-gray-500 text-xs">20,000 ₫</span></span>
+                </label>
+                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Vitani Dasani" data-price="8000" />
+                  <span>Vitani Dasani <span class="text-gray-500 text-xs">8,000 ₫</span></span>
+                </label>
+                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Ionlife" data-price="10000" />
+                  <span>Ionlife <span class="text-gray-500 text-xs">10,000 ₫</span></span>
+                </label>
+                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Pocari" data-price="18000" />
+                  <span>Pocari <span class="text-gray-500 text-xs">18,000 ₫</span></span>
+                </label>
+                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Liquid Chalk Small" data-price="70000" />
+                  <span>Liquid Chalk Small <span class="text-gray-500 text-xs">70,000 ₫</span></span>
+                </label>
+                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Liquid Chalk Big" data-price="150000" />
+                  <span>Liquid Chalk Big <span class="text-gray-500 text-xs">150,000 ₫</span></span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Discount (collapsible) -->
+          <div>
+            <button type="button" onclick="toggleDiscount()"
+                    class="w-full flex items-center justify-between text-sm font-medium text-gray-300 mb-1.5 focus:outline-none">
+              <span>Discount</span>
+              <svg id="discount-chevron" class="w-4 h-4 transition-transform duration-200"
+                   fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </button>
+            <div id="discount-body" class="hidden">
+              <div class="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2.5 space-y-2">
+                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input type="radio" name="discount" class="discount-rb accent-orange-500 w-4 h-4 cursor-pointer" value="" checked />
+                  <span class="text-gray-400">No discount</span>
+                </label>
+                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input type="radio" name="discount" class="discount-rb accent-orange-500 w-4 h-4 cursor-pointer" value="day30" />
+                  <span>30% discount <span class="text-gray-500 text-xs">Day Pass</span></span>
+                </label>
+                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input type="radio" name="discount" class="discount-rb accent-orange-500 w-4 h-4 cursor-pointer" value="day50" />
+                  <span>50% discount <span class="text-gray-500 text-xs">Day Pass</span></span>
+                </label>
+                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input type="radio" name="discount" class="discount-rb accent-orange-500 w-4 h-4 cursor-pointer" value="lasthour30" />
+                  <span>30% discount <span class="text-gray-500 text-xs">Last hour entry (9 PM+)</span></span>
+                </label>
+                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input type="radio" name="discount" class="discount-rb accent-orange-500 w-4 h-4 cursor-pointer" value="birthday" />
+                  <span>Birthday discount <span class="text-gray-500 text-xs">Free shoes or 20,000 ₫ off</span></span>
+                </label>
+              </div>
             </div>
           </div>
 
@@ -566,7 +611,7 @@ import MainLayout from '../layouts/MainLayout.astro';
       }, 300);
     });
 
-    // ── Check-in type & add-ons: auto-calculate amount ──
+    // ── Check-in type, add-ons & discount: auto-calculate amount ──
     function recalcAmount() {
       var typeSelect  = document.getElementById('f-checkin-type');
       var selectedOpt = typeSelect.options[typeSelect.selectedIndex];
@@ -575,13 +620,42 @@ import MainLayout from '../layouts/MainLayout.astro';
       document.querySelectorAll('.addon-cb:checked').forEach(function (cb) {
         addonTotal += parseInt(cb.dataset.price || '0') || 0;
       });
-      var total = basePrice + addonTotal;
+      var discountRb  = document.querySelector('.discount-rb:checked');
+      var discountVal = discountRb ? discountRb.value : '';
+      var total;
+      if (discountVal === 'day30') {
+        total = Math.round(basePrice * 0.7) + addonTotal;
+      } else if (discountVal === 'day50') {
+        total = Math.round(basePrice * 0.5) + addonTotal;
+      } else if (discountVal === 'lasthour30') {
+        total = Math.round((basePrice + addonTotal) * 0.7);
+      } else if (discountVal === 'birthday') {
+        total = Math.max(0, (basePrice + addonTotal) - 20000);
+      } else {
+        total = basePrice + addonTotal;
+      }
       document.getElementById('f-amount').value = total > 0 ? total : '';
     }
     document.getElementById('f-checkin-type').addEventListener('change', recalcAmount);
     document.querySelectorAll('.addon-cb').forEach(function (cb) {
       cb.addEventListener('change', recalcAmount);
     });
+    document.querySelectorAll('.discount-rb').forEach(function (rb) {
+      rb.addEventListener('change', recalcAmount);
+    });
+
+    function toggleAddons() {
+      var body    = document.getElementById('addons-body');
+      var chevron = document.getElementById('addons-chevron');
+      var nowHidden = body.classList.toggle('hidden');
+      chevron.classList.toggle('rotate-180', !nowHidden);
+    }
+    function toggleDiscount() {
+      var body    = document.getElementById('discount-body');
+      var chevron = document.getElementById('discount-chevron');
+      var nowHidden = body.classList.toggle('hidden');
+      chevron.classList.toggle('rotate-180', !nowHidden);
+    }
 
     // ── Form submit ──
     document.getElementById('checkin-form').addEventListener('submit', function (e) {
@@ -596,6 +670,15 @@ import MainLayout from '../layouts/MainLayout.astro';
       var checkinType    = document.getElementById('f-checkin-type').value;
       var addonsArr      = [];
       document.querySelectorAll('.addon-cb:checked').forEach(function (cb) { addonsArr.push(cb.dataset.name); });
+      var DISCOUNT_LABELS = {
+        'day30':      '30% discount – Day Pass',
+        'day50':      '50% discount – Day Pass',
+        'lasthour30': '30% discount – Last hour entry',
+        'birthday':   'Birthday discount'
+      };
+      var discountRbSub  = document.querySelector('.discount-rb:checked');
+      var discountValSub = discountRbSub ? discountRbSub.value : '';
+      if (discountValSub && DISCOUNT_LABELS[discountValSub]) addonsArr.push('Discount: ' + DISCOUNT_LABELS[discountValSub]);
       var addonsStr      = addonsArr.join(', ');
       var punchFromSel   = document.getElementById('f-punch-from');
       var punchHolderId  = '';
@@ -658,6 +741,8 @@ import MainLayout from '../layouts/MainLayout.astro';
           document.getElementById('f-payment').value    = '';
           document.getElementById('f-checkin-type').value = '';
           document.querySelectorAll('.addon-cb').forEach(function (cb) { cb.checked = false; });
+          var noDiscRb = document.querySelector('.discount-rb[value=""]');
+          if (noDiscRb) noDiscRb.checked = true;
           document.getElementById('f-amount').value     = '';
           document.getElementById('f-notes').value      = '';
           document.getElementById('f-punch-from').value = '';
