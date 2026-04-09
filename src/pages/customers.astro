@@ -3,6 +3,7 @@ import MainLayout from '../layouts/MainLayout.astro';
 ---
 
 <MainLayout title="Customers" activePage="customers">
+<div style="overflow-x:clip">
 
   <!-- ── Customer Stats Panel ─────────────────────────────────────────── -->
   <div class="mb-6 space-y-4">
@@ -111,19 +112,8 @@ import MainLayout from '../layouts/MainLayout.astro';
         <div class="w-6 h-6 border-2 border-orange-200 border-t-orange-500 rounded-full animate-spin"></div>
       </div>
 
-      <!-- Heatmap grid (rendered by JS) -->
-      <div id="heatmap-container" class="overflow-x-auto" style="min-height:60px"></div>
-
-      <!-- Legend -->
-      <div class="flex items-center gap-1.5 mt-3 justify-end">
-        <span class="text-xs text-gray-400">Less</span>
-        <div style="width:12px;height:12px;border-radius:3px;background:#f3f4f6;border:1px solid #e5e7eb"></div>
-        <div style="width:12px;height:12px;border-radius:3px;background:#ffedd5"></div>
-        <div style="width:12px;height:12px;border-radius:3px;background:#fed7aa"></div>
-        <div style="width:12px;height:12px;border-radius:3px;background:#fb923c"></div>
-        <div style="width:12px;height:12px;border-radius:3px;background:#ea580c"></div>
-        <span class="text-xs text-gray-400">More</span>
-      </div>
+      <!-- Heatmap grid (rendered by ApexCharts) -->
+      <div id="heatmap-container"></div>
     </div><!-- /Heatmap -->
 
   </div><!-- /Stats Panel -->
@@ -387,11 +377,13 @@ import MainLayout from '../layouts/MainLayout.astro';
     </div>
   </div>
 
+  <script is:inline src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
   <script is:inline>
     // ═══════════════════════════════════════════════════════════════════════
     // ── Stats Panel ─────────────────────────────────────────────────────────
     // ═══════════════════════════════════════════════════════════════════════
     var _hmPeriod = 'week';
+    var _hmChart  = null;
     var MONTH_NAMES = ['January','February','March','April','May','June',
                        'July','August','September','October','November','December'];
 
@@ -524,6 +516,7 @@ import MainLayout from '../layouts/MainLayout.astro';
     }
 
     function fetchHeatmap() {
+      if (_hmChart) { _hmChart.destroy(); _hmChart = null; }
       var range = _getHeatmapRange();
       if (!range.from || !range.to) return;
       document.getElementById('hm-loading').classList.remove('hidden');
@@ -550,184 +543,136 @@ import MainLayout from '../layouts/MainLayout.astro';
         });
     }
 
-    function _hmColor(count, max) {
-      if (!count || max === 0) return '#f3f4f6';
-      var r = count / max;
-      if (r <= 0.15) return '#ffedd5';
-      if (r <= 0.35) return '#fed7aa';
-      if (r <= 0.60) return '#fb923c';
-      return '#ea580c';
-    }
-
+    // ── Heatmap rendering with ApexCharts ──────────────────────────────────
     function _renderHeatmap(dateMap, startDate, endDate) {
-      var container = document.getElementById('heatmap-container');
+      if (_hmChart) { _hmChart.destroy(); _hmChart = null; }
+      document.getElementById('heatmap-container').innerHTML = '';
       if (_hmPeriod === 'week') {
-        _renderWeekHeatmap(container, dateMap, startDate);
-      } else if (_hmPeriod === 'year') {
-        _renderYearHeatmap(container, dateMap, startDate, endDate);
+        _renderApexWeekBar(dateMap, startDate);
       } else {
-        _renderCalendarHeatmap(container, dateMap, startDate, endDate);
+        _renderApexGrid(dateMap, startDate, endDate);
       }
     }
 
-    // Week view: 7 large day columns
-    function _renderWeekHeatmap(container, dateMap, startDate) {
-      var DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      var counts = [];
+    // Week view: bar chart Mon–Sun
+    function _renderApexWeekBar(dateMap, startDate) {
+      var DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      var categories = [];
+      var counts     = [];
       for (var i = 0; i < 7; i++) {
         var d = new Date(startDate);
         d.setDate(startDate.getDate() + i);
+        categories.push(DAY_LABELS[i] + ' ' + (d.getMonth() + 1) + '/' + d.getDate());
         counts.push(dateMap[_fmtDate(d)] || 0);
       }
-      var max   = Math.max(1, Math.max.apply(null, counts));
-      var today = _todayStr();
-      var html  = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px">';
-      for (var i = 0; i < 7; i++) {
-        var d  = new Date(startDate);
-        d.setDate(startDate.getDate() + i);
-        var ds    = _fmtDate(d);
-        var count = counts[i];
-        var bg    = _hmColor(count, max);
-        var ring  = ds === today ? 'outline:2px solid #f97316;outline-offset:2px;' : '';
-        html += '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;' +
-          'gap:2px;padding:12px 4px;border-radius:12px;background:' + bg + ';' + ring + '" ' +
-          'title="' + ds + ': ' + count + ' check-in' + (count !== 1 ? 's' : '') + '">' +
-          '<span style="font-size:11px;font-weight:600;color:#4b5563">' + DAY_NAMES[i] + '</span>' +
-          '<span style="font-size:10px;color:#9ca3af">' + (d.getMonth() + 1) + '/' + d.getDate() + '</span>' +
-          '<span style="font-size:22px;font-weight:700;color:' + (count > 0 ? '#1f2937' : '#d1d5db') + '">' + count + '</span>' +
-          '</div>';
-      }
-      html += '</div>';
-      container.innerHTML = html;
-    }
-
-    // Calendar / month view
-    function _renderCalendarHeatmap(container, dateMap, startDate, endDate) {
-      var max = 1;
-      Object.keys(dateMap).forEach(function (k) { if (dateMap[k] > max) max = dateMap[k]; });
-
-      // Pad to Monday-aligned grid
-      var gridStart = new Date(startDate);
-      var dow = gridStart.getDay();
-      gridStart.setDate(gridStart.getDate() - (dow === 0 ? 6 : dow - 1));
-      var gridEnd = new Date(endDate);
-      var edow = gridEnd.getDay();
-      if (edow !== 0) gridEnd.setDate(gridEnd.getDate() + (7 - edow));
-
-      var today = _todayStr();
-      var ms    = MONTH_NAMES.map(function (m) { return m.slice(0, 3); });
-      var DS    = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
-
-      var html = '<table style="border-collapse:collapse;font-size:11px"><thead><tr>' +
-        '<th style="width:32px"></th>';
-      DS.forEach(function (d) {
-        html += '<th style="width:30px;text-align:center;color:#9ca3af;font-weight:500;' +
-          'padding-bottom:5px">' + d + '</th>';
+      _hmChart = new ApexCharts(document.getElementById('heatmap-container'), {
+        chart: {
+          type: 'bar', height: 200,
+          toolbar: { show: false },
+          fontFamily: 'Inter, system-ui, sans-serif'
+        },
+        series: [{ name: 'Check-ins', data: counts }],
+        xaxis: { categories: categories, labels: { style: { fontSize: '11px', colors: '#6b7280' } } },
+        yaxis: { min: 0, forceNiceScale: true, labels: { style: { fontSize: '11px', colors: '#6b7280' } } },
+        colors: ['#f97316'],
+        plotOptions: {
+          bar: { borderRadius: 5, columnWidth: '55%', distributed: true, dataLabels: { position: 'top' } }
+        },
+        dataLabels: {
+          enabled: true, offsetY: -18,
+          style: { fontSize: '11px', colors: ['#4b5563'] }
+        },
+        legend: { show: false },
+        grid: { strokeDashArray: 4, borderColor: '#f3f4f6' },
+        tooltip: { y: { formatter: function (v) { return v + ' check-in' + (v !== 1 ? 's' : ''); } } }
       });
-      html += '</tr></thead><tbody>';
-
-      var cursor = new Date(gridStart);
-      while (cursor <= gridEnd) {
-        html += '<tr>';
-        var wLbl = cursor.getDate() <= 7 ? ms[cursor.getMonth()] : '';
-        html += '<td style="text-align:right;padding-right:6px;color:#9ca3af;font-size:10px;' +
-          'white-space:nowrap;vertical-align:middle">' + wLbl + '</td>';
-        for (var d = 0; d < 7; d++) {
-          var ds      = _fmtDate(cursor);
-          var inRange = cursor >= startDate && cursor <= endDate;
-          var count   = inRange ? (dateMap[ds] || 0) : -1;
-          var bg      = inRange ? _hmColor(count, max) : 'transparent';
-          var isToday = ds === today;
-          var title   = inRange
-            ? ds + ': ' + count + ' check-in' + (count !== 1 ? 's' : '')
-            : '';
-          var textCol = (count > 0 && inRange) ? (count > max * 0.5 ? '#fff' : '#374151') : '#d1d5db';
-          html += '<td style="padding:2px"><div title="' + title + '" style="width:24px;height:24px;' +
-            'border-radius:5px;background:' + bg + ';' +
-            (isToday && inRange ? 'outline:2px solid #f97316;outline-offset:1px;' : '') + '">' +
-            (inRange && count > 0
-              ? '<span style="display:block;text-align:center;line-height:24px;font-size:10px;color:' + textCol + '">' + count + '</span>'
-              : '') +
-            '</div></td>';
-          cursor.setDate(cursor.getDate() + 1);
-        }
-        html += '</tr>';
-      }
-      html += '</tbody></table>';
-      container.innerHTML = html;
+      _hmChart.render();
     }
 
-    // Year view: GitHub-style contribution graph
-    function _renderYearHeatmap(container, dateMap, startDate, endDate) {
-      var max = 1;
-      Object.keys(dateMap).forEach(function (k) { if (dateMap[k] > max) max = dateMap[k]; });
+    // Month / Year / Custom: GitHub-style heatmap (weeks = columns, days = rows)
+    function _renderApexGrid(dateMap, startDate, endDate) {
+      // ApexCharts stacks series bottom-to-top, so reverse day order: Mon appears on top
+      var DAY_NAMES_REV   = ['Sun', 'Sat', 'Fri', 'Thu', 'Wed', 'Tue', 'Mon'];
+      var DAY_OFFSETS_REV = [6, 5, 4, 3, 2, 1, 0]; // offset from week-start Monday
 
       var gridStart = new Date(startDate);
       var dow = gridStart.getDay();
       gridStart.setDate(gridStart.getDate() - (dow === 0 ? 6 : dow - 1));
-      var gridEnd = new Date(endDate);
-      var edow = gridEnd.getDay();
-      if (edow !== 0) gridEnd.setDate(gridEnd.getDate() + (7 - edow));
 
-      var totalDays = Math.round((gridEnd - gridStart) / 86400000) + 1;
-      var numWeeks  = Math.ceil(totalDays / 7);
-
-      // Build grid[week][day]
-      var grid = [];
-      var cur  = new Date(gridStart);
-      for (var w = 0; w < numWeeks; w++) {
-        var week = [];
-        for (var d = 0; d < 7; d++) {
-          var ds      = _fmtDate(cur);
-          var inRange = cur >= startDate && cur <= endDate;
-          week.push({ ds: ds, count: inRange ? (dateMap[ds] || 0) : -1, inRange: inRange });
-          cur.setDate(cur.getDate() + 1);
-        }
-        grid.push(week);
+      var weekStarts = [];
+      var cur = new Date(gridStart);
+      while (cur <= endDate) {
+        weekStarts.push(new Date(cur));
+        cur.setDate(cur.getDate() + 7);
       }
 
-      var ms    = MONTH_NAMES.map(function (m) { return m.slice(0, 3); });
-      var DS    = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
-      var today = _todayStr();
-      var CELL  = 13;
-      var GAP   = 3;
-
-      // Month label row: show label on the first week that has day 1-7 of a month
-      var mLabels = grid.map(function (week) {
-        var d0 = new Date(week[0].ds + 'T00:00:00');
-        return d0.getDate() <= 7 ? ms[d0.getMonth()] : '';
+      var series = DAY_NAMES_REV.map(function (name, ri) {
+        var offset = DAY_OFFSETS_REV[ri];
+        return {
+          name: name,
+          data: weekStarts.map(function (ws) {
+            var d = new Date(ws);
+            d.setDate(ws.getDate() + offset);
+            var inRange = d >= startDate && d <= endDate;
+            return { x: (d.getMonth() + 1) + '/' + d.getDate(), y: inRange ? (dateMap[_fmtDate(d)] || 0) : null };
+          })
+        };
       });
 
-      var html = '<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:10px">';
-      // Month labels row
-      html += '<thead><tr><th style="width:22px"></th>';
-      mLabels.forEach(function (lbl) {
-        html += '<th style="text-align:left;color:#9ca3af;font-weight:normal;padding-bottom:4px;' +
-          'width:' + (CELL + GAP) + 'px;white-space:nowrap">' + lbl + '</th>';
+      // Show month abbreviation only on the first week of each month
+      var xCategories = weekStarts.map(function (ws) {
+        return ws.getDate() <= 7 ? MONTH_NAMES[ws.getMonth()].slice(0, 3) : '';
       });
-      html += '</tr></thead><tbody>';
 
-      for (var d = 0; d < 7; d++) {
-        html += '<tr><td style="text-align:right;padding-right:4px;color:#9ca3af;white-space:nowrap">' +
-          DS[d] + '</td>';
-        for (var w = 0; w < numWeeks; w++) {
-          var cell    = grid[w][d];
-          var bg      = cell.inRange ? _hmColor(cell.count, max) : 'transparent';
-          var isToday = cell.ds === today;
-          var title   = cell.inRange
-            ? cell.ds + ': ' + (cell.count >= 0 ? cell.count : 0) +
-              ' check-in' + (cell.count !== 1 ? 's' : '')
-            : '';
-          html += '<td style="padding:' + Math.floor(GAP / 2) + 'px">' +
-            '<div title="' + title + '" style="width:' + CELL + 'px;height:' + CELL + 'px;' +
-            'border-radius:3px;background:' + bg + ';' +
-            (isToday && cell.inRange ? 'outline:2px solid #f97316;outline-offset:1px;' : '') +
-            '"></div></td>';
+      _hmChart = new ApexCharts(document.getElementById('heatmap-container'), {
+        chart: {
+          type: 'heatmap', height: 185,
+          toolbar: { show: false },
+          fontFamily: 'Inter, system-ui, sans-serif',
+          animations: { enabled: false }
+        },
+        series: series,
+        dataLabels: { enabled: false },
+        legend: { show: false },
+        xaxis: {
+          categories: xCategories,
+          labels: {
+            rotate: 0,
+            style: { fontSize: '10px', colors: '#9ca3af' },
+            formatter: function (v) { return v || ''; }
+          },
+          axisBorder: { show: false },
+          axisTicks: { show: false }
+        },
+        yaxis: { labels: { style: { fontSize: '11px', colors: '#6b7280' } } },
+        plotOptions: {
+          heatmap: {
+            radius: 3,
+            enableShades: false,
+            colorScale: {
+              ranges: [
+                { from: 0,   to: 0,    color: '#f3f4f6', name: 'None' },
+                { from: 1,   to: 2,    color: '#ffedd5', name: '1-2'  },
+                { from: 3,   to: 5,    color: '#fdba74', name: '3-5'  },
+                { from: 6,   to: 10,   color: '#fb923c', name: '6-10' },
+                { from: 11,  to: 9999, color: '#ea580c', name: '11+'  }
+              ]
+            }
+          }
+        },
+        tooltip: {
+          custom: function (opts) {
+            var sd = opts.w.config.series[opts.seriesIndex].data[opts.dataPointIndex];
+            var v  = sd ? sd.y : null;
+            if (v === null || v === undefined) return '';
+            var day = opts.w.config.series[opts.seriesIndex].name;
+            return '<div style="padding:6px 10px;font-family:Inter,sans-serif;font-size:12px">' +
+              '<strong>' + (sd.x || '') + ' (' + day + ')</strong>: ' +
+              v + ' check-in' + (v !== 1 ? 's' : '') + '</div>';
+          }
         }
-        html += '</tr>';
-      }
-      html += '</tbody></table></div>';
-      container.innerHTML = html;
+      });
+      _hmChart.render();
     }
     // ═══════════════════════════════════════════════════════════════════════
 
@@ -1392,4 +1337,5 @@ import MainLayout from '../layouts/MainLayout.astro';
       return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
   </script>
+</div>
 </MainLayout>
