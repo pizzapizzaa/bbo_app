@@ -4,6 +4,130 @@ import MainLayout from '../layouts/MainLayout.astro';
 
 <MainLayout title="Customers" activePage="customers">
 
+  <!-- ── Customer Stats Panel ─────────────────────────────────────────── -->
+  <div class="mb-6 space-y-4">
+
+    <!-- Stat Cards Row -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+      <!-- New Customers Card -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+        <div class="flex items-start justify-between gap-3 mb-4">
+          <div>
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">New Customers</p>
+            <div class="flex items-baseline gap-1.5">
+              <span id="stat-new-count" class="text-3xl font-bold text-gray-800">—</span>
+              <span id="stat-new-sub"   class="text-xs text-gray-400"></span>
+            </div>
+          </div>
+          <div class="shrink-0 p-2.5 bg-orange-50 rounded-xl">
+            <svg class="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+            </svg>
+          </div>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <input type="date" id="new-cust-from"
+                 class="flex-1 min-w-0 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs
+                        focus:outline-none focus:ring-2 focus:ring-orange-300" />
+          <span class="text-gray-300 text-xs shrink-0">to</span>
+          <input type="date" id="new-cust-to"
+                 class="flex-1 min-w-0 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs
+                        focus:outline-none focus:ring-2 focus:ring-orange-300" />
+          <button onclick="fetchNewCustomerStat()"
+                  class="shrink-0 bg-orange-500 hover:bg-orange-600 text-white text-xs font-medium
+                         px-3 py-1.5 rounded-lg transition">Apply</button>
+        </div>
+      </div>
+
+      <!-- Returned Customers Card -->
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+        <div class="flex items-start justify-between gap-3 mb-4">
+          <div>
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Returned Customers</p>
+            <div class="flex items-baseline gap-1.5">
+              <span id="stat-ret-pct" class="text-3xl font-bold text-gray-800">—</span>
+              <span id="stat-ret-sub" class="text-xs text-gray-400"></span>
+            </div>
+          </div>
+          <div class="shrink-0 p-2.5 bg-green-50 rounded-xl">
+            <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+          </div>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <input type="date" id="ret-from"
+                 class="flex-1 min-w-0 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs
+                        focus:outline-none focus:ring-2 focus:ring-orange-300" />
+          <span class="text-gray-300 text-xs shrink-0">to</span>
+          <input type="date" id="ret-to"
+                 class="flex-1 min-w-0 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs
+                        focus:outline-none focus:ring-2 focus:ring-orange-300" />
+          <button onclick="fetchReturnedStat()"
+                  class="shrink-0 bg-orange-500 hover:bg-orange-600 text-white text-xs font-medium
+                         px-3 py-1.5 rounded-lg transition">Apply</button>
+        </div>
+      </div>
+
+    </div><!-- /Stat Cards Row -->
+
+    <!-- Check-in Activity Heatmap -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+      <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Check-in Activity</p>
+        <div class="flex flex-wrap items-center gap-2">
+          <!-- Period tabs -->
+          <div class="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-medium">
+            <button id="hm-btn-week"   onclick="setHeatmapPeriod('week')"
+                    class="px-3 py-1.5 bg-orange-500 text-white">Week</button>
+            <button id="hm-btn-month"  onclick="setHeatmapPeriod('month')"
+                    class="px-3 py-1.5 text-gray-600 hover:bg-gray-50 border-l border-gray-200">Month</button>
+            <button id="hm-btn-year"   onclick="setHeatmapPeriod('year')"
+                    class="px-3 py-1.5 text-gray-600 hover:bg-gray-50 border-l border-gray-200">Year</button>
+            <button id="hm-btn-custom" onclick="setHeatmapPeriod('custom')"
+                    class="px-3 py-1.5 text-gray-600 hover:bg-gray-50 border-l border-gray-200">Custom</button>
+          </div>
+          <!-- Custom date inputs (shown only when "Custom" is active) -->
+          <div id="hm-custom-row" class="hidden flex items-center gap-1.5">
+            <input type="date" id="hm-from"
+                   class="border border-gray-200 rounded-lg px-2 py-1 text-xs
+                          focus:outline-none focus:ring-2 focus:ring-orange-300" />
+            <span class="text-gray-300 text-xs">to</span>
+            <input type="date" id="hm-to"
+                   class="border border-gray-200 rounded-lg px-2 py-1 text-xs
+                          focus:outline-none focus:ring-2 focus:ring-orange-300" />
+            <button onclick="fetchHeatmap()"
+                    class="bg-orange-500 hover:bg-orange-600 text-white text-xs font-medium
+                           px-3 py-1 rounded-lg transition">Apply</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading spinner -->
+      <div id="hm-loading" class="hidden py-6 flex justify-center">
+        <div class="w-6 h-6 border-2 border-orange-200 border-t-orange-500 rounded-full animate-spin"></div>
+      </div>
+
+      <!-- Heatmap grid (rendered by JS) -->
+      <div id="heatmap-container" class="overflow-x-auto" style="min-height:60px"></div>
+
+      <!-- Legend -->
+      <div class="flex items-center gap-1.5 mt-3 justify-end">
+        <span class="text-xs text-gray-400">Less</span>
+        <div style="width:12px;height:12px;border-radius:3px;background:#f3f4f6;border:1px solid #e5e7eb"></div>
+        <div style="width:12px;height:12px;border-radius:3px;background:#ffedd5"></div>
+        <div style="width:12px;height:12px;border-radius:3px;background:#fed7aa"></div>
+        <div style="width:12px;height:12px;border-radius:3px;background:#fb923c"></div>
+        <div style="width:12px;height:12px;border-radius:3px;background:#ea580c"></div>
+        <span class="text-xs text-gray-400">More</span>
+      </div>
+    </div><!-- /Heatmap -->
+
+  </div><!-- /Stats Panel -->
+
   <!-- Action bar -->
   <div class="flex flex-wrap items-center gap-3 mb-6">
     <!-- Upload CSV -->
@@ -264,6 +388,349 @@ import MainLayout from '../layouts/MainLayout.astro';
   </div>
 
   <script is:inline>
+    // ═══════════════════════════════════════════════════════════════════════
+    // ── Stats Panel ─────────────────────────────────────────────────────────
+    // ═══════════════════════════════════════════════════════════════════════
+    var _hmPeriod = 'week';
+    var MONTH_NAMES = ['January','February','March','April','May','June',
+                       'July','August','September','October','November','December'];
+
+    function _fmtDate(d) {
+      return d.getFullYear() + '-' +
+        String(d.getMonth() + 1).padStart(2, '0') + '-' +
+        String(d.getDate()).padStart(2, '0');
+    }
+
+    function _todayStr() {
+      return _fmtDate(new Date());
+    }
+
+    function _thisMonthRange() {
+      var now  = new Date();
+      var from = new Date(now.getFullYear(), now.getMonth(), 1);
+      var to   = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      return { from: _fmtDate(from), to: _fmtDate(to) };
+    }
+
+    function initStatDefaults() {
+      var r = _thisMonthRange();
+      document.getElementById('new-cust-from').value = r.from;
+      document.getElementById('new-cust-to').value   = r.to;
+      document.getElementById('ret-from').value      = r.from;
+      document.getElementById('ret-to').value        = r.to;
+    }
+
+    // ── New Customers stat card ──────────────────────────────────────────────
+    function fetchNewCustomerStat() {
+      var from = document.getElementById('new-cust-from').value;
+      var to   = document.getElementById('new-cust-to').value;
+      if (!from || !to) return;
+      document.getElementById('stat-new-count').textContent = '…';
+      document.getElementById('stat-new-sub').textContent   = '';
+      apiFetch('/api/customers/stats?stats_from=' + from + '&stats_to=' + to)
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if (data.error) {
+            document.getElementById('stat-new-count').textContent = '!';
+            document.getElementById('stat-new-sub').textContent   = data.error;
+            return;
+          }
+          document.getElementById('stat-new-count').textContent = data.new_customers;
+          document.getElementById('stat-new-sub').textContent   = _formatRange(from, to);
+        })
+        .catch(function () {
+          document.getElementById('stat-new-count').textContent = '!';
+          document.getElementById('stat-new-sub').textContent   = 'Error loading';
+        });
+    }
+
+    // ── Returned Customers stat card ─────────────────────────────────────────
+    function fetchReturnedStat() {
+      var from = document.getElementById('ret-from').value;
+      var to   = document.getElementById('ret-to').value;
+      if (!from || !to) return;
+      document.getElementById('stat-ret-pct').textContent = '…';
+      document.getElementById('stat-ret-sub').textContent = '';
+      apiFetch('/api/customers/stats?stats_from=' + from + '&stats_to=' + to)
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if (data.error) {
+            document.getElementById('stat-ret-pct').textContent = '!';
+            document.getElementById('stat-ret-sub').textContent = data.error;
+            return;
+          }
+          if (data.returned_pct === null || data.total_period_visitors === 0) {
+            document.getElementById('stat-ret-pct').textContent = 'N/A';
+            document.getElementById('stat-ret-sub').textContent = 'No visitors this period';
+          } else {
+            document.getElementById('stat-ret-pct').textContent = data.returned_pct + '%';
+            document.getElementById('stat-ret-sub').textContent =
+              data.returned_count + ' of ' + data.total_period_visitors + ' visitors';
+          }
+        })
+        .catch(function () {
+          document.getElementById('stat-ret-pct').textContent = '!';
+          document.getElementById('stat-ret-sub').textContent = 'Error loading';
+        });
+    }
+
+    function _formatRange(from, to) {
+      var f = new Date(from + 'T00:00:00');
+      var t = new Date(to   + 'T00:00:00');
+      var ms = MONTH_NAMES.map(function (m) { return m.slice(0, 3); });
+      return ms[f.getMonth()] + ' ' + f.getDate() +
+             ' – ' + ms[t.getMonth()] + ' ' + t.getDate() + ', ' + t.getFullYear();
+    }
+
+    // ── Heatmap ──────────────────────────────────────────────────────────────
+    function setHeatmapPeriod(period) {
+      _hmPeriod = period;
+      ['week', 'month', 'year', 'custom'].forEach(function (p) {
+        var btn = document.getElementById('hm-btn-' + p);
+        if (p === period) {
+          btn.classList.add('bg-orange-500', 'text-white');
+          btn.classList.remove('text-gray-600', 'hover:bg-gray-50');
+        } else {
+          btn.classList.remove('bg-orange-500', 'text-white');
+          btn.classList.add('text-gray-600', 'hover:bg-gray-50');
+        }
+      });
+      document.getElementById('hm-custom-row').classList.toggle('hidden', period !== 'custom');
+      if (period !== 'custom') fetchHeatmap();
+    }
+
+    function _getHeatmapRange() {
+      var today = new Date();
+      if (_hmPeriod === 'week') {
+        var dow = today.getDay();
+        var mon = new Date(today);
+        mon.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1));
+        var sun = new Date(mon);
+        sun.setDate(mon.getDate() + 6);
+        return { from: _fmtDate(mon), to: _fmtDate(sun) };
+      }
+      if (_hmPeriod === 'month') {
+        return _thisMonthRange();
+      }
+      if (_hmPeriod === 'year') {
+        var y = today.getFullYear();
+        return { from: y + '-01-01', to: y + '-12-31' };
+      }
+      // custom
+      return {
+        from: document.getElementById('hm-from').value,
+        to:   document.getElementById('hm-to').value
+      };
+    }
+
+    function fetchHeatmap() {
+      var range = _getHeatmapRange();
+      if (!range.from || !range.to) return;
+      document.getElementById('hm-loading').classList.remove('hidden');
+      document.getElementById('heatmap-container').innerHTML = '';
+      apiFetch('/api/customers/stats?hm_from=' + range.from + '&hm_to=' + range.to)
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          document.getElementById('hm-loading').classList.add('hidden');
+          if (data.error) {
+            document.getElementById('heatmap-container').innerHTML =
+              '<p class="text-sm text-red-500 py-4">Failed to load: ' + escHtml(data.error) + '</p>';
+            return;
+          }
+          var dateMap = {};
+          (data.heatmap || []).forEach(function (d) { dateMap[d.date] = d.count; });
+          var start = new Date(range.from + 'T00:00:00');
+          var end   = new Date(range.to   + 'T00:00:00');
+          _renderHeatmap(dateMap, start, end);
+        })
+        .catch(function () {
+          document.getElementById('hm-loading').classList.add('hidden');
+          document.getElementById('heatmap-container').innerHTML =
+            '<p class="text-sm text-red-500 py-4">Failed to load heatmap.</p>';
+        });
+    }
+
+    function _hmColor(count, max) {
+      if (!count || max === 0) return '#f3f4f6';
+      var r = count / max;
+      if (r <= 0.15) return '#ffedd5';
+      if (r <= 0.35) return '#fed7aa';
+      if (r <= 0.60) return '#fb923c';
+      return '#ea580c';
+    }
+
+    function _renderHeatmap(dateMap, startDate, endDate) {
+      var container = document.getElementById('heatmap-container');
+      if (_hmPeriod === 'week') {
+        _renderWeekHeatmap(container, dateMap, startDate);
+      } else if (_hmPeriod === 'year') {
+        _renderYearHeatmap(container, dateMap, startDate, endDate);
+      } else {
+        _renderCalendarHeatmap(container, dateMap, startDate, endDate);
+      }
+    }
+
+    // Week view: 7 large day columns
+    function _renderWeekHeatmap(container, dateMap, startDate) {
+      var DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      var counts = [];
+      for (var i = 0; i < 7; i++) {
+        var d = new Date(startDate);
+        d.setDate(startDate.getDate() + i);
+        counts.push(dateMap[_fmtDate(d)] || 0);
+      }
+      var max   = Math.max(1, Math.max.apply(null, counts));
+      var today = _todayStr();
+      var html  = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px">';
+      for (var i = 0; i < 7; i++) {
+        var d  = new Date(startDate);
+        d.setDate(startDate.getDate() + i);
+        var ds    = _fmtDate(d);
+        var count = counts[i];
+        var bg    = _hmColor(count, max);
+        var ring  = ds === today ? 'outline:2px solid #f97316;outline-offset:2px;' : '';
+        html += '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;' +
+          'gap:2px;padding:12px 4px;border-radius:12px;background:' + bg + ';' + ring + '" ' +
+          'title="' + ds + ': ' + count + ' check-in' + (count !== 1 ? 's' : '') + '">' +
+          '<span style="font-size:11px;font-weight:600;color:#4b5563">' + DAY_NAMES[i] + '</span>' +
+          '<span style="font-size:10px;color:#9ca3af">' + (d.getMonth() + 1) + '/' + d.getDate() + '</span>' +
+          '<span style="font-size:22px;font-weight:700;color:' + (count > 0 ? '#1f2937' : '#d1d5db') + '">' + count + '</span>' +
+          '</div>';
+      }
+      html += '</div>';
+      container.innerHTML = html;
+    }
+
+    // Calendar / month view
+    function _renderCalendarHeatmap(container, dateMap, startDate, endDate) {
+      var max = 1;
+      Object.keys(dateMap).forEach(function (k) { if (dateMap[k] > max) max = dateMap[k]; });
+
+      // Pad to Monday-aligned grid
+      var gridStart = new Date(startDate);
+      var dow = gridStart.getDay();
+      gridStart.setDate(gridStart.getDate() - (dow === 0 ? 6 : dow - 1));
+      var gridEnd = new Date(endDate);
+      var edow = gridEnd.getDay();
+      if (edow !== 0) gridEnd.setDate(gridEnd.getDate() + (7 - edow));
+
+      var today = _todayStr();
+      var ms    = MONTH_NAMES.map(function (m) { return m.slice(0, 3); });
+      var DS    = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+
+      var html = '<table style="border-collapse:collapse;font-size:11px"><thead><tr>' +
+        '<th style="width:32px"></th>';
+      DS.forEach(function (d) {
+        html += '<th style="width:30px;text-align:center;color:#9ca3af;font-weight:500;' +
+          'padding-bottom:5px">' + d + '</th>';
+      });
+      html += '</tr></thead><tbody>';
+
+      var cursor = new Date(gridStart);
+      while (cursor <= gridEnd) {
+        html += '<tr>';
+        var wLbl = cursor.getDate() <= 7 ? ms[cursor.getMonth()] : '';
+        html += '<td style="text-align:right;padding-right:6px;color:#9ca3af;font-size:10px;' +
+          'white-space:nowrap;vertical-align:middle">' + wLbl + '</td>';
+        for (var d = 0; d < 7; d++) {
+          var ds      = _fmtDate(cursor);
+          var inRange = cursor >= startDate && cursor <= endDate;
+          var count   = inRange ? (dateMap[ds] || 0) : -1;
+          var bg      = inRange ? _hmColor(count, max) : 'transparent';
+          var isToday = ds === today;
+          var title   = inRange
+            ? ds + ': ' + count + ' check-in' + (count !== 1 ? 's' : '')
+            : '';
+          var textCol = (count > 0 && inRange) ? (count > max * 0.5 ? '#fff' : '#374151') : '#d1d5db';
+          html += '<td style="padding:2px"><div title="' + title + '" style="width:24px;height:24px;' +
+            'border-radius:5px;background:' + bg + ';' +
+            (isToday && inRange ? 'outline:2px solid #f97316;outline-offset:1px;' : '') + '">' +
+            (inRange && count > 0
+              ? '<span style="display:block;text-align:center;line-height:24px;font-size:10px;color:' + textCol + '">' + count + '</span>'
+              : '') +
+            '</div></td>';
+          cursor.setDate(cursor.getDate() + 1);
+        }
+        html += '</tr>';
+      }
+      html += '</tbody></table>';
+      container.innerHTML = html;
+    }
+
+    // Year view: GitHub-style contribution graph
+    function _renderYearHeatmap(container, dateMap, startDate, endDate) {
+      var max = 1;
+      Object.keys(dateMap).forEach(function (k) { if (dateMap[k] > max) max = dateMap[k]; });
+
+      var gridStart = new Date(startDate);
+      var dow = gridStart.getDay();
+      gridStart.setDate(gridStart.getDate() - (dow === 0 ? 6 : dow - 1));
+      var gridEnd = new Date(endDate);
+      var edow = gridEnd.getDay();
+      if (edow !== 0) gridEnd.setDate(gridEnd.getDate() + (7 - edow));
+
+      var totalDays = Math.round((gridEnd - gridStart) / 86400000) + 1;
+      var numWeeks  = Math.ceil(totalDays / 7);
+
+      // Build grid[week][day]
+      var grid = [];
+      var cur  = new Date(gridStart);
+      for (var w = 0; w < numWeeks; w++) {
+        var week = [];
+        for (var d = 0; d < 7; d++) {
+          var ds      = _fmtDate(cur);
+          var inRange = cur >= startDate && cur <= endDate;
+          week.push({ ds: ds, count: inRange ? (dateMap[ds] || 0) : -1, inRange: inRange });
+          cur.setDate(cur.getDate() + 1);
+        }
+        grid.push(week);
+      }
+
+      var ms    = MONTH_NAMES.map(function (m) { return m.slice(0, 3); });
+      var DS    = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+      var today = _todayStr();
+      var CELL  = 13;
+      var GAP   = 3;
+
+      // Month label row: show label on the first week that has day 1-7 of a month
+      var mLabels = grid.map(function (week) {
+        var d0 = new Date(week[0].ds + 'T00:00:00');
+        return d0.getDate() <= 7 ? ms[d0.getMonth()] : '';
+      });
+
+      var html = '<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:10px">';
+      // Month labels row
+      html += '<thead><tr><th style="width:22px"></th>';
+      mLabels.forEach(function (lbl) {
+        html += '<th style="text-align:left;color:#9ca3af;font-weight:normal;padding-bottom:4px;' +
+          'width:' + (CELL + GAP) + 'px;white-space:nowrap">' + lbl + '</th>';
+      });
+      html += '</tr></thead><tbody>';
+
+      for (var d = 0; d < 7; d++) {
+        html += '<tr><td style="text-align:right;padding-right:4px;color:#9ca3af;white-space:nowrap">' +
+          DS[d] + '</td>';
+        for (var w = 0; w < numWeeks; w++) {
+          var cell    = grid[w][d];
+          var bg      = cell.inRange ? _hmColor(cell.count, max) : 'transparent';
+          var isToday = cell.ds === today;
+          var title   = cell.inRange
+            ? cell.ds + ': ' + (cell.count >= 0 ? cell.count : 0) +
+              ' check-in' + (cell.count !== 1 ? 's' : '')
+            : '';
+          html += '<td style="padding:' + Math.floor(GAP / 2) + 'px">' +
+            '<div title="' + title + '" style="width:' + CELL + 'px;height:' + CELL + 'px;' +
+            'border-radius:3px;background:' + bg + ';' +
+            (isToday && cell.inRange ? 'outline:2px solid #f97316;outline-offset:1px;' : '') +
+            '"></div></td>';
+        }
+        html += '</tr>';
+      }
+      html += '</tbody></table></div>';
+      container.innerHTML = html;
+    }
+    // ═══════════════════════════════════════════════════════════════════════
+
     var customerTable = null;
     var customerHeaders = [];
     var customerRows = [];
@@ -527,6 +994,12 @@ import MainLayout from '../layouts/MainLayout.astro';
     $(document).ready(function () {
       loadHiddenColumns();
       loadCustomers();
+
+      // ── Stats Panel init ──
+      initStatDefaults();
+      fetchNewCustomerStat();
+      fetchReturnedStat();
+      fetchHeatmap();
 
       // Close columns dropdown when clicking outside
       document.addEventListener('click', function (e) {
