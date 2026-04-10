@@ -43,7 +43,11 @@ export const GET: APIRoute = async ({ url }) => {
       if (periodErr) return serverError(periodErr.message);
 
       const periodNames = [
-        ...new Set((periodRows ?? []).map((r: any) => String(r.customer_name)))
+        ...new Set(
+          (periodRows ?? [])
+            .map((r: any) => String(r.customer_name))
+            .filter((n) => n !== 'Other')
+        )
       ];
       result.total_period_visitors = periodNames.length;
 
@@ -74,7 +78,7 @@ export const GET: APIRoute = async ({ url }) => {
     if (hmFrom && hmTo) {
       const { data: hmRows, error: hmErr } = await fetchAllPages((f, t) =>
         db.from('checkins')
-          .select('date')
+          .select('date, customer_name')
           .gte('date', hmFrom)
           .lte('date', hmTo)
           .range(f, t)
@@ -83,6 +87,7 @@ export const GET: APIRoute = async ({ url }) => {
 
       const counts: Record<string, number> = {};
       (hmRows ?? []).forEach((r: any) => {
+        if (String(r.customer_name) === 'Other') return;
         const d = String(r.date);
         counts[d] = (counts[d] ?? 0) + 1;
       });

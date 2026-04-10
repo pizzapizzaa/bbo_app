@@ -190,6 +190,10 @@ import MainLayout from '../layouts/MainLayout.astro';
                   <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Liquid Chalk Big" data-price="150000" />
                   <span>Liquid Chalk Big <span class="text-gray-500 text-xs">150,000 ₫</span></span>
                 </label>
+                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Socks" data-price="10000" />
+                  <span>Socks <span class="text-gray-500 text-xs">10,000 ₫</span></span>
+                </label>
               </div>
             </div>
           </div>
@@ -540,7 +544,8 @@ import MainLayout from '../layouts/MainLayout.astro';
     }
 
     function updateStats(checkins) {
-      document.getElementById('stat-count').textContent = checkins.length;
+      var customerCheckins = checkins.filter(function (c) { return c.customer_name !== 'Other'; });
+      document.getElementById('stat-count').textContent = customerCheckins.length;
       var rev = checkins.reduce(function (s, c) { return s + (parseFloat(c.amount) || 0); }, 0);
       document.getElementById('stat-rev').textContent = Math.round(rev).toLocaleString('vi-VN') + ' ₫';
     }
