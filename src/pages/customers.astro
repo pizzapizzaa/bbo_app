@@ -3,7 +3,7 @@ import MainLayout from '../layouts/MainLayout.astro';
 ---
 
 <MainLayout title="Customers" activePage="customers">
-<div style="overflow-x:clip">
+<div>
 
   <!-- ── Customer Stats Panel ─────────────────────────────────────────── -->
   <div class="mb-6 space-y-4">
@@ -1225,7 +1225,6 @@ import MainLayout from '../layouts/MainLayout.astro';
                "<'flex flex-wrap items-center justify-between mt-3'<'text-sm text-gray-500'i><'flex gap-1'p>>",
           order: [[0, 'asc']],
           pageLength: 25,
-          scrollX: true,
           language: { emptyTable: 'No customer records found.' }
         });
 
