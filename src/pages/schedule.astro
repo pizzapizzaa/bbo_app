@@ -332,6 +332,59 @@ import MainLayout from '../layouts/MainLayout.astro';
     </div>
   </div>
 
+  <!-- ── Edit Schedule Entry Modal ── -->
+  <div id="edit-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+       onclick="if(event.target===this)closeEditModal()">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-6">
+      <h3 class="font-semibold text-gray-800 text-base mb-4">Edit Schedule Entry</h3>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">Staff Name <span class="text-red-400">*</span></label>
+          <input id="e-staff" list="staff-list" type="text" placeholder="Select or type name…" autocomplete="off"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                   focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">Date <span class="text-red-400">*</span></label>
+          <input id="e-date" type="date"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                   focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">Start Time <span class="text-red-400">*</span></label>
+            <input id="e-start" type="time"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                     focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">End Time <span class="text-red-400">*</span></label>
+            <input id="e-end" type="time"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                     focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">Notes</label>
+          <input id="e-notes" type="text" placeholder="Optional…"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                   focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent" />
+        </div>
+        <div id="edit-error" class="hidden text-sm text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2"></div>
+      </div>
+      <div class="flex gap-3 mt-5">
+        <button onclick="closeEditModal()" type="button"
+          class="flex-1 border border-gray-300 text-gray-700 font-medium py-2 rounded-lg text-sm hover:bg-gray-50 transition">
+          Cancel
+        </button>
+        <button id="edit-save-btn" onclick="submitEdit()" type="button"
+          class="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 rounded-lg text-sm transition active:scale-[0.98]">
+          Save Changes
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script is:inline>
     var scheduleData = [];
     var currentWeekStart;
@@ -483,13 +536,27 @@ import MainLayout from '../layouts/MainLayout.astro';
             var dur = h + 'h' + (m ? ' ' + m + 'm' : '');
             var safeId = escHtml(String(entry.id));
             bodyHtml +=
-              '<div onclick="deleteEntry(\'' + safeId + '\')" ' +
-              'title="Click to delete&#10;' + escHtml(staffName) + ': ' + start + '–' + end +
+              '<div ' +
+              'title="' + escHtml(staffName) + ': ' + start + '–' + end +
                 (entry.notes ? '&#10;Note: ' + escHtml(entry.notes) : '') + '" ' +
-              'class="mb-1 px-2 py-1 rounded-md cursor-pointer text-xs leading-snug border hover:opacity-75 transition-opacity" ' +
+              'class="mb-1 px-2 py-1 rounded-md text-xs leading-snug border group" ' +
               'style="background:' + color.bg + ';color:' + color.text + ';border-color:' + color.border + '">' +
+              '<div class="flex items-start justify-between gap-0.5">' +
+              '<div>' +
               '<div class="font-semibold whitespace-nowrap">' + start + '–' + end + '</div>' +
               '<div class="opacity-70 truncate">' + dur + (entry.notes ? ' · ' + escHtml(entry.notes) : '') + '</div>' +
+              '</div>' +
+              '<div class="flex gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">' +
+              '<button onclick="openEditModal(\'' + safeId + '\')" title="Edit entry" type="button" ' +
+              'class="p-0.5 rounded hover:bg-black/10 transition-colors">' +
+              '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>' +
+              '</button>' +
+              '<button onclick="deleteEntry(\'' + safeId + '\')" title="Delete entry" type="button" ' +
+              'class="p-0.5 rounded hover:bg-black/10 transition-colors">' +
+              '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>' +
+              '</button>' +
+              '</div>' +
+              '</div>' +
               '</div>';
           });
           bodyHtml += '</td>';
@@ -604,6 +671,72 @@ import MainLayout from '../layouts/MainLayout.astro';
           showToast('Entry deleted.', 'warning');
         })
         .catch(function (err) { showToast('Delete failed: ' + err.message, 'error'); });
+    }
+
+    // ── Edit entry ──
+    var editingId = null;
+
+    function openEditModal(id) {
+      var entry = scheduleData.filter(function (s) { return String(s.id) === String(id); })[0];
+      if (!entry) return;
+      editingId = id;
+      document.getElementById('e-staff').value = entry.staff_name || '';
+      document.getElementById('e-date').value  = entry.date || '';
+      document.getElementById('e-start').value = entry.start_time || '';
+      document.getElementById('e-end').value   = entry.end_time || '';
+      document.getElementById('e-notes').value = entry.notes || '';
+      document.getElementById('edit-error').classList.add('hidden');
+      document.getElementById('edit-save-btn').disabled = false;
+      document.getElementById('edit-save-btn').textContent = 'Save Changes';
+      document.getElementById('edit-modal').classList.remove('hidden');
+    }
+
+    function closeEditModal() {
+      document.getElementById('edit-modal').classList.add('hidden');
+      editingId = null;
+    }
+
+    function submitEdit() {
+      var errEl = document.getElementById('edit-error');
+      errEl.classList.add('hidden');
+      var staff = document.getElementById('e-staff').value.trim();
+      var date  = document.getElementById('e-date').value;
+      var start = document.getElementById('e-start').value;
+      var end   = document.getElementById('e-end').value;
+      var notes = document.getElementById('e-notes').value.trim();
+
+      if (!staff || !date || !start || !end) {
+        errEl.textContent = 'Please fill in all required fields.';
+        errEl.classList.remove('hidden');
+        return;
+      }
+
+      var saveBtn = document.getElementById('edit-save-btn');
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving…';
+
+      apiFetch('/api/schedule/' + editingId, {
+        method: 'PATCH',
+        body: JSON.stringify({ staff_name: staff, date: date, start_time: start, end_time: end, notes: notes })
+      })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Save Changes';
+          if (data.error) { errEl.textContent = data.error; errEl.classList.remove('hidden'); return; }
+          for (var i = 0; i < scheduleData.length; i++) {
+            if (String(scheduleData[i].id) === String(editingId)) { scheduleData[i] = data.entry; break; }
+          }
+          closeEditModal();
+          renderCalendar();
+          showToast('Entry updated!');
+        })
+        .catch(function (err) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Save Changes';
+          errEl.textContent = 'Save failed: ' + err.message;
+          errEl.classList.remove('hidden');
+        });
     }
 
     function exportCSV() {
