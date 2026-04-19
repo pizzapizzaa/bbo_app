@@ -17,7 +17,7 @@ const COL_MAP: Record<string, string> = {
 };
 
 // DB column → display header (inverse map)
-const DISPLAY_HEADERS = ['Full Name', 'DOB', 'Email', 'Telephone no', 'Emergency contact', 'Note', 'Waiver form (old)', 'Punch Card', 'Punches', 'PT Punches', 'Membership', 'Member Until'];
+const DISPLAY_HEADERS = ['Full Name', 'DOB', 'Email', 'Telephone no', 'Emergency contact', 'Note', 'Waiver form (old)', 'Punches', 'PT Punches', 'Membership', 'Member Until'];
 
 /** GET /api/customers — return all customers */
 export const GET: APIRoute = async () => {

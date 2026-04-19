@@ -339,7 +339,8 @@ import MainLayout from '../layouts/MainLayout.astro';
           <label class="block text-xs font-medium text-gray-600 mb-1">Punches Remaining</label>
           <input id="edit-punch-count" type="number" min="0" step="1" value="0"
                  class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
-                        focus:outline-none focus:ring-2 focus:ring-orange-300" />
+                        focus:outline-none focus:ring-2 focus:ring-orange-300"
+                 oninput="(function(v){ var cb = document.getElementById('edit-punch-holder'); cb.checked = v > 0; document.getElementById('edit-punch-count-row').classList.toggle('hidden', !cb.checked); })(parseInt(this.value)||0)" />
         </div>
         <div id="edit-punch-error"
              class="hidden text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2"></div>
@@ -375,7 +376,8 @@ import MainLayout from '../layouts/MainLayout.astro';
           <label class="block text-xs font-medium text-gray-600 mb-1">PT Punches Remaining</label>
           <input id="edit-pt-punch-count" type="number" min="0" step="1" value="0"
                  class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
-                        focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                        focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                 oninput="(function(v){ var cb = document.getElementById('edit-pt-punch-holder'); cb.checked = v > 0; document.getElementById('edit-pt-punch-count-row').classList.toggle('hidden', !cb.checked); })(parseInt(this.value)||0)" />
         </div>
         <div id="edit-pt-punch-error"
              class="hidden text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2"></div>
@@ -1224,22 +1226,11 @@ import MainLayout from '../layouts/MainLayout.astro';
       // Handle special Punch Card / Membership columns
       var finalCols = cols.map(function (col, i) {
         var h = visibleHeaders[i];
-        if (h === 'Punch Card') {
-          return Object.assign({}, col, {
-            render: function (val, type, row) {
-              if (type !== 'display') return val;
-              var yes = row._is_punch_card_holder;
-              return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ' +
-                (yes ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500') + '">' +
-                (yes ? 'Yes' : 'No') + '</span>';
-            }
-          });
-        }
         if (h === 'Punches') {
           return Object.assign({}, col, {
             render: function (val, type, row) {
               if (type !== 'display') return val;
-              if (!row._is_punch_card_holder) return '<span class="text-gray-300">—</span>';
+              if (!row._punches_remaining) return '<span class="text-gray-300">—</span>';
               return '<span class="font-semibold ' + (row._punches_remaining > 0 ? 'text-green-600' : 'text-red-500') + '">' +
                 row._punches_remaining + '</span>';
             }
