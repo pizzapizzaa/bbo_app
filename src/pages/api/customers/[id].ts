@@ -13,6 +13,7 @@ export const PATCH: APIRoute = async ({ params, request }) => {
     let body: {
       is_punch_card_holder?: boolean;
       punches_remaining?: number;
+      pt_punches_remaining?: number;
       membership_type?: string;
       membership_start_date?: string | null;
       membership_end_date?: string | null;
@@ -29,6 +30,11 @@ export const PATCH: APIRoute = async ({ params, request }) => {
       updates.punches_remaining    = isPunchCardHolder
         ? Math.max(0, Math.floor(Number(body.punches_remaining) || 0))
         : 0;
+    }
+
+    // PT punch field
+    if ('pt_punches_remaining' in body) {
+      updates.pt_punches_remaining = Math.max(0, Math.floor(Number(body.pt_punches_remaining) || 0));
     }
 
     // Membership fields
@@ -68,7 +74,7 @@ export const PATCH: APIRoute = async ({ params, request }) => {
       .from('customers')
       .update(updates)
       .eq('id', id)
-      .select('id, is_punch_card_holder, punches_remaining, membership_type, membership_start_date, membership_end_date')
+      .select('id, is_punch_card_holder, punches_remaining, pt_punches_remaining, membership_type, membership_start_date, membership_end_date')
       .single();
 
     if (error) {

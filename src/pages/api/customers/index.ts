@@ -17,7 +17,7 @@ const COL_MAP: Record<string, string> = {
 };
 
 // DB column → display header (inverse map)
-const DISPLAY_HEADERS = ['Full Name', 'DOB', 'Email', 'Telephone no', 'Emergency contact', 'Note', 'Waiver form (old)', 'Punch Card', 'Punches', 'Membership', 'Member Until'];
+const DISPLAY_HEADERS = ['Full Name', 'DOB', 'Email', 'Telephone no', 'Emergency contact', 'Note', 'Waiver form (old)', 'Punch Card', 'Punches', 'PT Punches', 'Membership', 'Member Until'];
 
 /** GET /api/customers — return all customers */
 export const GET: APIRoute = async () => {
@@ -28,14 +28,14 @@ export const GET: APIRoute = async () => {
 
   const res = await fetchAllPages((from, to) =>
     db.from('customers')
-      .select('id, full_name, dob, email, telephone, emergency_contact, note, waiver_form, is_punch_card_holder, punches_remaining, membership_type, membership_start_date, membership_end_date')
+      .select('id, full_name, dob, email, telephone, emergency_contact, note, waiver_form, is_punch_card_holder, punches_remaining, pt_punches_remaining, membership_type, membership_start_date, membership_end_date')
       .order('full_name')
       .range(from, to)
   );
 
   if (res.error) {
     // Column doesn't exist yet — retry without punch card columns
-    if (res.error.code === '42703' || res.error.message?.includes('is_punch_card_holder') || res.error.message?.includes('punches_remaining') || res.error.message?.includes('membership_type')) {
+    if (res.error.code === '42703' || res.error.message?.includes('is_punch_card_holder') || res.error.message?.includes('punches_remaining') || res.error.message?.includes('pt_punches_remaining') || res.error.message?.includes('membership_type')) {
       hasPunchCols = false;
       const fallback = await fetchAllPages((from, to) =>
         db.from('customers')
@@ -66,8 +66,10 @@ export const GET: APIRoute = async () => {
     'Waiver form (old)':  r.waiver_form,
     'Punch Card':           hasPunchCols ? (r.is_punch_card_holder ? 'Yes' : 'No') : 'No',
     'Punches':              hasPunchCols ? (r.punches_remaining ?? 0) : 0,
+    'PT Punches':           hasPunchCols ? (r.pt_punches_remaining ?? 0) : 0,
     _is_punch_card_holder:  hasPunchCols ? (r.is_punch_card_holder ?? false) : false,
     _punches_remaining:     hasPunchCols ? (r.punches_remaining ?? 0) : 0,
+    _pt_punches_remaining:  hasPunchCols ? (r.pt_punches_remaining ?? 0) : 0,
     'Membership':           hasPunchCols ? (r.membership_type ?? '') : '',
     'Member Until':         hasPunchCols ? (r.membership_end_date ?? '') : '',
     _membership_type:       hasPunchCols ? (r.membership_type ?? '') : '',

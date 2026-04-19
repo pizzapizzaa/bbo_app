@@ -12,7 +12,7 @@ export const DELETE: APIRoute = async ({ params }) => {
   // Fetch the check-in first so we can revert any punch deduction
   const { data: checkin, error: fetchError } = await db
     .from('checkins')
-    .select('punch_card_holder_id')
+    .select('punch_card_holder_id, pt_punch_holder_id')
     .eq('id', id)
     .single();
 
@@ -39,6 +39,22 @@ export const DELETE: APIRoute = async ({ params }) => {
         .from('customers')
         .update({ punches_remaining: (holder.punches_remaining ?? 0) + 1 })
         .eq('id', checkin.punch_card_holder_id);
+    }
+  }
+
+  // Restore the PT punch if this check-in deducted one
+  if (checkin?.pt_punch_holder_id) {
+    const { data: ptHolder } = await db
+      .from('customers')
+      .select('pt_punches_remaining')
+      .eq('id', checkin.pt_punch_holder_id)
+      .single();
+
+    if (ptHolder) {
+      await db
+        .from('customers')
+        .update({ pt_punches_remaining: (ptHolder.pt_punches_remaining ?? 0) + 1 })
+        .eq('id', checkin.pt_punch_holder_id);
     }
   }
 

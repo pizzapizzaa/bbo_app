@@ -137,6 +137,10 @@ import MainLayout from '../layouts/MainLayout.astro';
               <optgroup label="20 Punches">
                 <option value="20 Punches – Adult" data-price="2500000">20 Punches – Adult (2,500,000 ₫)</option>
               </optgroup>
+              <optgroup label="PT Punches">
+                <option value="10 PT Punches – Shingo PT" data-price="0">10 PT Punches – Shingo PT</option>
+                <option value="10 PT Punches – Other PT" data-price="0">10 PT Punches – Other PT</option>
+              </optgroup>
               <optgroup label="Membership">
                 <option value="Membership – 1 Month" data-price="1250000">Membership – 1 Month (1,250,000 ₫)</option>
                 <option value="Membership – 3 Months" data-price="3050000">Membership – 3 Months (3,050,000 ₫)</option>
@@ -251,6 +255,7 @@ import MainLayout from '../layouts/MainLayout.astro';
               <option value="Local Bank Transfer">Local Bank Transfer</option>
               <option value="Complimentary">Complimentary</option>
               <option value="Punch Card">Punch Card</option>
+              <option value="PT Punch">PT Punch</option>
               <option value="Valid Membership">Valid Membership</option>
             </select>
           </div>
@@ -268,6 +273,21 @@ import MainLayout from '../layouts/MainLayout.astro';
               <option value="">— Select punch card holder —</option>
             </select>
             <p id="punch-from-hint" class="hidden text-xs text-yellow-400 mt-1">No punch card holders with remaining punches found.</p>
+          </div>
+
+          <!-- Use PT punch from (shown only when PT Punch is selected) -->
+          <div id="pt-punch-from-row" class="hidden">
+            <label class="block text-sm font-medium text-gray-300 mb-1.5">
+              Use PT punch from <span class="text-red-400">*</span>
+            </label>
+            <select
+              id="f-pt-punch-from"
+              class="w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm
+                     focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
+            >
+              <option value="">— Select PT punch holder —</option>
+            </select>
+            <p id="pt-punch-from-hint" class="hidden text-xs text-yellow-400 mt-1">No customers with remaining PT punches found.</p>
           </div>
 
           <!-- Amount -->
@@ -357,6 +377,7 @@ import MainLayout from '../layouts/MainLayout.astro';
                 <th>Amount (VND)</th>
                 <th>Add-ons</th>
                 <th>Punch From</th>
+                <th>PT Punch From</th>
                 <th>Notes</th>
                 <th>Actions</th>
               </tr>
@@ -439,6 +460,7 @@ import MainLayout from '../layouts/MainLayout.astro';
             });
           }
           buildPunchCardDropdown(rows);
+          buildPTPunchDropdown(rows);
         })
         .catch(function () { /* datalist is optional — ignore errors */ });
     }
@@ -456,6 +478,23 @@ import MainLayout from '../layouts/MainLayout.astro';
         opt.value            = c._id;
         opt.dataset.holderName = c['Full Name'] || '';
         opt.textContent      = (c['Full Name'] || '') + ' (' + c._punches_remaining + ' punch' + (c._punches_remaining !== 1 ? 'es' : '') + ' left)';
+        select.appendChild(opt);
+      });
+      hint.classList.toggle('hidden', holders.length > 0);
+    }
+
+    function buildPTPunchDropdown(customers) {
+      var select = document.getElementById('f-pt-punch-from');
+      var hint   = document.getElementById('pt-punch-from-hint');
+      select.innerHTML = '<option value="">— Select PT punch holder —</option>';
+      var holders = (customers || allCustomers).filter(function (c) {
+        return c._pt_punches_remaining > 0;
+      });
+      holders.forEach(function (c) {
+        var opt = document.createElement('option');
+        opt.value              = c._id;
+        opt.dataset.holderName = c['Full Name'] || '';
+        opt.textContent        = (c['Full Name'] || '') + ' (' + c._pt_punches_remaining + ' PT punch' + (c._pt_punches_remaining !== 1 ? 'es' : '') + ' left)';
         select.appendChild(opt);
       });
       hint.classList.toggle('hidden', holders.length > 0);
@@ -495,6 +534,7 @@ import MainLayout from '../layouts/MainLayout.astro';
           { title: 'Amount (VND)' },
           { title: 'Add-ons' },
           { title: 'Punch From' },
+          { title: 'PT Punch From' },
           { title: 'Notes' },
           { title: 'Actions', orderable: false, searchable: false }
         ],
@@ -524,6 +564,9 @@ import MainLayout from '../layouts/MainLayout.astro';
             : '<span class="text-gray-300">—</span>',
           c.punch_card_holder_name
             ? '<span class="text-xs text-purple-600 font-medium">' + escHtml(c.punch_card_holder_name) + '</span>'
+            : '<span class="text-gray-300">—</span>',
+          c.pt_punch_holder_name
+            ? '<span class="text-xs text-indigo-600 font-medium">' + escHtml(c.pt_punch_holder_name) + '</span>'
             : '<span class="text-gray-300">—</span>',
           escHtml(c.notes || ''),
           '<button onclick="deleteCheckin(\'' + c.id + '\')" ' +
@@ -589,9 +632,12 @@ import MainLayout from '../layouts/MainLayout.astro';
 
     // ── Punch card: show/hide punch-from section on payment change ──
     document.getElementById('f-payment').addEventListener('change', function () {
-      var isPunch = this.value === 'Punch Card';
+      var isPunch   = this.value === 'Punch Card';
+      var isPTPunch = this.value === 'PT Punch';
       document.getElementById('punch-from-row').classList.toggle('hidden', !isPunch);
       if (!isPunch) document.getElementById('f-punch-from').value = '';
+      document.getElementById('pt-punch-from-row').classList.toggle('hidden', !isPTPunch);
+      if (!isPTPunch) document.getElementById('f-pt-punch-from').value = '';
     });
 
     // ── Punch card: auto-select customer in punch dropdown when customer changes ──
@@ -698,6 +744,19 @@ import MainLayout from '../layouts/MainLayout.astro';
         punchHolderName = (selectedOpt && selectedOpt.dataset.holderName) || selectedOpt.textContent.split(' (')[0];
       }
 
+      var ptPunchFromSel   = document.getElementById('f-pt-punch-from');
+      var ptPunchHolderId  = '';
+      var ptPunchHolderName = '';
+      if (payment === 'PT Punch') {
+        ptPunchHolderId = ptPunchFromSel.value;
+        if (!ptPunchHolderId) {
+          errEl.textContent = 'Please select a PT punch holder.';
+          errEl.classList.remove('hidden'); return;
+        }
+        var selectedPTOpt = ptPunchFromSel.options[ptPunchFromSel.selectedIndex];
+        ptPunchHolderName = (selectedPTOpt && selectedPTOpt.dataset.holderName) || selectedPTOpt.textContent.split(' (')[0];
+      }
+
       if (!customerName) {
         errEl.textContent = 'Please enter a customer name.';
         errEl.classList.remove('hidden'); return;
@@ -727,6 +786,8 @@ import MainLayout from '../layouts/MainLayout.astro';
           addons:               addonsStr,
           punch_card_holder_id:   punchHolderId   || undefined,
           punch_card_holder_name: punchHolderName || undefined,
+          pt_punch_holder_id:     ptPunchHolderId   || undefined,
+          pt_punch_holder_name:   ptPunchHolderName || undefined,
         })
       })
         .then(function (res) { return res.json(); })
@@ -741,7 +802,7 @@ import MainLayout from '../layouts/MainLayout.astro';
           document.getElementById('table-date-label').textContent = formatDateLabel(dateStr);
           loadCheckinsForRange(dateStr, dateStr);
           // Refresh punch card dropdown counts if a punch was used
-          if (punchHolderId) buildCustomerDatalist();
+          if (punchHolderId || ptPunchHolderId) buildCustomerDatalist();
           document.getElementById('f-customer').value   = '';
           document.getElementById('f-payment').value    = '';
           document.getElementById('f-checkin-type').value = '';
@@ -752,6 +813,8 @@ import MainLayout from '../layouts/MainLayout.astro';
           document.getElementById('f-notes').value      = '';
           document.getElementById('f-punch-from').value = '';
           document.getElementById('punch-from-row').classList.add('hidden');
+          document.getElementById('f-pt-punch-from').value = '';
+          document.getElementById('pt-punch-from-row').classList.add('hidden');
           // Reset date+time to now for next entry
           var n = new Date();
           document.getElementById('f-checkin-date').value = n.toISOString().slice(0, 10);
@@ -774,6 +837,7 @@ import MainLayout from '../layouts/MainLayout.astro';
         .then(function (data) {
           if (data.error) { showToast('Delete failed: ' + data.error, 'error'); return; }
           loadCheckinsForRange(activeFrom, activeTo);
+          buildCustomerDatalist();
           showToast('Check-in deleted.', 'warning');
         })
         .catch(function (err) { showToast('Delete failed: ' + err.message, 'error'); });
@@ -782,10 +846,11 @@ import MainLayout from '../layouts/MainLayout.astro';
     function exportCheckins() {
       if (!allCheckins.length) { showToast('No check-ins to export for this period.', 'warning'); return; }
       var label = activeFrom === activeTo ? activeFrom : (activeFrom + '_to_' + activeTo);
-      var headers = ['Date', 'Time', 'Customer Name', 'Check-in Type', 'Payment Method', 'Amount', 'Add-ons', 'Punch From', 'Notes'];
+      var headers = ['Date', 'Time', 'Customer Name', 'Check-in Type', 'Payment Method', 'Amount', 'Add-ons', 'Punch From', 'PT Punch From', 'Notes'];
       var csvContent = [headers].concat(allCheckins.map(function (c) {
         return [c.date, (c.time || '').slice(0, 5), c.customer_name, c.checkin_type || '',
-                c.payment_method, Math.round(c.amount || 0), c.addons || '', c.punch_card_holder_name || '', c.notes || ''];
+                c.payment_method, Math.round(c.amount || 0), c.addons || '',
+                c.punch_card_holder_name || '', c.pt_punch_holder_name || '', c.notes || ''];
       })).map(function (row) {
         return row.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(',');
       }).join('\n');

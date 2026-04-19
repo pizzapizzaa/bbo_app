@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS customers (
   membership_type       TEXT        NOT NULL DEFAULT '',   -- '' | '1 Month' | '3 Months' | '6 Months' | '12 Months'
   membership_start_date DATE,
   membership_end_date   DATE,
+  pt_punches_remaining  INTEGER     NOT NULL DEFAULT 0,
   created_at            TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -53,7 +54,9 @@ CREATE TABLE IF NOT EXISTS checkins (
   amount                 NUMERIC(12,0) NOT NULL DEFAULT 0,  -- VND, no decimals
   notes                  TEXT        NOT NULL DEFAULT '',
   punch_card_holder_id   UUID        REFERENCES customers(id) ON DELETE SET NULL,
-  punch_card_holder_name TEXT        NOT NULL DEFAULT ''
+  punch_card_holder_name TEXT        NOT NULL DEFAULT '',
+  pt_punch_holder_id     UUID        REFERENCES customers(id) ON DELETE SET NULL,
+  pt_punch_holder_name   TEXT        NOT NULL DEFAULT ''
 );
 
 CREATE INDEX IF NOT EXISTS idx_checkins_date ON checkins (date);
@@ -96,6 +99,12 @@ CREATE TABLE IF NOT EXISTS event_entries (
 
 CREATE INDEX IF NOT EXISTS idx_event_entries_date      ON event_entries (date);
 CREATE INDEX IF NOT EXISTS idx_event_entries_type_date ON event_entries (event_type, date);
+
+-- ── Migration: PT Punch support ─────────────────────────────────────────────
+-- Run these ALTER statements in Supabase SQL Editor if the tables already exist.
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS pt_punches_remaining INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE checkins  ADD COLUMN IF NOT EXISTS pt_punch_holder_id   UUID REFERENCES customers(id) ON DELETE SET NULL;
+ALTER TABLE checkins  ADD COLUMN IF NOT EXISTS pt_punch_holder_name TEXT NOT NULL DEFAULT '';
 
 ALTER TABLE customers        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE schedule_entries ENABLE ROW LEVEL SECURITY;

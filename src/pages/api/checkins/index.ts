@@ -42,6 +42,8 @@ export const POST: APIRoute = async ({ request }) => {
     notes?: string;
     punch_card_holder_id?: string;
     punch_card_holder_name?: string;
+    pt_punch_holder_id?: string;
+    pt_punch_holder_name?: string;
     checkin_type?: string;
     addons?: string;
   };
@@ -50,6 +52,7 @@ export const POST: APIRoute = async ({ request }) => {
 
   const { customer_name, date, time, payment_method, amount, notes,
           punch_card_holder_id, punch_card_holder_name,
+          pt_punch_holder_id, pt_punch_holder_name,
           checkin_type, addons } = body;
   if (!customer_name || !date || !time || !payment_method) {
     return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400 });
@@ -83,6 +86,8 @@ export const POST: APIRoute = async ({ request }) => {
       notes: notes ?? '',
       punch_card_holder_id:   punch_card_holder_id   || null,
       punch_card_holder_name: punch_card_holder_name || '',
+      pt_punch_holder_id:     pt_punch_holder_id     || null,
+      pt_punch_holder_name:   pt_punch_holder_name   || '',
       checkin_type: checkin_type ?? '',
       addons:       addons       ?? '',
     })
@@ -110,6 +115,12 @@ export const POST: APIRoute = async ({ request }) => {
     '10 Punches – Kid':     10,
     '20 Punches – Adult':   20,
   };
+
+  // ── PT punch purchase: add PT punches to the buyer's account ──
+  const PT_PUNCH_ADDS: Record<string, number> = {
+    '10 PT Punches – Shingo PT': 10,
+    '10 PT Punches – Other PT':  10,
+  };
   const MEMBERSHIP_TYPE_MAP: Record<string, string> = {
     'Membership – 1 Month':   '1 Month',
     'Membership – 3 Months':  '3 Months',
@@ -121,12 +132,13 @@ export const POST: APIRoute = async ({ request }) => {
   };
 
   const punchesToAdd  = checkin_type ? (PUNCH_ADDS[checkin_type] ?? 0) : 0;
+  const ptPunchesToAdd = checkin_type ? (PT_PUNCH_ADDS[checkin_type] ?? 0) : 0;
   const newMemberType = checkin_type ? (MEMBERSHIP_TYPE_MAP[checkin_type] ?? '') : '';
 
-  if (punchesToAdd > 0 || newMemberType) {
+  if (punchesToAdd > 0 || ptPunchesToAdd > 0 || newMemberType) {
     const { data: cust } = await db
       .from('customers')
-      .select('id, punches_remaining, membership_end_date')
+      .select('id, punches_remaining, pt_punches_remaining, membership_end_date')
       .ilike('full_name', customer_name)
       .limit(1)
       .maybeSingle();
@@ -136,6 +148,12 @@ export const POST: APIRoute = async ({ request }) => {
         await db.from('customers').update({
           is_punch_card_holder: true,
           punches_remaining: (cust.punches_remaining ?? 0) + punchesToAdd,
+        }).eq('id', cust.id);
+      }
+
+      if (ptPunchesToAdd > 0) {
+        await db.from('customers').update({
+          pt_punches_remaining: (cust.pt_punches_remaining ?? 0) + ptPunchesToAdd,
         }).eq('id', cust.id);
       }
 
@@ -168,6 +186,22 @@ export const POST: APIRoute = async ({ request }) => {
         .from('customers')
         .update({ punches_remaining: holder.punches_remaining - 1 })
         .eq('id', punch_card_holder_id);
+    }
+  }
+
+  // Deduct one PT punch from the PT punch holder
+  if (pt_punch_holder_id) {
+    const { data: ptHolder } = await db
+      .from('customers')
+      .select('pt_punches_remaining')
+      .eq('id', pt_punch_holder_id)
+      .single();
+
+    if (ptHolder && ptHolder.pt_punches_remaining > 0) {
+      await db
+        .from('customers')
+        .update({ pt_punches_remaining: ptHolder.pt_punches_remaining - 1 })
+        .eq('id', pt_punch_holder_id);
     }
   }
 

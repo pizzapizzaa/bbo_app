@@ -355,6 +355,36 @@ import MainLayout from '../layouts/MainLayout.astro';
     </div>
   </div>
 
+  <!-- Edit PT Punch Modal -->
+  <div id="edit-pt-punch-modal"
+       class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+       onclick="if(event.target===this)closeEditPTPunchModal()">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h2 class="font-semibold text-gray-800 text-lg">PT Punch — <span id="edit-pt-punch-name" class="text-indigo-500"></span></h2>
+        <button onclick="closeEditPTPunchModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+      </div>
+      <div class="px-6 py-5 space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">PT Punches Remaining</label>
+          <input id="edit-pt-punch-count" type="number" min="0" step="1" value="0"
+                 class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
+                        focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+        </div>
+        <div id="edit-pt-punch-error"
+             class="hidden text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2"></div>
+        <div class="flex justify-end gap-3 pt-1">
+          <button type="button" onclick="closeEditPTPunchModal()"
+                  class="bg-white hover:bg-gray-50 border border-gray-300 text-gray-700
+                         font-medium text-sm px-4 py-2 rounded-lg transition">Cancel</button>
+          <button id="edit-pt-punch-submit" onclick="submitEditPTPunch()"
+                  class="bg-indigo-500 hover:bg-indigo-600 text-white font-medium text-sm
+                         px-5 py-2 rounded-lg transition">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Customer table -->
   <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 overflow-x-auto">
     <!-- Loading spinner -->
@@ -864,6 +894,55 @@ import MainLayout from '../layouts/MainLayout.astro';
         });
     }
 
+    // ── Edit PT Punch Modal ──
+    var editPTPunchId = null;
+
+    function openEditPTPunch(id) {
+      var row = customerRows.find(function (r) { return r._id === id; });
+      if (!row) return;
+      editPTPunchId = id;
+      document.getElementById('edit-pt-punch-name').textContent  = row['Full Name'] || '';
+      document.getElementById('edit-pt-punch-count').value        = row._pt_punches_remaining || 0;
+      document.getElementById('edit-pt-punch-error').classList.add('hidden');
+      document.getElementById('edit-pt-punch-modal').classList.remove('hidden');
+    }
+
+    function closeEditPTPunchModal() {
+      document.getElementById('edit-pt-punch-modal').classList.add('hidden');
+      editPTPunchId = null;
+    }
+
+    function submitEditPTPunch() {
+      if (!editPTPunchId) return;
+      var remaining = parseInt(document.getElementById('edit-pt-punch-count').value, 10) || 0;
+      var errEl     = document.getElementById('edit-pt-punch-error');
+      var btn       = document.getElementById('edit-pt-punch-submit');
+      errEl.classList.add('hidden');
+      btn.disabled = true; btn.textContent = 'Saving…';
+
+      apiFetch('/api/customers/' + editPTPunchId, {
+        method: 'PATCH',
+        body: JSON.stringify({ pt_punches_remaining: remaining })
+      })
+        .then(function (res) { return res.json(); })
+        .then(function (result) {
+          btn.disabled = false; btn.textContent = 'Save';
+          if (result.error) { errEl.textContent = result.error; errEl.classList.remove('hidden'); return; }
+          var row = customerRows.find(function (r) { return r._id === editPTPunchId; });
+          if (row) {
+            row['PT Punches']          = result.row.pt_punches_remaining ?? remaining;
+            row._pt_punches_remaining  = result.row.pt_punches_remaining ?? remaining;
+          }
+          if (customerTable) { customerTable.clear(); customerTable.rows.add(customerRows).draw(); }
+          closeEditPTPunchModal();
+          showToast('PT punch updated.', 'success');
+        })
+        .catch(function (err) {
+          btn.disabled = false; btn.textContent = 'Save';
+          errEl.textContent = 'Failed: ' + err.message; errEl.classList.remove('hidden');
+        });
+    }
+
     // ── API helper ──
     function apiFetch(url, options) {
       var token = sessionStorage.getItem('bbo_token') || '';
@@ -877,7 +956,7 @@ import MainLayout from '../layouts/MainLayout.astro';
     }
 
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') { closeAddModal(); closeEditPunchModal(); closeEditMembershipModal(); closeColumnsDropdown(); }
+      if (e.key === 'Escape') { closeAddModal(); closeEditPunchModal(); closeEditMembershipModal(); closeEditPTPunchModal(); closeColumnsDropdown(); }
     });
 
     function openAddModal() {
@@ -1156,6 +1235,16 @@ import MainLayout from '../layouts/MainLayout.astro';
             }
           });
         }
+        if (h === 'PT Punches') {
+          return Object.assign({}, col, {
+            render: function (val, type, row) {
+              if (type !== 'display') return val;
+              if (!row._pt_punches_remaining) return '<span class="text-gray-300">—</span>';
+              return '<span class="font-semibold ' + (row._pt_punches_remaining > 0 ? 'text-indigo-600' : 'text-red-500') + '">' +
+                row._pt_punches_remaining + '</span>';
+            }
+          });
+        }
         if (h === 'Membership') {
           return Object.assign({}, col, {
             render: function (val, type, row) {
@@ -1206,6 +1295,13 @@ import MainLayout from '../layouts/MainLayout.astro';
             '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" ' +
             'd="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>' +
             '</svg>Punch</button>' +
+            '<button onclick="openEditPTPunch(\'' + row._id + '\')" ' +
+            'class="inline-flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-700 ' +
+            'hover:bg-indigo-50 px-2 py-1 rounded transition" title="Edit PT punch">' +
+            '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" ' +
+            'd="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>' +
+            '</svg>PT</button>' +
             '<button onclick="deleteCustomer(\'' + row._id + '\')" ' +
             'class="inline-flex items-center gap-1 text-xs text-red-500 hover:text-red-700 ' +
             'hover:bg-red-50 px-2 py-1 rounded transition">' +
