@@ -365,7 +365,13 @@ import MainLayout from '../layouts/MainLayout.astro';
         <button onclick="closeEditPTPunchModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
       </div>
       <div class="px-6 py-5 space-y-4">
-        <div>
+        <div class="flex items-center gap-3">
+          <input id="edit-pt-punch-holder" type="checkbox"
+                 class="w-4 h-4 rounded accent-indigo-500"
+                 onchange="document.getElementById('edit-pt-punch-count-row').classList.toggle('hidden', !this.checked)" />
+          <label for="edit-pt-punch-holder" class="text-sm font-medium text-gray-700">Is PT Punch Holder</label>
+        </div>
+        <div id="edit-pt-punch-count-row" class="hidden">
           <label class="block text-xs font-medium text-gray-600 mb-1">PT Punches Remaining</label>
           <input id="edit-pt-punch-count" type="number" min="0" step="1" value="0"
                  class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
@@ -901,8 +907,11 @@ import MainLayout from '../layouts/MainLayout.astro';
       var row = customerRows.find(function (r) { return r._id === id; });
       if (!row) return;
       editPTPunchId = id;
-      document.getElementById('edit-pt-punch-name').textContent  = row['Full Name'] || '';
-      document.getElementById('edit-pt-punch-count').value        = row._pt_punches_remaining || 0;
+      var isHolder = (row._pt_punches_remaining || 0) > 0;
+      document.getElementById('edit-pt-punch-name').textContent    = row['Full Name'] || '';
+      document.getElementById('edit-pt-punch-holder').checked      = isHolder;
+      document.getElementById('edit-pt-punch-count').value         = row._pt_punches_remaining || 0;
+      document.getElementById('edit-pt-punch-count-row').classList.toggle('hidden', !isHolder);
       document.getElementById('edit-pt-punch-error').classList.add('hidden');
       document.getElementById('edit-pt-punch-modal').classList.remove('hidden');
     }
@@ -914,7 +923,8 @@ import MainLayout from '../layouts/MainLayout.astro';
 
     function submitEditPTPunch() {
       if (!editPTPunchId) return;
-      var remaining = parseInt(document.getElementById('edit-pt-punch-count').value, 10) || 0;
+      var isHolder  = document.getElementById('edit-pt-punch-holder').checked;
+      var remaining = isHolder ? (parseInt(document.getElementById('edit-pt-punch-count').value, 10) || 0) : 0;
       var errEl     = document.getElementById('edit-pt-punch-error');
       var btn       = document.getElementById('edit-pt-punch-submit');
       errEl.classList.add('hidden');
