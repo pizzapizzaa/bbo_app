@@ -134,6 +134,16 @@ const { title, activePage = '' } = Astro.props;
 
   <script is:inline>
     (function () {
+      // One-time migration: copy auth keys from sessionStorage (old) to localStorage (new)
+      if (!localStorage.getItem('bbo_auth') && sessionStorage.getItem('bbo_auth')) {
+        localStorage.setItem('bbo_auth',  sessionStorage.getItem('bbo_auth'));
+        localStorage.setItem('bbo_token', sessionStorage.getItem('bbo_token') || '');
+        localStorage.setItem('bbo_admin', sessionStorage.getItem('bbo_admin') || '');
+        sessionStorage.removeItem('bbo_auth');
+        sessionStorage.removeItem('bbo_token');
+        sessionStorage.removeItem('bbo_admin');
+      }
+
       if (!localStorage.getItem('bbo_auth')) {
         window.location.replace('/');
         return;

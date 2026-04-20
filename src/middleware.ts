@@ -4,8 +4,10 @@ import { verifyToken } from './lib/auth';
 export const onRequest = defineMiddleware((context, next) => {
   const { pathname } = new URL(context.request.url);
 
-  // Protect all /api/* routes except the login endpoint and public event reads
-  if (pathname.startsWith('/api/') && pathname !== '/api/auth/token') {
+  // Protect all /api/* routes except login, refresh, and public event reads
+  if (pathname.startsWith('/api/') &&
+      pathname !== '/api/auth/token' &&
+      pathname !== '/api/auth/refresh') {
     // Public: anyone may read the events schedule
     if (pathname === '/api/events' && context.request.method === 'GET') {
       return next();
