@@ -3,11 +3,12 @@ export const prerender = false;
 import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
 import { ok, serverError } from '../../../lib/auth';
+import { isValidUUID } from '../../../lib/validate';
 
 /** PATCH /api/events/:id — admin only */
 export const PATCH: APIRoute = async ({ params, request }) => {
   const { id } = params;
-  if (!id) return new Response(JSON.stringify({ error: 'Missing id' }), { status: 400 });
+  if (!id || !isValidUUID(id)) return new Response(JSON.stringify({ error: 'Invalid id' }), { status: 400 });
 
   let body: {
     event_type?: string;
@@ -53,7 +54,7 @@ export const PATCH: APIRoute = async ({ params, request }) => {
 /** DELETE /api/events/:id — admin only */
 export const DELETE: APIRoute = async ({ params }) => {
   const { id } = params;
-  if (!id) return new Response(JSON.stringify({ error: 'Missing id' }), { status: 400 });
+  if (!id || !isValidUUID(id)) return new Response(JSON.stringify({ error: 'Invalid id' }), { status: 400 });
 
   const { error } = await db
     .from('event_entries')

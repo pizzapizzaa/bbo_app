@@ -3,12 +3,13 @@ export const prerender = false;
 import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
 import { ok, serverError } from '../../../lib/auth';
+import { isValidUUID } from '../../../lib/validate';
 
 /** PATCH /api/customers/:id — update punch card and/or membership info */
 export const PATCH: APIRoute = async ({ params, request }) => {
   try {
     const { id } = params;
-    if (!id) return new Response(JSON.stringify({ error: 'Missing id' }), { status: 400 });
+    if (!id || !isValidUUID(id)) return new Response(JSON.stringify({ error: 'Invalid id' }), { status: 400 });
 
     let body: {
       is_punch_card_holder?: boolean;
@@ -91,7 +92,7 @@ export const PATCH: APIRoute = async ({ params, request }) => {
 export const DELETE: APIRoute = async ({ params }) => {
   try {
     const { id } = params;
-    if (!id) return new Response(JSON.stringify({ error: 'Missing id' }), { status: 400 });
+    if (!id || !isValidUUID(id)) return new Response(JSON.stringify({ error: 'Invalid id' }), { status: 400 });
 
     const { error } = await db
       .from('customers')

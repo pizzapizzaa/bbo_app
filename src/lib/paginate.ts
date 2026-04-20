@@ -1,4 +1,5 @@
 const PAGE_SIZE = 1000;
+const MAX_PAGES = 100; // hard cap: 100 × 1000 = 100 000 rows maximum
 
 /**
  * Fetches all rows from a Supabase query by paginating with `.range()`,
@@ -12,13 +13,15 @@ export async function fetchAllPages(
 ): Promise<{ data: any[]; error: any }> {
   const all: any[] = [];
   let from = 0;
-  while (true) {
+  let page = 0;
+  while (page < MAX_PAGES) {
     const { data, error } = await selectFn(from, from + PAGE_SIZE - 1);
     if (error) return { data: [], error };
     const rows = data ?? [];
     all.push(...rows);
     if (rows.length < PAGE_SIZE) break;
     from += PAGE_SIZE;
+    page++;
   }
   return { data: all, error: null };
 }

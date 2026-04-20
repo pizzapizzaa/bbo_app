@@ -100,6 +100,21 @@ CREATE TABLE IF NOT EXISTS event_entries (
 CREATE INDEX IF NOT EXISTS idx_event_entries_date      ON event_entries (date);
 CREATE INDEX IF NOT EXISTS idx_event_entries_type_date ON event_entries (event_type, date);
 
+-- ── Route Setting Schedule ───────────────────────────────────────────────────
+-- One row per routesetting session (typically every other Monday).
+CREATE TABLE IF NOT EXISTS routesetting_entries (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  date       DATE        NOT NULL,
+  walls      TEXT        NOT NULL DEFAULT '[]',    -- JSON array of wall codes e.g. ["W1","W3"]
+  setters    TEXT        NOT NULL DEFAULT '[]',    -- JSON array of {name, routes} objects
+  styles     TEXT        NOT NULL DEFAULT '[]',    -- JSON array of style strings
+  notes      TEXT        NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_routesetting_date ON routesetting_entries (date);
+ALTER TABLE routesetting_entries ENABLE ROW LEVEL SECURITY;
+
 -- ── Migration: PT Punch support ─────────────────────────────────────────────
 -- Run these ALTER statements in Supabase SQL Editor if the tables already exist.
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS pt_punches_remaining INTEGER NOT NULL DEFAULT 0;

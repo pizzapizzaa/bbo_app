@@ -203,11 +203,6 @@
         sessionStorage.setItem('bbo_auth', 'true');
         sessionStorage.setItem('bbo_token', data.token);
         sessionStorage.setItem('bbo_admin', username);
-        // Also persist to localStorage so the public /events page can detect
-        // admin privileges even when opened in a separate tab.
-        localStorage.setItem('bbo_auth', 'true');
-        localStorage.setItem('bbo_token', data.token);
-        localStorage.setItem('bbo_admin', username);
         window.location.replace('/dashboard');
       } else {
         document.getElementById('password').value = '';

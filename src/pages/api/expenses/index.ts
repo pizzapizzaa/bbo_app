@@ -4,6 +4,7 @@ import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
 import { ok, serverError } from '../../../lib/auth';
 import { fetchAllPages } from '../../../lib/paginate';
+import { isValidDate, isValidAmount, MAX_TEXT } from '../../../lib/validate';
 
 const VALID_TYPES = [
   'Construction Setup', 'Construction Material', 'Holds',
@@ -47,8 +48,18 @@ export const POST: APIRoute = async ({ request }) => {
   if (!description || !type || !date || amount == null) {
     return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400 });
   }
+  if (!isValidDate(String(date))) {
+    return new Response(JSON.stringify({ error: 'Invalid date format (expected YYYY-MM-DD)' }), { status: 400 });
+  }
   if (!VALID_TYPES.includes(type)) {
     return new Response(JSON.stringify({ error: 'Invalid expense type' }), { status: 400 });
+  }
+  const numAmount = Number(amount);
+  if (!isValidAmount(numAmount)) {
+    return new Response(JSON.stringify({ error: 'Invalid amount' }), { status: 400 });
+  }
+  if (String(description).length > MAX_TEXT || String(comment ?? '').length > MAX_TEXT) {
+    return new Response(JSON.stringify({ error: 'description or comment exceeds maximum length' }), { status: 400 });
   }
 
   const { data, error } = await db
@@ -58,7 +69,7 @@ export const POST: APIRoute = async ({ request }) => {
       type,
       date,
       location:  location ?? '',
-      amount:    Math.round(Math.abs(Number(amount))),
+      amount:    Math.round(Math.abs(numAmount)),
       comment:   comment ?? '',
     })
     .select()

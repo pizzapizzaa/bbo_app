@@ -1361,7 +1361,7 @@ import MainLayout from '../layouts/MainLayout.astro';
 
     function clearAllCustomers() {
       if (!confirm('Clear ALL customer data? This cannot be undone.')) return;
-      apiFetch('/api/customers', { method: 'DELETE' })
+      apiFetch('/api/customers', { method: 'DELETE', body: JSON.stringify({ confirm: 'DELETE ALL CUSTOMERS' }) })
         .then(function (res) { return res.json(); })
         .then(function () {
           customerHeaders = [];

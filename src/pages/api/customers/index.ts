@@ -138,9 +138,18 @@ export const POST: APIRoute = async ({ request }) => {
   } catch (e: any) { return serverError(e?.message ?? String(e)); }
 };
 
-/** DELETE /api/customers — wipe all customer records */
-export const DELETE: APIRoute = async () => {
+/** DELETE /api/customers — wipe all customer records.
+ *  Requires body: { "confirm": "DELETE ALL CUSTOMERS" } to prevent accidental wipes. */
+export const DELETE: APIRoute = async ({ request }) => {
   try {
+  let body: { confirm?: string } = {};
+  try { body = await request.json(); } catch { /* body is optional */ }
+  if (body.confirm !== 'DELETE ALL CUSTOMERS') {
+    return new Response(
+      JSON.stringify({ error: 'Confirmation required. Send { "confirm": "DELETE ALL CUSTOMERS" }.' }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
   const { error } = await db
     .from('customers')
     .delete()

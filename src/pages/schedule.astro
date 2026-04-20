@@ -4,6 +4,20 @@ import MainLayout from '../layouts/MainLayout.astro';
 
 <MainLayout title="Staff Schedule" activePage="schedule">
 
+  <!-- ══ Page-level tabs ══ -->
+  <div class="flex border-b border-gray-200 mb-6">
+    <button id="page-tab-staff" type="button" onclick="switchPageTab('staff')"
+      class="px-5 py-3 text-sm font-semibold text-orange-500 border-b-2 border-orange-500 -mb-px transition">
+      Staff Schedule
+    </button>
+    <button id="page-tab-route" type="button" onclick="switchPageTab('route')"
+      class="px-5 py-3 text-sm font-medium text-gray-400 border-b-2 border-transparent -mb-px hover:text-gray-600 transition">
+      Route Setting Schedule
+    </button>
+  </div>
+
+  <!-- ══ Tab 1: Staff Schedule ══ -->
+  <div id="page-panel-staff">
   <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
     <!-- ── Add / Bulk Entry ── -->
@@ -384,6 +398,189 @@ import MainLayout from '../layouts/MainLayout.astro';
       </div>
     </div>
   </div>
+
+  </div><!-- end #page-panel-staff -->
+
+  <!-- ══ Tab 2: Route Setting Schedule ══ -->
+  <div id="page-panel-route" class="hidden">
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+
+      <!-- ── Route Setting Form (1 col) ── -->
+      <div class="xl:col-span-1">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h2 class="font-semibold text-gray-800 mb-4">Log Setting Session</h2>
+          <form id="rs-form" class="space-y-4" novalidate>
+
+            <!-- Setting Date -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Setting Date <span class="text-red-400">*</span></label>
+              <input id="rs-date" type="date"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                       focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent" />
+            </div>
+
+            <!-- Reset Wall -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Reset Wall <span class="text-red-400">*</span></label>
+              <div class="border border-gray-200 rounded-lg p-3 grid grid-cols-2 gap-2">
+                <label class="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" class="rs-wall-cb accent-purple-600 w-3.5 h-3.5" value="W1" />
+                  <span class="text-sm text-gray-700">W1 — Overhang 20</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" class="rs-wall-cb accent-purple-600 w-3.5 h-3.5" value="W2" />
+                  <span class="text-sm text-gray-700">W2 — Vertical</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" class="rs-wall-cb accent-purple-600 w-3.5 h-3.5" value="W3" />
+                  <span class="text-sm text-gray-700">W3 — Overhang 10</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" class="rs-wall-cb accent-purple-600 w-3.5 h-3.5" value="W4" />
+                  <span class="text-sm text-gray-700">W4 — Cave 60</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" class="rs-wall-cb accent-purple-600 w-3.5 h-3.5" value="W5" />
+                  <span class="text-sm text-gray-700">W5 — Overhang 40</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" class="rs-wall-cb accent-purple-600 w-3.5 h-3.5" value="W6" />
+                  <span class="text-sm text-gray-700">W6 — Slab</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Route Setters + route counts -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Route Setter <span class="text-red-400">*</span></label>
+              <div class="border border-gray-200 rounded-lg p-3 space-y-2.5">
+                <label class="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" class="rs-setter-cb accent-purple-600 w-3.5 h-3.5" value="Thanh Tu" onchange="toggleSetterInput(this)" />
+                  <span class="text-sm text-gray-700 flex-1">Thanh Tu</span>
+                  <input type="number" class="rs-routes-input hidden w-20 border border-gray-300 rounded-lg px-2 py-1 text-sm text-center
+                         focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    data-setter="Thanh Tu" min="1" max="99" placeholder="# routes" />
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" class="rs-setter-cb accent-purple-600 w-3.5 h-3.5" value="Shingo" onchange="toggleSetterInput(this)" />
+                  <span class="text-sm text-gray-700 flex-1">Shingo</span>
+                  <input type="number" class="rs-routes-input hidden w-20 border border-gray-300 rounded-lg px-2 py-1 text-sm text-center
+                         focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    data-setter="Shingo" min="1" max="99" placeholder="# routes" />
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" class="rs-setter-cb accent-purple-600 w-3.5 h-3.5" value="Tran Huy" onchange="toggleSetterInput(this)" />
+                  <span class="text-sm text-gray-700 flex-1">Tran Huy</span>
+                  <input type="number" class="rs-routes-input hidden w-20 border border-gray-300 rounded-lg px-2 py-1 text-sm text-center
+                         focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    data-setter="Tran Huy" min="1" max="99" placeholder="# routes" />
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" class="rs-setter-cb accent-purple-600 w-3.5 h-3.5" value="Sam" onchange="toggleSetterInput(this)" />
+                  <span class="text-sm text-gray-700 flex-1">Sam</span>
+                  <input type="number" class="rs-routes-input hidden w-20 border border-gray-300 rounded-lg px-2 py-1 text-sm text-center
+                         focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    data-setter="Sam" min="1" max="99" placeholder="# routes" />
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" class="rs-setter-cb accent-purple-600 w-3.5 h-3.5" value="Huy Le" onchange="toggleSetterInput(this)" />
+                  <span class="text-sm text-gray-700 flex-1">Huy Le</span>
+                  <input type="number" class="rs-routes-input hidden w-20 border border-gray-300 rounded-lg px-2 py-1 text-sm text-center
+                         focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    data-setter="Huy Le" min="1" max="99" placeholder="# routes" />
+                </label>
+              </div>
+            </div>
+
+            <!-- Setting Styles Coverage -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Setting Styles Coverage</label>
+              <div class="flex flex-wrap gap-x-4 gap-y-2">
+                <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input type="checkbox" class="rs-style-cb accent-purple-600 w-3.5 h-3.5" value="Dynamic" />
+                  <span class="text-sm text-gray-700">Dynamic</span>
+                </label>
+                <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input type="checkbox" class="rs-style-cb accent-purple-600 w-3.5 h-3.5" value="Static" />
+                  <span class="text-sm text-gray-700">Static</span>
+                </label>
+                <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input type="checkbox" class="rs-style-cb accent-purple-600 w-3.5 h-3.5" value="Coordination" />
+                  <span class="text-sm text-gray-700">Coordination</span>
+                </label>
+                <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input type="checkbox" class="rs-style-cb accent-purple-600 w-3.5 h-3.5" value="Comp style" />
+                  <span class="text-sm text-gray-700">Comp style</span>
+                </label>
+                <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input type="checkbox" class="rs-style-cb accent-purple-600 w-3.5 h-3.5" value="Other" />
+                  <span class="text-sm text-gray-700">Other</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Notes -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Notes</label>
+              <input id="rs-notes" type="text" placeholder="Optional…"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                       focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent" />
+            </div>
+
+            <div id="rs-form-error" class="hidden text-sm text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2"></div>
+
+            <div class="flex gap-2">
+              <button type="submit" id="rs-submit-btn"
+                class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold
+                       py-2.5 rounded-lg text-sm transition active:scale-[0.98]">
+                Save Session
+              </button>
+              <button type="button" id="rs-cancel-btn" onclick="cancelRSEdit()"
+                class="hidden px-4 border border-gray-300 text-gray-700 font-medium py-2.5
+                       rounded-lg text-sm hover:bg-gray-50 transition">
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- ── Monthly Calendar (2 cols) ── -->
+      <div class="xl:col-span-2">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+
+          <!-- Header: title + month nav -->
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+            <div>
+              <h2 class="font-semibold text-gray-800">Route Setting Calendar</h2>
+              <p class="text-xs text-gray-400 mt-0.5">Mondays highlighted — routesetting typically every other Monday</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="rs-prev-month" type="button" onclick="rsNavMonth(-1)"
+                class="px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition">
+                ‹ Prev
+              </button>
+              <span id="rs-month-label" class="text-sm font-medium text-gray-700 min-w-[160px] text-center px-1"></span>
+              <button id="rs-next-month" type="button" onclick="rsNavMonth(1)"
+                class="px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition">
+                Next ›
+              </button>
+              <button type="button" onclick="rsGoToday()"
+                class="px-2.5 py-1.5 text-sm bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition">
+                Today
+              </button>
+            </div>
+          </div>
+
+          <!-- Calendar body -->
+          <div class="overflow-x-auto">
+            <div id="rs-calendar-body"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div><!-- end #page-panel-route -->
 
   <script is:inline>
     var scheduleData = [];
@@ -1063,6 +1260,306 @@ import MainLayout from '../layouts/MainLayout.astro';
         (type === 'warning' ? 'bg-yellow-500 text-white' : type === 'error' ? 'bg-red-500 text-white' : 'bg-green-500 text-white');
       document.body.appendChild(t);
       setTimeout(function () { t.remove(); }, 2500);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // ── Page-level tab switching ──────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════════
+    function switchPageTab(tab) {
+      var isStaff = tab === 'staff';
+      document.getElementById('page-panel-staff').classList.toggle('hidden', !isStaff);
+      document.getElementById('page-panel-route').classList.toggle('hidden', isStaff);
+      var activeClass   = 'px-5 py-3 text-sm font-semibold text-orange-500 border-b-2 border-orange-500 -mb-px transition';
+      var inactiveClass = 'px-5 py-3 text-sm font-medium text-gray-400 border-b-2 border-transparent -mb-px hover:text-gray-600 transition';
+      document.getElementById('page-tab-staff').className = isStaff ? activeClass : inactiveClass;
+      document.getElementById('page-tab-route').className  = isStaff ? inactiveClass : activeClass;
+      if (!isStaff && !rsDataLoaded) loadRSData();
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // ── Route Setting Schedule ────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════════
+    var rsData       = [];
+    var rsDataLoaded = false;
+    var rsCurrentMonth;  // Date set to 1st of the currently displayed month
+    var rsEditingId  = null;
+
+    function tryParseJSON(str, fallback) {
+      try { var v = JSON.parse(str); return Array.isArray(v) ? v : fallback; }
+      catch (_) { return fallback; }
+    }
+
+    function parseRSEntry(e) {
+      return {
+        id:      e.id,
+        date:    e.date,
+        walls:   tryParseJSON(e.walls,   []),
+        setters: tryParseJSON(e.setters, []),
+        styles:  tryParseJSON(e.styles,  []),
+        notes:   e.notes || ''
+      };
+    }
+
+    function loadRSData() {
+      rsDataLoaded = true;
+      apiFetch('/api/routesetting')
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          rsData = (data.entries || []).map(parseRSEntry);
+          renderRSCalendar();
+        })
+        .catch(function (err) { showToast('Failed to load routesetting data: ' + err.message, 'error'); });
+    }
+
+    // ── Monthly calendar renderer ─────────────────────────────────────────────
+    function getMonthStart(date) {
+      return new Date(date.getFullYear(), date.getMonth(), 1);
+    }
+
+    function renderRSCalendar() {
+      if (!rsCurrentMonth) rsCurrentMonth = getMonthStart(new Date());
+
+      var MONTH_NAMES = ['January','February','March','April','May','June',
+                         'July','August','September','October','November','December'];
+      document.getElementById('rs-month-label').textContent =
+        MONTH_NAMES[rsCurrentMonth.getMonth()] + ' ' + rsCurrentMonth.getFullYear();
+
+      // Find the Monday on or before the 1st of the month
+      var firstDay = new Date(rsCurrentMonth);
+      var dow = firstDay.getDay(); // 0=Sun .. 6=Sat
+      var offset = dow === 0 ? -6 : 1 - dow; // back to Monday
+      var calStart = new Date(firstDay);
+      calStart.setDate(firstDay.getDate() + offset);
+
+      var todayISO = fmtDate(new Date());
+      var DAY_HEADERS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+      var html = '<table class="w-full border-collapse" style="min-width:480px">';
+
+      // Header row
+      html += '<thead><tr>';
+      DAY_HEADERS.forEach(function (d) {
+        var isMon = d === 'Mon';
+        html += '<th class="pb-2 text-center text-xs font-semibold uppercase tracking-wide ' +
+          (isMon ? 'text-purple-600' : 'text-gray-400') + '">' + d + '</th>';
+      });
+      html += '</tr></thead><tbody>';
+
+      var cur = new Date(calStart);
+      for (var week = 0; week < 6; week++) {
+        html += '<tr>';
+        for (var col = 0; col < 7; col++) {
+          var curISO  = fmtDate(cur);
+          var inMonth = cur.getMonth() === rsCurrentMonth.getMonth();
+          var isToday = curISO === todayISO;
+          var isMonday = col === 0;
+
+          var entries = rsData.filter(function (e) { return e.date === curISO; });
+
+          var cellClass = 'border border-gray-100 p-1.5 align-top ';
+          if (isMonday && inMonth) cellClass += 'bg-purple-50/50 ';
+          if (isToday) cellClass += 'ring-2 ring-inset ring-orange-400 ';
+
+          var numClass = 'text-xs font-semibold mb-1 ';
+          if (!inMonth)       numClass += 'text-gray-300';
+          else if (isToday)   numClass += 'text-orange-500';
+          else if (isMonday)  numClass += 'text-purple-600';
+          else                numClass += 'text-gray-600';
+
+          html += '<td class="' + cellClass + '" style="min-width:72px;height:72px">';
+          html += '<div class="' + numClass + '">' + cur.getDate() + '</div>';
+
+          entries.forEach(function (entry) {
+            var wallStr   = entry.walls.join(', ') || '—';
+            var setterStr = entry.setters.map(function (s) {
+              return escHtml(s.name) + ' <span class="opacity-60">(' + s.routes + ')</span>';
+            }).join(', ');
+            var tooltipText = wallStr + '\n' +
+              entry.setters.map(function (s) { return s.name + ': ' + s.routes + ' routes'; }).join(', ') +
+              (entry.styles.length ? '\nStyles: ' + entry.styles.join(', ') : '') +
+              (entry.notes ? '\nNotes: ' + entry.notes : '');
+            var safeId = escHtml(String(entry.id));
+
+            html += '<div class="mb-1 px-1.5 py-1 rounded bg-purple-100 border border-purple-200 ' +
+              'text-xs text-purple-800 cursor-default group" title="' + escHtml(tooltipText) + '">' +
+              '<div class="font-semibold truncate">' + escHtml(wallStr) + '</div>' +
+              '<div class="text-purple-600 truncate leading-snug">' + setterStr + '</div>' +
+              (entry.styles.length
+                ? '<div class="text-purple-500 truncate opacity-75">' + escHtml(entry.styles.join(', ')) + '</div>'
+                : '') +
+              '<div class="flex gap-0.5 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">' +
+              '<button onclick="openRSEdit(\'' + safeId + '\')" type="button" title="Edit" ' +
+              'class="p-0.5 rounded hover:bg-purple-300 transition">' +
+              '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+              '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" ' +
+              'd="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>' +
+              '</svg></button>' +
+              '<button onclick="deleteRSEntry(\'' + safeId + '\')" type="button" title="Delete" ' +
+              'class="p-0.5 rounded hover:bg-purple-300 transition">' +
+              '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+              '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" ' +
+              'd="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>' +
+              '</svg></button>' +
+              '</div>' +
+              '</div>';
+          });
+
+          html += '</td>';
+          cur.setDate(cur.getDate() + 1);
+        }
+        html += '</tr>';
+        // Stop after 5 rows if the whole month is already covered
+        if (week >= 4 && cur.getMonth() !== rsCurrentMonth.getMonth()) break;
+      }
+
+      html += '</tbody></table>';
+      document.getElementById('rs-calendar-body').innerHTML = html;
+    }
+
+    function rsNavMonth(dir) {
+      if (!rsCurrentMonth) rsCurrentMonth = getMonthStart(new Date());
+      rsCurrentMonth = new Date(rsCurrentMonth.getFullYear(), rsCurrentMonth.getMonth() + dir, 1);
+      renderRSCalendar();
+    }
+
+    function rsGoToday() {
+      rsCurrentMonth = getMonthStart(new Date());
+      renderRSCalendar();
+    }
+
+    // ── Setter checkbox toggle ────────────────────────────────────────────────
+    function toggleSetterInput(cb) {
+      var input = document.querySelector('.rs-routes-input[data-setter="' + cb.value + '"]');
+      if (!input) return;
+      input.classList.toggle('hidden', !cb.checked);
+      if (!cb.checked) input.value = '';
+    }
+
+    // ── Route setting form submit (create + update) ───────────────────────────
+    document.getElementById('rs-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var errEl = document.getElementById('rs-form-error');
+      errEl.classList.add('hidden');
+
+      var date = document.getElementById('rs-date').value;
+      var walls = Array.from(document.querySelectorAll('.rs-wall-cb:checked'))
+        .map(function (cb) { return cb.value; });
+      var setters = Array.from(document.querySelectorAll('.rs-setter-cb:checked'))
+        .map(function (cb) {
+          var inp = document.querySelector('.rs-routes-input[data-setter="' + cb.value + '"]');
+          return { name: cb.value, routes: parseInt((inp && inp.value) || '0', 10) || 0 };
+        });
+      var styles = Array.from(document.querySelectorAll('.rs-style-cb:checked'))
+        .map(function (cb) { return cb.value; });
+      var notes = document.getElementById('rs-notes').value.trim();
+
+      if (!date)          { errEl.textContent = 'Please select a setting date.';        errEl.classList.remove('hidden'); return; }
+      if (!walls.length)  { errEl.textContent = 'Please select at least one wall.';     errEl.classList.remove('hidden'); return; }
+      if (!setters.length){ errEl.textContent = 'Please select at least one setter.';   errEl.classList.remove('hidden'); return; }
+
+      var isEdit  = !!rsEditingId;
+      var url     = isEdit ? '/api/routesetting/' + rsEditingId : '/api/routesetting';
+      var method  = isEdit ? 'PATCH' : 'POST';
+
+      var btn = document.getElementById('rs-submit-btn');
+      btn.disabled = true; btn.textContent = 'Saving…';
+
+      apiFetch(url, {
+        method: method,
+        body: JSON.stringify({
+          date:    date,
+          walls:   JSON.stringify(walls),
+          setters: JSON.stringify(setters),
+          styles:  JSON.stringify(styles),
+          notes:   notes
+        })
+      })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          btn.disabled = false;
+          btn.textContent = isEdit ? 'Update Session' : 'Save Session';
+          if (data.error) { errEl.textContent = data.error; errEl.classList.remove('hidden'); return; }
+
+          var parsed = parseRSEntry(data.entry);
+          if (isEdit) {
+            for (var i = 0; i < rsData.length; i++) {
+              if (String(rsData[i].id) === String(rsEditingId)) { rsData[i] = parsed; break; }
+            }
+          } else {
+            rsData.unshift(parsed);
+          }
+          rsCurrentMonth = getMonthStart(new Date(date + 'T00:00:00'));
+          renderRSCalendar();
+          resetRSForm();
+          showToast(isEdit ? 'Session updated!' : 'Routesetting session saved!');
+        })
+        .catch(function (err) {
+          btn.disabled = false;
+          btn.textContent = isEdit ? 'Update Session' : 'Save Session';
+          errEl.textContent = 'Save failed: ' + err.message;
+          errEl.classList.remove('hidden');
+        });
+    });
+
+    function resetRSForm() {
+      rsEditingId = null;
+      document.getElementById('rs-date').value = '';
+      document.querySelectorAll('.rs-wall-cb, .rs-setter-cb, .rs-style-cb').forEach(function (cb) { cb.checked = false; });
+      document.querySelectorAll('.rs-routes-input').forEach(function (inp) { inp.value = ''; inp.classList.add('hidden'); });
+      document.getElementById('rs-notes').value = '';
+      document.getElementById('rs-submit-btn').textContent = 'Save Session';
+      document.getElementById('rs-cancel-btn').classList.add('hidden');
+    }
+
+    function cancelRSEdit() {
+      resetRSForm();
+    }
+
+    function openRSEdit(id) {
+      var entry = rsData.filter(function (e) { return String(e.id) === String(id); })[0];
+      if (!entry) return;
+      rsEditingId = id;
+
+      document.getElementById('rs-date').value = entry.date;
+
+      document.querySelectorAll('.rs-wall-cb').forEach(function (cb) {
+        cb.checked = entry.walls.indexOf(cb.value) !== -1;
+      });
+
+      document.querySelectorAll('.rs-setter-cb').forEach(function (cb) {
+        var sd = entry.setters.filter(function (s) { return s.name === cb.value; })[0];
+        cb.checked = !!sd;
+        var inp = document.querySelector('.rs-routes-input[data-setter="' + cb.value + '"]');
+        if (inp) {
+          if (sd) { inp.value = sd.routes; inp.classList.remove('hidden'); }
+          else    { inp.value = '';        inp.classList.add('hidden'); }
+        }
+      });
+
+      document.querySelectorAll('.rs-style-cb').forEach(function (cb) {
+        cb.checked = entry.styles.indexOf(cb.value) !== -1;
+      });
+
+      document.getElementById('rs-notes').value = entry.notes;
+      document.getElementById('rs-submit-btn').textContent = 'Update Session';
+      document.getElementById('rs-cancel-btn').classList.remove('hidden');
+
+      // Scroll the form into view
+      document.getElementById('rs-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      showToast('Session loaded — edit and click Update Session.', '');
+    }
+
+    function deleteRSEntry(id) {
+      if (!confirm('Delete this routesetting session?')) return;
+      apiFetch('/api/routesetting/' + id, { method: 'DELETE' })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if (data.error) { showToast('Delete failed: ' + data.error, 'error'); return; }
+          rsData = rsData.filter(function (e) { return String(e.id) !== String(id); });
+          renderRSCalendar();
+          showToast('Session deleted.', 'warning');
+        })
+        .catch(function (err) { showToast('Delete failed: ' + err.message, 'error'); });
     }
   </script>
 </MainLayout>

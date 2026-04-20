@@ -19,16 +19,37 @@ const { title, activePage = '' } = Astro.props;
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
   <!-- DataTables CSS -->
-  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css" />
-  <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.dataTables.min.css" />
+  <link rel="stylesheet"
+        href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css"
+        integrity="sha384-cya1SKeBBe5YTpHgx4WoICmzqkoHTxoGqjPySUq2nLksbJ/JiKXX2RmhyLz6jwST"
+        crossorigin="anonymous" />
+  <link rel="stylesheet"
+        href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.dataTables.min.css"
+        integrity="sha384-dQZQS3OJyqbS/bx7sHpCjzRa7/roDU1cGuIKAqfNCjHGMG/jUFKCdaFsIwwKQFEJ"
+        crossorigin="anonymous" />
 
   <!-- jQuery + DataTables JS (synchronous so all page scripts can use $) -->
   <!-- is:inline prevents Astro/Vite from converting these to async ES modules -->
-  <script is:inline src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-  <script is:inline src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
-  <script is:inline src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
-  <script is:inline src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script is:inline src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+  <script is:inline
+          src="https://code.jquery.com/jquery-3.7.1.min.js"
+          integrity="sha384-1H217gwSVyLSIfaLxHbE7dRb3v4mYCKbpQvzx0cegeju1MVsGrX5xXxAvs/HgeFs"
+          crossorigin="anonymous"></script>
+  <script is:inline
+          src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"
+          integrity="sha384-Udt767MMeKelGRBxaCfxX88YDLbViYdQ7T/gkRoB197Jf+OviZ+lsaRAOpS/MIjf"
+          crossorigin="anonymous"></script>
+  <script is:inline
+          src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"
+          integrity="sha384-D7Ifmm6VZVyjXndPxbvw6UXiK3Vixw1lgK5y+0pVVaQvzHPCpx8atng0IjL5wdcQ"
+          crossorigin="anonymous"></script>
+  <script is:inline
+          src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
+          integrity="sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG"
+          crossorigin="anonymous"></script>
+  <script is:inline
+          src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"
+          integrity="sha384-On4D3nN2gGDU45v05twd+TTLH8PL+2gbsGVpnKEpSfv7pDd1pgEJxxc4k7iWeg9d"
+          crossorigin="anonymous"></script>
 
   <!-- Auth guard: hide body until verified -->
   <style>
@@ -299,15 +320,21 @@ const { title, activePage = '' } = Astro.props;
     if (_nameEl) _nameEl.textContent = _user;
     if (_avatarEl) _avatarEl.textContent = _user.charAt(0).toUpperCase();
 
-    // Logout
-    function doLogout() {
+    // Logout — revoke token server-side before clearing local state.
+    async function doLogout() {
       if (confirm('Log out?')) {
+        var token = sessionStorage.getItem('bbo_token') || '';
+        if (token) {
+          try {
+            await fetch('/api/auth/logout', {
+              method: 'POST',
+              headers: { 'Authorization': 'Bearer ' + token },
+            });
+          } catch (_) { /* network error is fine — local cleanup still proceeds */ }
+        }
         sessionStorage.removeItem('bbo_auth');
         sessionStorage.removeItem('bbo_token');
         sessionStorage.removeItem('bbo_admin');
-        localStorage.removeItem('bbo_auth');
-        localStorage.removeItem('bbo_token');
-        localStorage.removeItem('bbo_admin');
         window.location.replace('/');
       }
     }

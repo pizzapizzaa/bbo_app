@@ -4,6 +4,7 @@ import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
 import { ok, serverError } from '../../../lib/auth';
 import { fetchAllPages } from '../../../lib/paginate';
+import { isValidDate, isValidTime, MAX_TEXT } from '../../../lib/validate';
 
 /** GET /api/events — public, returns all event entries ordered by date/time */
 export const GET: APIRoute = async () => {
@@ -42,6 +43,15 @@ export const POST: APIRoute = async ({ request }) => {
   }
   if (!date || !start_time || !end_time) {
     return new Response(JSON.stringify({ error: 'Missing required fields: date, start_time, end_time' }), { status: 400 });
+  }
+  if (!isValidDate(date)) {
+    return new Response(JSON.stringify({ error: 'Invalid date format (expected YYYY-MM-DD)' }), { status: 400 });
+  }
+  if (!isValidTime(start_time) || !isValidTime(end_time)) {
+    return new Response(JSON.stringify({ error: 'Invalid time format (expected HH:MM)' }), { status: 400 });
+  }
+  if ((title ?? '').length > MAX_TEXT || (description ?? '').length > MAX_TEXT) {
+    return new Response(JSON.stringify({ error: 'title or description exceeds maximum length' }), { status: 400 });
   }
 
   const { data, error } = await db

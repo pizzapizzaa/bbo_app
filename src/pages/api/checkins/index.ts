@@ -4,6 +4,7 @@ import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
 import { ok, serverError } from '../../../lib/auth';
 import { fetchAllPages } from '../../../lib/paginate';
+import { isValidDate, isValidTime, MAX_NAME, MAX_TEXT, escapeLike } from '../../../lib/validate';
 
 /** GET /api/checkins?date=YYYY-MM-DD          — single date
  *  GET /api/checkins?from=YYYY-MM-DD&to=YYYY-MM-DD — inclusive date range */
@@ -11,6 +12,14 @@ export const GET: APIRoute = async ({ url }) => {
   const date = url.searchParams.get('date');
   const from = url.searchParams.get('from');
   const to   = url.searchParams.get('to');
+
+  // Validate date params to prevent unexpected query behaviour
+  if (date && !isValidDate(date)) {
+    return new Response(JSON.stringify({ error: 'Invalid date format' }), { status: 400 });
+  }
+  if ((from && !isValidDate(from)) || (to && !isValidDate(to))) {
+    return new Response(JSON.stringify({ error: 'Invalid from/to date format' }), { status: 400 });
+  }
 
   let query = db
     .from('checkins')
@@ -57,13 +66,25 @@ export const POST: APIRoute = async ({ request }) => {
   if (!customer_name || !date || !time || !payment_method) {
     return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400 });
   }
+  if (String(customer_name).length > MAX_NAME) {
+    return new Response(JSON.stringify({ error: 'customer_name too long' }), { status: 400 });
+  }
+  if (!isValidDate(date)) {
+    return new Response(JSON.stringify({ error: 'Invalid date format (expected YYYY-MM-DD)' }), { status: 400 });
+  }
+  if (!isValidTime(time.slice(0, 5))) {
+    return new Response(JSON.stringify({ error: 'Invalid time format (expected HH:MM)' }), { status: 400 });
+  }
+  if ((notes ?? '').length > MAX_TEXT) {
+    return new Response(JSON.stringify({ error: 'notes exceeds maximum length' }), { status: 400 });
+  }
 
   // Validate membership when payment is "Valid Membership"
   if (payment_method === 'Valid Membership') {
     const { data: memberData } = await db
       .from('customers')
       .select('membership_type, membership_end_date')
-      .ilike('full_name', customer_name)
+      .ilike('full_name', escapeLike(customer_name))
       .limit(1)
       .single();
 
@@ -100,7 +121,7 @@ export const POST: APIRoute = async ({ request }) => {
   const { data: existing } = await db
     .from('customers')
     .select('id')
-    .ilike('full_name', customer_name)
+    .ilike('full_name', escapeLike(customer_name))
     .limit(1)
     .maybeSingle();
 
@@ -139,7 +160,7 @@ export const POST: APIRoute = async ({ request }) => {
     const { data: cust } = await db
       .from('customers')
       .select('id, punches_remaining, pt_punches_remaining, membership_end_date')
-      .ilike('full_name', customer_name)
+      .ilike('full_name', escapeLike(customer_name))
       .limit(1)
       .maybeSingle();
 

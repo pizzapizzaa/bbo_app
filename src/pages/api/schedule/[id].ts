@@ -3,11 +3,12 @@ export const prerender = false;
 import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
 import { ok, serverError } from '../../../lib/auth';
+import { isValidUUID, isValidDate, isValidTime, MAX_NAME } from '../../../lib/validate';
 
 /** PATCH /api/schedule/:id — update an existing entry */
 export const PATCH: APIRoute = async ({ params, request }) => {
   const { id } = params;
-  if (!id) return new Response(JSON.stringify({ error: 'Missing id' }), { status: 400 });
+  if (!id || !isValidUUID(id)) return new Response(JSON.stringify({ error: 'Invalid id' }), { status: 400 });
 
   let body: { staff_name?: string; date?: string; start_time?: string; end_time?: string; notes?: string };
   try { body = await request.json(); }
@@ -16,6 +17,15 @@ export const PATCH: APIRoute = async ({ params, request }) => {
   const { staff_name, date, start_time, end_time, notes } = body;
   if (!staff_name || !date || !start_time || !end_time) {
     return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400 });
+  }
+  if (String(staff_name).length > MAX_NAME) {
+    return new Response(JSON.stringify({ error: 'staff_name too long' }), { status: 400 });
+  }
+  if (!isValidDate(String(date))) {
+    return new Response(JSON.stringify({ error: 'Invalid date format (expected YYYY-MM-DD)' }), { status: 400 });
+  }
+  if (!isValidTime(String(start_time)) || !isValidTime(String(end_time))) {
+    return new Response(JSON.stringify({ error: 'Invalid time format (expected HH:MM)' }), { status: 400 });
   }
 
   const { data, error } = await db
@@ -32,7 +42,7 @@ export const PATCH: APIRoute = async ({ params, request }) => {
 /** DELETE /api/schedule/:id */
 export const DELETE: APIRoute = async ({ params }) => {
   const { id } = params;
-  if (!id) return new Response(JSON.stringify({ error: 'Missing id' }), { status: 400 });
+  if (!id || !isValidUUID(id)) return new Response(JSON.stringify({ error: 'Invalid id' }), { status: 400 });
 
   const { error } = await db
     .from('schedule_entries')

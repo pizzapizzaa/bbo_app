@@ -280,14 +280,14 @@
     var isAdmin          = false;
 
     // ── Auth helpers ───────────────────────────────────────────────────────
-    // Check sessionStorage first (same-tab navigation), then localStorage
-    // (new-tab or direct URL navigation while logged in on another tab).
+    // Admin controls are visible only in the same session (sessionStorage).
+    // Tokens are never stored in localStorage to limit XSS exposure.
     function checkAdmin() {
-      return !!sessionStorage.getItem('bbo_auth') || !!localStorage.getItem('bbo_auth');
+      return !!sessionStorage.getItem('bbo_auth');
     }
 
     function getToken() {
-      return sessionStorage.getItem('bbo_token') || localStorage.getItem('bbo_token') || '';
+      return sessionStorage.getItem('bbo_token') || '';
     }
 
     function apiFetch(url, opts) {
