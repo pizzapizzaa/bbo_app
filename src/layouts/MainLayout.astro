@@ -404,8 +404,8 @@ const { title, activePage = '' } = Astro.props;
             localStorage.removeItem('bbo_auth');
             localStorage.removeItem('bbo_token');
             localStorage.removeItem('bbo_admin');
-            window.location.replace('/');
-            return new Promise(function () {}); // never resolves — redirect in progress
+            setTimeout(function () { window.location.replace('/'); }, 1500);
+            return Promise.reject(new Error('Session expired. Redirecting to login…'));
           }
           return res;
         });
