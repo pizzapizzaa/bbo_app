@@ -273,14 +273,6 @@ import MainLayout from '../layouts/MainLayout.astro';
 
     var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-    // ── API helper ──
-    function apiFetch(url, options) {
-      var token = localStorage.getItem('bbo_token') || '';
-      var headers = { 'Authorization': 'Bearer ' + token };
-      if (options && options.body) headers['Content-Type'] = 'application/json';
-      return fetch(url, Object.assign({}, options, { headers: headers }));
-    }
-
     $(document).ready(function () {
       var now = new Date();
 

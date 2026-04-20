@@ -286,16 +286,6 @@
       return !!localStorage.getItem('bbo_auth');
     }
 
-    function getToken() {
-      return localStorage.getItem('bbo_token') || '';
-    }
-
-    function apiFetch(url, opts) {
-      var hdrs = { 'Authorization': 'Bearer ' + getToken() };
-      if (opts && opts.body) hdrs['Content-Type'] = 'application/json';
-      return fetch(url, Object.assign({}, opts || {}, { headers: hdrs }));
-    }
-
     // ── Date / time helpers ────────────────────────────────────────────────
     function getWeekStart(d) {
       var dt = new Date(d);

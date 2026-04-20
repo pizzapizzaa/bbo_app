@@ -955,18 +955,6 @@ import MainLayout from '../layouts/MainLayout.astro';
         });
     }
 
-    // ── API helper ──
-    function apiFetch(url, options) {
-      var token = localStorage.getItem('bbo_token') || '';
-      var defaults = { headers: { 'Authorization': 'Bearer ' + token } };
-      if (options && options.body) {
-        defaults.headers['Content-Type'] = 'application/json';
-      }
-      return fetch(url, Object.assign({}, defaults, options, {
-        headers: Object.assign(defaults.headers, options && options.headers)
-      }));
-    }
-
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') { closeAddModal(); closeEditPunchModal(); closeEditMembershipModal(); closeEditPTPunchModal(); closeColumnsDropdown(); }
     });

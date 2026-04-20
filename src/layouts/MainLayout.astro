@@ -144,7 +144,11 @@ const { title, activePage = '' } = Astro.props;
         sessionStorage.removeItem('bbo_admin');
       }
 
-      if (!localStorage.getItem('bbo_auth')) {
+      // Guard: must have both the auth flag AND a non-empty token
+      if (!localStorage.getItem('bbo_auth') || !localStorage.getItem('bbo_token')) {
+        localStorage.removeItem('bbo_auth');
+        localStorage.removeItem('bbo_token');
+        localStorage.removeItem('bbo_admin');
         window.location.replace('/');
         return;
       }
@@ -386,6 +390,25 @@ const { title, activePage = '' } = Astro.props;
         localStorage.removeItem('bbo_admin');
         window.location.replace('/');
       }
+    }
+
+    // Global apiFetch — shared by all page scripts loaded after this layout.
+    // Automatically attaches the Bearer token and redirects to login on 401.
+    function apiFetch(url, options) {
+      var token = localStorage.getItem('bbo_token') || '';
+      var headers = { 'Authorization': 'Bearer ' + token };
+      if (options && options.body) headers['Content-Type'] = 'application/json';
+      return fetch(url, Object.assign({}, options, { headers: headers }))
+        .then(function (res) {
+          if (res.status === 401) {
+            localStorage.removeItem('bbo_auth');
+            localStorage.removeItem('bbo_token');
+            localStorage.removeItem('bbo_admin');
+            window.location.replace('/');
+            return new Promise(function () {}); // never resolves — redirect in progress
+          }
+          return res;
+        });
     }
 
     // Mobile sidebar toggle

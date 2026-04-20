@@ -598,14 +598,6 @@ import MainLayout from '../layouts/MainLayout.astro';
       { bg: '#E0E7FF', text: '#3730A3', border: '#818CF8' }
     ];
 
-    // ── API helper ──
-    function apiFetch(url, options) {
-      var token = localStorage.getItem('bbo_token') || '';
-      var headers = { 'Authorization': 'Bearer ' + token };
-      if (options && options.body) headers['Content-Type'] = 'application/json';
-      return fetch(url, Object.assign({}, options, { headers: headers }));
-    }
-
     $(document).ready(function () {
       document.getElementById('f-date').value = new Date().toISOString().slice(0, 10);
       currentWeekStart = getWeekStart(new Date());

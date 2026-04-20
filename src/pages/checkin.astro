@@ -396,14 +396,6 @@ import MainLayout from '../layouts/MainLayout.astro';
     var activeTo     = '';
     var allCustomers = [];  // cache with punch card info
 
-    // ── API helper ──
-    function apiFetch(url, options) {
-      var token = localStorage.getItem('bbo_token') || '';
-      var headers = { 'Authorization': 'Bearer ' + token };
-      if (options && options.body) headers['Content-Type'] = 'application/json';
-      return fetch(url, Object.assign({}, options, { headers: headers }));
-    }
-
     $(document).ready(function () {
       var now   = new Date();
       var today = now.toISOString().slice(0, 10);

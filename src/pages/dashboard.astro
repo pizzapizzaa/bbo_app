@@ -131,11 +131,6 @@ import MainLayout from '../layouts/MainLayout.astro';
   </div>
 
   <script is:inline>
-    function apiFetch(url) {
-      var token = localStorage.getItem('bbo_token') || '';
-      return fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
-    }
-
     $(document).ready(function () {
       var today = new Date().toISOString().slice(0, 10);
 
