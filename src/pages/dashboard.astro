@@ -132,7 +132,7 @@ import MainLayout from '../layouts/MainLayout.astro';
 
   <script is:inline>
     function apiFetch(url) {
-      var token = sessionStorage.getItem('bbo_token') || '';
+      var token = localStorage.getItem('bbo_token') || '';
       return fetch(url, { headers: { 'Authorization': 'Bearer ' + token } });
     }
 

@@ -28,9 +28,9 @@ export function revokeToken(token: string): void {
   if (revokedTokens.size > 10_000) revokedTokens.clear();
 }
 
-/** Issue a signed session token that expires in 12 hours. */
+/** Issue a signed session token that expires in 30 days. */
 export function signToken(username: string): string {
-  const exp     = Date.now() + 12 * 60 * 60 * 1000;
+  const exp     = Date.now() + 30 * 24 * 60 * 60 * 1000;
   const payload = `${username}.${exp}`;
   const sig     = createHmac('sha256', getSecret()).update(payload).digest('hex');
   return Buffer.from(`${payload}.${sig}`).toString('base64url');

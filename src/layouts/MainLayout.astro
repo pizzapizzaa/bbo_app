@@ -134,13 +134,52 @@ const { title, activePage = '' } = Astro.props;
 
   <script is:inline>
     (function () {
-      if (!sessionStorage.getItem('bbo_auth')) {
+      if (!localStorage.getItem('bbo_auth')) {
         window.location.replace('/');
-      } else {
-        document.addEventListener('DOMContentLoaded', function () {
-          document.body.style.display = '';
-        });
+        return;
       }
+      document.addEventListener('DOMContentLoaded', function () {
+        document.body.style.display = '';
+      });
+
+      // ── Auto-refresh: silently renew the token when within 7 days of expiry ──
+      function tryDecodeTokenExp(token) {
+        try {
+          var decoded = atob(token.replace(/-/g, '+').replace(/_/g, '/'));
+          var parts = decoded.split('.');
+          // format: username.exp.sig — exp is second-to-last segment
+          return parseInt(parts[parts.length - 2], 10) || 0;
+        } catch (_) { return 0; }
+      }
+
+      function maybeRefreshToken() {
+        var token = localStorage.getItem('bbo_token');
+        if (!token) return;
+        var exp = tryDecodeTokenExp(token);
+        if (!exp) return;
+        var now = Date.now();
+        // Expired — force logout
+        if (now >= exp) {
+          localStorage.removeItem('bbo_auth');
+          localStorage.removeItem('bbo_token');
+          localStorage.removeItem('bbo_admin');
+          window.location.replace('/');
+          return;
+        }
+        // Within 7 days of expiry — refresh silently
+        if (exp - now < 7 * 24 * 60 * 60 * 1000) {
+          fetch('/api/auth/refresh', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token }
+          })
+            .then(function (r) { return r.json(); })
+            .then(function (d) { if (d.token) localStorage.setItem('bbo_token', d.token); })
+            .catch(function () {});
+        }
+      }
+
+      maybeRefreshToken();
+      setInterval(maybeRefreshToken, 60 * 60 * 1000); // re-check every hour
     })();
   </script>
 </head>
@@ -314,7 +353,7 @@ const { title, activePage = '' } = Astro.props;
     setInterval(refreshDatetime, 30000);
 
     // Populate user info
-    var _user = sessionStorage.getItem('bbo_admin') || 'Admin';
+    var _user = localStorage.getItem('bbo_admin') || 'Admin';
     var _nameEl = document.getElementById('user-name');
     var _avatarEl = document.getElementById('user-avatar');
     if (_nameEl) _nameEl.textContent = _user;
@@ -323,7 +362,7 @@ const { title, activePage = '' } = Astro.props;
     // Logout — revoke token server-side before clearing local state.
     async function doLogout() {
       if (confirm('Log out?')) {
-        var token = sessionStorage.getItem('bbo_token') || '';
+        var token = localStorage.getItem('bbo_token') || '';
         if (token) {
           try {
             await fetch('/api/auth/logout', {
@@ -332,9 +371,9 @@ const { title, activePage = '' } = Astro.props;
             });
           } catch (_) { /* network error is fine — local cleanup still proceeds */ }
         }
-        sessionStorage.removeItem('bbo_auth');
-        sessionStorage.removeItem('bbo_token');
-        sessionStorage.removeItem('bbo_admin');
+        localStorage.removeItem('bbo_auth');
+        localStorage.removeItem('bbo_token');
+        localStorage.removeItem('bbo_admin');
         window.location.replace('/');
       }
     }

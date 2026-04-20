@@ -283,11 +283,11 @@
     // Admin controls are visible only in the same session (sessionStorage).
     // Tokens are never stored in localStorage to limit XSS exposure.
     function checkAdmin() {
-      return !!sessionStorage.getItem('bbo_auth');
+      return !!localStorage.getItem('bbo_auth');
     }
 
     function getToken() {
-      return sessionStorage.getItem('bbo_token') || '';
+      return localStorage.getItem('bbo_token') || '';
     }
 
     function apiFetch(url, opts) {
