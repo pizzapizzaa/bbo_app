@@ -1,9 +1,15 @@
-import { createHmac, timingSafeEqual } from 'crypto';
+import { createHmac, createHash, timingSafeEqual } from 'crypto';
+import { db } from './db';
 
-/**
- * Lazily read SESSION_SECRET so that a missing value throws at runtime
- * (per-request) rather than silently using an insecure fallback.
- */
+// ── Types ─────────────────────────────────────────────────────────────────────
+export type UserRole = 'admin' | 'staff';
+
+export interface AuthInfo {
+  username: string;
+  role: UserRole;
+}
+
+// ── Secret ────────────────────────────────────────────────────────────────────
 function getSecret(): string {
   const secret = import.meta.env.SESSION_SECRET;
   if (!secret) {
@@ -15,68 +21,130 @@ function getSecret(): string {
   return secret;
 }
 
-/**
- * In-memory token revocation list.
- * Survives warm-function restarts; cleared on cold start.
- * For persistent revocation, store revoked tokens in the database.
- */
-const revokedTokens = new Set<string>();
+// ── Token signing ─────────────────────────────────────────────────────────────
+// Token lifetime reduced to 8 h; the /api/auth/refresh endpoint handles
+// automatic renewal so active sessions are unaffected.
+const TOKEN_TTL_MS = 8 * 60 * 60 * 1000;
 
-export function revokeToken(token: string): void {
-  revokedTokens.add(token);
-  // Guard against unbounded growth in long-lived instances.
-  if (revokedTokens.size > 10_000) revokedTokens.clear();
+// Token format: base64url(JSON{u,r,e}) + "." + base64url(HMAC-SHA256)
+// where u=username, r=role, e=expiry_epoch_ms
+// This format embeds role in the signed payload, avoiding ambiguous dot-splitting.
+
+/** Issue a signed session token for the given user. */
+export function signToken(username: string, role: UserRole): string {
+  const payload = Buffer.from(
+    JSON.stringify({ u: username, r: role, e: Date.now() + TOKEN_TTL_MS })
+  ).toString('base64url');
+  const sig = createHmac('sha256', getSecret()).update(payload).digest('base64url');
+  return `${payload}.${sig}`;
 }
 
-/** Issue a signed session token that expires in 30 days. */
-export function signToken(username: string): string {
-  const exp     = Date.now() + 30 * 24 * 60 * 60 * 1000;
-  const payload = `${username}.${exp}`;
-  const sig     = createHmac('sha256', getSecret()).update(payload).digest('hex');
-  return Buffer.from(`${payload}.${sig}`).toString('base64url');
-}
-
+// ── Token verification ────────────────────────────────────────────────────────
 /**
  * Verify a session token.
- * Returns the username if valid, null otherwise.
+ * Returns AuthInfo if the token is valid and not revoked, null otherwise.
+ * Performs a DB-backed revocation check, loading from Supabase on cold start
+ * and using the in-memory cache for warm invocations.
  */
-export function verifyToken(token: string): string | null {
+export async function verifyToken(token: string): Promise<AuthInfo | null> {
   try {
-    // Reject tokens that have been explicitly revoked via /api/auth/logout.
-    if (revokedTokens.has(token)) return null;
+    const dot = token.lastIndexOf('.');
+    if (dot < 0) return null;
 
-    const decoded = Buffer.from(token, 'base64url').toString('utf-8');
-    // Format: username.exp.sig  (username may contain dots — split from the right)
-    const lastDot   = decoded.lastIndexOf('.');
-    const sig       = decoded.slice(lastDot + 1);
-    const payload   = decoded.slice(0, lastDot);
+    const payload = token.slice(0, dot);
+    const sig     = token.slice(dot + 1);
 
-    const expectedSig = createHmac('sha256', getSecret()).update(payload).digest('hex');
+    const expectedSig = createHmac('sha256', getSecret()).update(payload).digest('base64url');
 
     // Timing-safe comparison
-    const sigBuf = Buffer.from(sig,         'hex');
-    const expBuf = Buffer.from(expectedSig, 'hex');
+    const sigBuf = Buffer.from(sig,         'base64url');
+    const expBuf = Buffer.from(expectedSig, 'base64url');
     if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) return null;
 
-    // Check expiry
-    const dotIdx  = payload.lastIndexOf('.');
-    const exp     = parseInt(payload.slice(dotIdx + 1), 10);
-    const username = payload.slice(0, dotIdx);
-    if (!username || Date.now() > exp) return null;
+    const { u, r, e } = JSON.parse(Buffer.from(payload, 'base64url').toString('utf-8'));
+    if (!u || !r || !e || Date.now() > e) return null;
 
-    return username;
+    if (await isTokenRevoked(token)) return null;
+
+    return { username: String(u), role: r as UserRole };
   } catch {
     return null;
   }
 }
 
 /** Extract and verify the Bearer token from an Authorization header. */
-export function authFromRequest(request: Request): string | null {
+export async function authFromRequest(request: Request): Promise<AuthInfo | null> {
   const header = request.headers.get('Authorization') ?? '';
   const token  = header.startsWith('Bearer ') ? header.slice(7).trim() : null;
   return token ? verifyToken(token) : null;
 }
 
+/** Returns AuthInfo if the request carries a valid admin token, null otherwise. */
+export async function requireAdmin(request: Request): Promise<AuthInfo | null> {
+  const auth = await authFromRequest(request);
+  return auth?.role === 'admin' ? auth : null;
+}
+
+// ── Token revocation (DB-backed, in-memory cached) ────────────────────────────
+const revokedHashes = new Set<string>();
+let revocationCacheLoaded = false;
+
+function tokenHash(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
+
+/**
+ * Load all non-expired revoked token hashes from DB into the in-memory cache.
+ * Called once per cold start; subsequent calls are no-ops while the cache is warm.
+ */
+async function ensureRevocationCache(): Promise<void> {
+  if (revocationCacheLoaded) return;
+  revocationCacheLoaded = true; // prevent concurrent duplicate loads
+  try {
+    const { data } = await db
+      .from('revoked_tokens')
+      .select('token_hash')
+      .gte('expires_at', new Date().toISOString());
+    (data ?? []).forEach((r: any) => revokedHashes.add(r.token_hash));
+  } catch {
+    // DB unavailable — continue with empty cache; allow retry on next cold start
+    revocationCacheLoaded = false;
+  }
+}
+
+async function isTokenRevoked(token: string): Promise<boolean> {
+  const hash = tokenHash(token);
+  if (revokedHashes.has(hash)) return true; // fast path (warm invocation)
+  await ensureRevocationCache();             // cold-start DB load
+  return revokedHashes.has(hash);
+}
+
+/**
+ * Revoke a token both in-memory and in the database.
+ * In-memory revocation takes effect immediately; DB write persists across cold starts.
+ */
+export async function revokeToken(token: string): Promise<void> {
+  const hash = tokenHash(token);
+  revokedHashes.add(hash);
+
+  // Extract the token's own expiry to set the DB row TTL (best-effort)
+  let expiresAt = new Date(Date.now() + TOKEN_TTL_MS);
+  try {
+    const dot = token.lastIndexOf('.');
+    if (dot > 0) {
+      const { e } = JSON.parse(Buffer.from(token.slice(0, dot), 'base64url').toString('utf-8'));
+      if (typeof e === 'number') expiresAt = new Date(e);
+    }
+  } catch { /* use default */ }
+
+  try {
+    await db.from('revoked_tokens').upsert({ token_hash: hash, expires_at: expiresAt.toISOString() });
+  } catch {
+    // In-memory revocation still took effect; DB failure is non-fatal
+  }
+}
+
+// ── Response helpers ──────────────────────────────────────────────────────────
 export function unauthorized(): Response {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), {
     status: 401,

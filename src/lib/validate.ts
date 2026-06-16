@@ -11,7 +11,16 @@ export const MAX_TEXT   = 1000;
 export const MAX_AMOUNT = 100_000_000_000;
 
 export function isValidUUID(s: string):   boolean { return UUID_RE.test(s); }
-export function isValidDate(s: string):   boolean { return ISO_DATE.test(s) && !isNaN(Date.parse(s)); }
+export function isValidDate(s: string): boolean {
+  if (!ISO_DATE.test(s)) return false;
+  // Parse the components and verify no rollover occurred (e.g. 2025-02-29 → 2025-03-01).
+  const [y, m, d] = s.split('-').map(Number);
+  const date = new Date(s);
+  return !isNaN(date.getTime()) &&
+         date.getUTCFullYear() === y &&
+         date.getUTCMonth() + 1 === m &&
+         date.getUTCDate()        === d;
+}
 export function isValidTime(s: string):   boolean { return HH_MM.test(s); }
 export function isValidAmount(n: number): boolean { return Number.isFinite(n) && n >= 0 && n <= MAX_AMOUNT; }
 

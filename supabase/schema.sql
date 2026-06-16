@@ -160,3 +160,39 @@ ALTER TABLE customers
 ALTER TABLE checkins
   ADD COLUMN IF NOT EXISTS checkin_type TEXT NOT NULL DEFAULT '',
   ADD COLUMN IF NOT EXISTS addons       TEXT NOT NULL DEFAULT '';
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- Staff Users  (Issue #2 — multi-user auth with roles)
+-- Replaces single env-var admin. Bootstrap: if table is empty, the app falls
+-- back to ADMIN_USERNAME / ADMIN_PASSWORD env vars so first deploy still works.
+-- Passwords are hashed with Node scrypt (salt:hash hex strings).
+-- Roles: 'admin' (full access) | 'staff' (check-in / read-only ops).
+-- ══════════════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS staff_users (
+  id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  username      TEXT        NOT NULL UNIQUE,
+  password_hash TEXT        NOT NULL,   -- "salt:hash" both hex, scrypt N=32768 r=8 p=1 len=64
+  role          TEXT        NOT NULL DEFAULT 'staff',  -- 'admin' | 'staff'
+  is_active     BOOLEAN     NOT NULL DEFAULT true,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE staff_users ENABLE ROW LEVEL SECURITY;
+-- No anon-key policies → service key only (same pattern as all other tables).
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- Revoked Tokens  (Issue #1 — persistent token revocation across cold starts)
+-- On logout the token SHA-256 hash + expiry are written here.
+-- verifyToken loads all non-expired hashes into memory on cold start, then
+-- uses the in-memory set as a fast path for subsequent warm invocations.
+-- Expired rows can be purged with:
+--   DELETE FROM revoked_tokens WHERE expires_at < now();
+-- ══════════════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS revoked_tokens (
+  token_hash  TEXT        PRIMARY KEY,             -- SHA-256 hex of the raw token string
+  expires_at  TIMESTAMPTZ NOT NULL                  -- mirrors the token's own expiry
+);
+
+CREATE INDEX IF NOT EXISTS idx_revoked_tokens_expires ON revoked_tokens (expires_at);
+ALTER TABLE revoked_tokens ENABLE ROW LEVEL SECURITY;
+-- No anon-key policies → service key only.

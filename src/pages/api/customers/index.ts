@@ -22,37 +22,16 @@ const DISPLAY_HEADERS = ['Full Name', 'DOB', 'Email', 'Telephone no', 'Emergency
 /** GET /api/customers — return all customers */
 export const GET: APIRoute = async () => {
   try {
-  // Try with punch card columns first; fall back if they don't exist yet (pre-migration)
-  let data: any[] | null = null;
-  let hasPunchCols = true;
-
-  const res = await fetchAllPages((from, to) =>
+  const { data, error } = await fetchAllPages((from, to) =>
     db.from('customers')
       .select('id, full_name, dob, email, telephone, emergency_contact, note, waiver_form, is_punch_card_holder, punches_remaining, pt_punches_remaining, membership_type, membership_start_date, membership_end_date')
       .order('full_name')
       .range(from, to)
   );
 
-  if (res.error) {
-    // Column doesn't exist yet — retry without punch card columns
-    if (res.error.code === '42703' || res.error.message?.includes('is_punch_card_holder') || res.error.message?.includes('punches_remaining') || res.error.message?.includes('pt_punches_remaining') || res.error.message?.includes('membership_type')) {
-      hasPunchCols = false;
-      const fallback = await fetchAllPages((from, to) =>
-        db.from('customers')
-          .select('id, full_name, dob, email, telephone, emergency_contact, note, waiver_form')
-          .order('full_name')
-          .range(from, to)
-      );
-      if (fallback.error) return serverError(fallback.error.message);
-      data = fallback.data;
-    } else {
-      return serverError(res.error.message);
-    }
-  } else {
-    data = res.data;
-  }
+  if (error) return serverError(error.message);
 
-  const total = data!.length;
+  const total = data.length;
 
   // Map DB rows back to the original CSV-style header names for the frontend
   const rows = data.map((r: any) => ({
@@ -64,20 +43,20 @@ export const GET: APIRoute = async () => {
     'Emergency contact':  r.emergency_contact,
     'Note':               r.note,
     'Waiver form (old)':  r.waiver_form,
-    'Punch Card':           hasPunchCols ? (r.is_punch_card_holder ? 'Yes' : 'No') : 'No',
-    'Punches':              hasPunchCols ? (r.punches_remaining ?? 0) : 0,
-    'PT Punches':           hasPunchCols ? (r.pt_punches_remaining ?? 0) : 0,
-    _is_punch_card_holder:  hasPunchCols ? (r.is_punch_card_holder ?? false) : false,
-    _punches_remaining:     hasPunchCols ? (r.punches_remaining ?? 0) : 0,
-    _pt_punches_remaining:  hasPunchCols ? (r.pt_punches_remaining ?? 0) : 0,
-    'Membership':           hasPunchCols ? (r.membership_type ?? '') : '',
-    'Member Until':         hasPunchCols ? (r.membership_end_date ?? '') : '',
-    _membership_type:       hasPunchCols ? (r.membership_type ?? '') : '',
-    _membership_start_date: hasPunchCols ? (r.membership_start_date ?? '') : '',
-    _membership_end_date:   hasPunchCols ? (r.membership_end_date ?? '') : '',
+    'Punch Card':           r.is_punch_card_holder ? 'Yes' : 'No',
+    'Punches':              r.punches_remaining ?? 0,
+    'PT Punches':           r.pt_punches_remaining ?? 0,
+    _is_punch_card_holder:  r.is_punch_card_holder ?? false,
+    _punches_remaining:     r.punches_remaining ?? 0,
+    _pt_punches_remaining:  r.pt_punches_remaining ?? 0,
+    'Membership':           r.membership_type ?? '',
+    'Member Until':         r.membership_end_date ?? '',
+    _membership_type:       r.membership_type ?? '',
+    _membership_start_date: r.membership_start_date ?? '',
+    _membership_end_date:   r.membership_end_date ?? '',
   }));
 
-  return ok({ headers: DISPLAY_HEADERS, rows, total, _punchColsMissing: !hasPunchCols });
+  return ok({ headers: DISPLAY_HEADERS, rows, total });
   } catch (e: any) { return serverError(e?.message ?? String(e)); }
 };
 
