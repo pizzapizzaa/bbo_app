@@ -22,13 +22,17 @@ export const GET: APIRoute = async ({ url }) => {
 
   try {
     // ── New customers & returned % ───────────────────────────────────────────
+    // Names that are never real customers
+    const NON_CUSTOMER_NAMES = ['Other', 'New Customer'];
+
     if (statsFrom && statsTo) {
-      // Count customers created in the date range (UTC-based)
+      // Count customers created in the date range, excluding placeholder names
       const { count: newCount, error: newErr } = await db
         .from('customers')
         .select('id', { count: 'exact', head: true })
         .gte('created_at', statsFrom + 'T00:00:00.000Z')
-        .lte('created_at', statsTo   + 'T23:59:59.999Z');
+        .lte('created_at', statsTo   + 'T23:59:59.999Z')
+        .not('full_name', 'in', `(${NON_CUSTOMER_NAMES.map(n => `"${n}"`).join(',')})`);
       if (newErr) return serverError(newErr.message);
       result.new_customers = newCount ?? 0;
 
@@ -46,7 +50,7 @@ export const GET: APIRoute = async ({ url }) => {
         ...new Set(
           (periodRows ?? [])
             .map((r: any) => String(r.customer_name))
-            .filter((n) => n !== 'Other')
+            .filter((n) => !NON_CUSTOMER_NAMES.includes(n))
         )
       ];
       result.total_period_visitors = periodNames.length;
@@ -87,7 +91,7 @@ export const GET: APIRoute = async ({ url }) => {
 
       const counts: Record<string, number> = {};
       (hmRows ?? []).forEach((r: any) => {
-        if (String(r.customer_name) === 'Other') return;
+        if (NON_CUSTOMER_NAMES.includes(String(r.customer_name))) return;
         const d = String(r.date);
         counts[d] = (counts[d] ?? 0) + 1;
       });

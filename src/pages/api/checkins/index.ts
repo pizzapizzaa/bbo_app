@@ -118,15 +118,19 @@ export const POST: APIRoute = async ({ request }) => {
   if (error) return serverError(error.message);
 
   // Auto-create a customer record if this name doesn't exist yet
-  const { data: existing } = await db
-    .from('customers')
-    .select('id')
-    .ilike('full_name', escapeLike(customer_name))
-    .limit(1)
-    .maybeSingle();
+  // Skip placeholder names that are not real customers
+  const NON_CUSTOMER_NAMES = ['Other', 'New Customer'];
+  if (!NON_CUSTOMER_NAMES.includes(customer_name)) {
+    const { data: existing } = await db
+      .from('customers')
+      .select('id')
+      .ilike('full_name', escapeLike(customer_name))
+      .limit(1)
+      .maybeSingle();
 
-  if (!existing) {
-    await db.from('customers').insert({ full_name: customer_name });
+    if (!existing) {
+      await db.from('customers').insert({ full_name: customer_name });
+    }
   }
 
   // ── Punch card purchase: add punches to the buyer's account ──
