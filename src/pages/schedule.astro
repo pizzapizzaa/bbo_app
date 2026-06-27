@@ -43,25 +43,28 @@ import MainLayout from '../layouts/MainLayout.astro';
             <!-- Staff Name -->
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1.5">Staff Name <span class="text-red-400">*</span></label>
-              <input
+              <select
                 id="f-staff"
-                list="staff-list"
-                type="text"
-                placeholder="Select or type name…"
-                autocomplete="off"
                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
                        focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+                onchange="toggleTempInput('f-staff-temp', this.value)"
+              >
+                <option value="">— Select staff —</option>
+                <option value="Huyen">Huyen</option>
+                <option value="Duyen Ha">Duyen Ha</option>
+                <option value="Thanh Tu">Thanh Tu</option>
+                <option value="Bao Anh">Bao Anh</option>
+                <option value="Danny">Danny</option>
+                <option value="Minh Chau">Minh Chau</option>
+                <option value="Temp">Temp</option>
+              </select>
+              <input
+                id="f-staff-temp"
+                type="text"
+                placeholder="Enter temp staff name…"
+                class="hidden mt-2 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                       focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
               />
-              <!-- Staff name datalist — add your staff names here -->
-              <datalist id="staff-list">
-                <option value="Thanh Tu"></option>
-                <option value="Duyen Ha"></option>
-                <option value="Thu Huyen"></option>
-                <option value="Kim An"></option>
-                <option value="Khue Anh"></option>
-                <option value="Huy Tran"></option>
-              </datalist>
-              <p class="text-xs text-gray-400 mt-1">Staff names can be configured in the source code.</p>
             </div>
 
             <!-- Date -->
@@ -354,9 +357,26 @@ import MainLayout from '../layouts/MainLayout.astro';
       <div class="space-y-4">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1.5">Staff Name <span class="text-red-400">*</span></label>
-          <input id="e-staff" list="staff-list" type="text" placeholder="Select or type name…" autocomplete="off"
+          <select id="e-staff"
             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
-                   focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent" />
+                   focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+            onchange="toggleTempInput('e-staff-temp', this.value)">
+            <option value="">— Select staff —</option>
+            <option value="Huyen">Huyen</option>
+            <option value="Duyen Ha">Duyen Ha</option>
+            <option value="Thanh Tu">Thanh Tu</option>
+            <option value="Bao Anh">Bao Anh</option>
+            <option value="Danny">Danny</option>
+            <option value="Minh Chau">Minh Chau</option>
+            <option value="Temp">Temp</option>
+          </select>
+          <input
+            id="e-staff-temp"
+            type="text"
+            placeholder="Enter temp staff name…"
+            class="hidden mt-2 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                   focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+          />
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1.5">Date <span class="text-red-400">*</span></label>
@@ -586,7 +606,7 @@ import MainLayout from '../layouts/MainLayout.astro';
     var scheduleData = [];
     var currentWeekStart;
 
-    var STAFF_NAMES = ['Thanh Tu', 'Duyen Ha', 'Thu Huyen', 'Kim An', 'Khue Anh', 'Huy Tran'];
+    var STAFF_NAMES = ['Huyen', 'Duyen Ha', 'Thanh Tu', 'Bao Anh', 'Danny', 'Minh Chau'];
     var STAFF_COLORS = [
       { bg: '#FED7AA', text: '#9A3412', border: '#FB923C' },
       { bg: '#BFDBFE', text: '#1E40AF', border: '#60A5FA' },
@@ -659,10 +679,31 @@ import MainLayout from '../layouts/MainLayout.astro';
 
     function getStaffList() {
       var list = STAFF_NAMES.slice();
+      // Include any staff from DB not in the canonical list (e.g. temp staff names)
       scheduleData.forEach(function (s) {
         if (list.indexOf(s.staff_name) === -1) list.push(s.staff_name);
       });
       return list;
+    }
+
+    function toggleTempInput(inputId, selectValue) {
+      var el = document.getElementById(inputId);
+      if (!el) return;
+      if (selectValue === 'Temp') {
+        el.classList.remove('hidden');
+        el.focus();
+      } else {
+        el.classList.add('hidden');
+        el.value = '';
+      }
+    }
+
+    function resolveStaffName(selectId, tempId) {
+      var sel = document.getElementById(selectId).value;
+      if (sel === 'Temp') {
+        return document.getElementById(tempId).value.trim();
+      }
+      return sel;
     }
 
     // ── Render calendar ──
@@ -697,8 +738,13 @@ import MainLayout from '../layouts/MainLayout.astro';
       headHtml += '</tr>';
       document.getElementById('cal-head').innerHTML = headHtml;
 
-      // Body rows — one per staff
-      var staffList = getStaffList();
+      // Body rows — only staff with at least one entry in the visible week
+      var weekDateSet = weekDates.map(fmtDate);
+      var staffList = getStaffList().filter(function (name) {
+        return scheduleData.some(function (s) {
+          return s.staff_name === name && weekDateSet.indexOf(s.date) !== -1;
+        });
+      });
       var bodyHtml  = '';
       staffList.forEach(function (staffName, rowIdx) {
         var color  = STAFF_COLORS[rowIdx % STAFF_COLORS.length];
@@ -806,14 +852,16 @@ import MainLayout from '../layouts/MainLayout.astro';
       var errEl = document.getElementById('form-error');
       errEl.classList.add('hidden');
 
-      var staff = document.getElementById('f-staff').value.trim();
+      var staff = resolveStaffName('f-staff', 'f-staff-temp');
       var date  = document.getElementById('f-date').value;
       var start = document.getElementById('f-start').value;
       var end   = document.getElementById('f-end').value;
       var notes = document.getElementById('f-notes').value.trim();
 
       if (!staff || !date || !start || !end) {
-        errEl.textContent = 'Please fill in all required fields.';
+        errEl.textContent = document.getElementById('f-staff').value === 'Temp' && !staff
+          ? 'Please enter the temp staff name.'
+          : 'Please fill in all required fields.';
         errEl.classList.remove('hidden');
         return;
       }
@@ -834,6 +882,8 @@ import MainLayout from '../layouts/MainLayout.astro';
           currentWeekStart = getWeekStart(new Date(date + 'T00:00:00'));
           renderCalendar();
           document.getElementById('f-staff').value = '';
+          document.getElementById('f-staff-temp').value = '';
+          document.getElementById('f-staff-temp').classList.add('hidden');
           document.getElementById('f-start').value = '';
           document.getElementById('f-end').value   = '';
           document.getElementById('f-notes').value  = '';
@@ -869,7 +919,22 @@ import MainLayout from '../layouts/MainLayout.astro';
       var entry = scheduleData.filter(function (s) { return String(s.id) === String(id); })[0];
       if (!entry) return;
       editingId = id;
-      document.getElementById('e-staff').value = entry.staff_name || '';
+      var staffName = entry.staff_name || '';
+      var eStaffSel = document.getElementById('e-staff');
+      var eStaffTemp = document.getElementById('e-staff-temp');
+      if (STAFF_NAMES.indexOf(staffName) !== -1) {
+        eStaffSel.value = staffName;
+        eStaffTemp.classList.add('hidden');
+        eStaffTemp.value = '';
+      } else if (staffName) {
+        eStaffSel.value = 'Temp';
+        eStaffTemp.classList.remove('hidden');
+        eStaffTemp.value = staffName;
+      } else {
+        eStaffSel.value = '';
+        eStaffTemp.classList.add('hidden');
+        eStaffTemp.value = '';
+      }
       document.getElementById('e-date').value  = entry.date || '';
       document.getElementById('e-start').value = entry.start_time || '';
       document.getElementById('e-end').value   = entry.end_time || '';
@@ -888,14 +953,16 @@ import MainLayout from '../layouts/MainLayout.astro';
     function submitEdit() {
       var errEl = document.getElementById('edit-error');
       errEl.classList.add('hidden');
-      var staff = document.getElementById('e-staff').value.trim();
+      var staff = resolveStaffName('e-staff', 'e-staff-temp');
       var date  = document.getElementById('e-date').value;
       var start = document.getElementById('e-start').value;
       var end   = document.getElementById('e-end').value;
       var notes = document.getElementById('e-notes').value.trim();
 
       if (!staff || !date || !start || !end) {
-        errEl.textContent = 'Please fill in all required fields.';
+        errEl.textContent = document.getElementById('e-staff').value === 'Temp' && !staff
+          ? 'Please enter the temp staff name.'
+          : 'Please fill in all required fields.';
         errEl.classList.remove('hidden');
         return;
       }
