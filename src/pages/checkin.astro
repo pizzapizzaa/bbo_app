@@ -69,21 +69,51 @@ import MainLayout from '../layouts/MainLayout.astro';
 
         <form id="checkin-form" class="space-y-4" novalidate>
 
-          <!-- Customer search -->
+          <!-- Customer search (select from dropdown only — no free entry) -->
           <div>
             <label class="block text-sm font-medium text-gray-300 mb-1.5">
               Customer <span class="text-red-400">*</span>
             </label>
-            <input
-              id="f-customer"
-              list="customer-datalist"
-              type="text"
-              placeholder="Type to search customer…"
-              autocomplete="off"
-              class="w-full bg-gray-800 border border-gray-600 text-white placeholder-gray-500 rounded-lg px-3 py-2 text-sm
-                     focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-            />
-            <datalist id="customer-datalist"></datalist>
+            <!-- Hidden value holder: written by picker, read by form submit -->
+            <input id="f-customer" type="hidden" value="" />
+            <div class="relative">
+              <input
+                id="f-customer-search"
+                type="text"
+                placeholder="Search customer name…"
+                autocomplete="off"
+                class="w-full bg-gray-800 border border-gray-600 text-white placeholder-gray-500 rounded-lg px-3 py-2 pr-8 text-sm
+                       focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+              />
+              <!-- Clear selection button -->
+              <button
+                type="button"
+                id="f-customer-clear"
+                class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white p-0.5"
+                title="Clear selection"
+                onclick="clearCustomerSelection()"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+              <!-- Live dropdown -->
+              <ul
+                id="f-customer-dropdown"
+                class="hidden absolute z-50 left-0 right-0 mt-1 bg-gray-800 border border-gray-600
+                       rounded-lg overflow-y-auto shadow-2xl max-h-52"
+              ></ul>
+            </div>
+            <!-- Shown only when "Other" is selected -->
+            <div id="f-other-name-row" class="hidden mt-2">
+              <input
+                id="f-other-name"
+                type="text"
+                placeholder="Note customer name for records…"
+                class="w-full bg-gray-800 border border-orange-500/60 text-white placeholder-gray-500
+                       rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+              />
+            </div>
             <p id="customer-hint" class="text-xs text-gray-500 mt-1">
               Load customers on the <a href="/customers" class="text-orange-400 hover:underline">Customers</a> page first.
             </p>
@@ -435,26 +465,13 @@ import MainLayout from '../layouts/MainLayout.astro';
         .then(function (data) {
           var rows = data.rows || [];
           allCustomers = rows;
-          var list = document.getElementById('customer-datalist');
-          list.innerHTML = '';
-          // Always prepend fixed entries
-          ['New Customer', 'Other'].forEach(function (label) {
-            var opt = document.createElement('option');
-            opt.value = label;
-            list.appendChild(opt);
-          });
           if (rows.length) {
             document.getElementById('customer-hint').classList.add('hidden');
-            rows.forEach(function (c) {
-              var opt = document.createElement('option');
-              opt.value = c['Full Name'] || '';
-              list.appendChild(opt);
-            });
           }
           buildPunchCardDropdown(rows);
           buildPTPunchDropdown(rows);
         })
-        .catch(function () { /* datalist is optional — ignore errors */ });
+        .catch(function () { /* ignore errors */ });
     }
 
     function buildPunchCardDropdown(customers) {
@@ -632,27 +649,151 @@ import MainLayout from '../layouts/MainLayout.astro';
       if (!isPTPunch) document.getElementById('f-pt-punch-from').value = '';
     });
 
-    // ── Punch card: auto-select customer in punch dropdown when customer changes ──
-    document.getElementById('f-customer').addEventListener('input', function () {
-      clearTimeout(window._custDebounce);
-      var name = this.value.trim();
-      window._custDebounce = setTimeout(function () {
-        var customer = allCustomers.find(function (c) { return c['Full Name'] === name; });
-        if (!customer) return;
-        var checkinDate = document.getElementById('f-checkin-date').value || new Date().toISOString().slice(0, 10);
-        // Membership takes priority
-        if (customer._membership_type && customer._membership_end_date && customer._membership_end_date >= checkinDate) {
-          document.getElementById('f-payment').value = 'Valid Membership';
-          document.getElementById('punch-from-row').classList.add('hidden');
-          document.getElementById('f-punch-from').value = '';
-        } else if (customer._is_punch_card_holder && customer._punches_remaining > 0) {
-          // Auto-switch to Punch Card and pre-select this customer
-          document.getElementById('f-payment').value = 'Punch Card';
-          document.getElementById('punch-from-row').classList.remove('hidden');
-          document.getElementById('f-punch-from').value = customer._id;
+    // ── Punch card: auto-select based on selected customer ───────────────────────
+    function onCustomerSelected(name) {
+      var customer = allCustomers.find(function (c) { return c['Full Name'] === name; });
+      if (!customer) return;
+      var checkinDate = document.getElementById('f-checkin-date').value || new Date().toISOString().slice(0, 10);
+      // Membership takes priority
+      if (customer._membership_type && customer._membership_end_date && customer._membership_end_date >= checkinDate) {
+        document.getElementById('f-payment').value = 'Valid Membership';
+        document.getElementById('punch-from-row').classList.add('hidden');
+        document.getElementById('f-punch-from').value = '';
+      } else if (customer._is_punch_card_holder && customer._punches_remaining > 0) {
+        document.getElementById('f-payment').value = 'Punch Card';
+        document.getElementById('punch-from-row').classList.remove('hidden');
+        document.getElementById('f-punch-from').value = customer._id;
+      }
+    }
+
+    // ── Customer picker: search-and-select combobox ───────────────────────────────
+    (function () {
+      var searchInput = document.getElementById('f-customer-search');
+      var hiddenInput = document.getElementById('f-customer');
+      var dropdown    = document.getElementById('f-customer-dropdown');
+      var clearBtn    = document.getElementById('f-customer-clear');
+      var otherRow    = document.getElementById('f-other-name-row');
+      var activeIdx   = -1;
+
+      function closeDropdown() {
+        dropdown.classList.add('hidden');
+        dropdown.innerHTML = '';
+        activeIdx = -1;
+      }
+
+      function selectCustomer(name) {
+        hiddenInput.value    = name;
+        searchInput.value    = name === 'Other' ? 'Other (not in database)' : name;
+        searchInput.readOnly = true;
+        searchInput.classList.add('text-orange-300', 'border-orange-500/50');
+        clearBtn.classList.remove('hidden');
+        otherRow.classList.toggle('hidden', name !== 'Other');
+        if (name === 'Other') document.getElementById('f-other-name').focus();
+        closeDropdown();
+        onCustomerSelected(name);
+      }
+
+      window.clearCustomerSelection = function () {
+        hiddenInput.value    = '';
+        searchInput.value    = '';
+        searchInput.readOnly = false;
+        searchInput.classList.remove('text-orange-300', 'border-orange-500/50');
+        clearBtn.classList.add('hidden');
+        otherRow.classList.add('hidden');
+        document.getElementById('f-other-name').value        = '';
+        document.getElementById('f-payment').value           = '';
+        document.getElementById('punch-from-row').classList.add('hidden');
+        document.getElementById('f-punch-from').value        = '';
+        document.getElementById('pt-punch-from-row').classList.add('hidden');
+        document.getElementById('f-pt-punch-from').value     = '';
+        closeDropdown();
+        searchInput.focus();
+      };
+
+      function renderDropdown(q) {
+        var lower    = (q || '').toLowerCase();
+        var filtered = lower
+          ? allCustomers.filter(function (c) {
+              return (c['Full Name'] || '').toLowerCase().includes(lower);
+            })
+          : allCustomers;
+
+        dropdown.innerHTML = '';
+        activeIdx = -1;
+
+        filtered.slice(0, 25).forEach(function (c) {
+          var li = document.createElement('li');
+          li.className = 'px-3 py-2 text-sm text-gray-200 cursor-pointer hover:bg-gray-700 hover:text-orange-400 border-b border-gray-700/40 last:border-0 transition-colors';
+          li.textContent = c['Full Name'] || '';
+          li.addEventListener('mousedown', function (e) {
+            e.preventDefault();
+            selectCustomer(c['Full Name'] || '');
+          });
+          dropdown.appendChild(li);
+        });
+
+        // "Other" always at the bottom
+        var otherLi = document.createElement('li');
+        otherLi.className = 'px-3 py-2 text-sm text-gray-500 italic cursor-pointer hover:bg-gray-700 hover:text-orange-400 border-t border-gray-600 transition-colors';
+        otherLi.textContent = 'Other (not in database)';
+        otherLi.addEventListener('mousedown', function (e) {
+          e.preventDefault();
+          selectCustomer('Other');
+        });
+        dropdown.appendChild(otherLi);
+        dropdown.classList.remove('hidden');
+      }
+
+      searchInput.addEventListener('focus', function () {
+        if (hiddenInput.value) return; // already locked to a selection
+        renderDropdown(searchInput.value.trim());
+      });
+
+      searchInput.addEventListener('input', function () {
+        // Typing clears any prior lock
+        hiddenInput.value    = '';
+        searchInput.readOnly = false;
+        searchInput.classList.remove('text-orange-300', 'border-orange-500/50');
+        clearBtn.classList.add('hidden');
+        otherRow.classList.add('hidden');
+        renderDropdown(searchInput.value.trim());
+      });
+
+      searchInput.addEventListener('keydown', function (e) {
+        var items = dropdown.querySelectorAll('li');
+        if (!items.length) return;
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          activeIdx = Math.min(activeIdx + 1, items.length - 1);
+          items.forEach(function (li, i) {
+            li.classList.toggle('bg-gray-700', i === activeIdx);
+            li.classList.toggle('text-orange-400', i === activeIdx);
+          });
+          items[activeIdx].scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          activeIdx = Math.max(activeIdx - 1, 0);
+          items.forEach(function (li, i) {
+            li.classList.toggle('bg-gray-700', i === activeIdx);
+            li.classList.toggle('text-orange-400', i === activeIdx);
+          });
+          items[activeIdx].scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'Enter' && activeIdx >= 0) {
+          e.preventDefault();
+          items[activeIdx].dispatchEvent(new MouseEvent('mousedown'));
+        } else if (e.key === 'Escape') {
+          closeDropdown();
         }
-      }, 300);
-    });
+      });
+
+      document.addEventListener('click', function (e) {
+        if (!searchInput.contains(e.target) &&
+            !dropdown.contains(e.target) &&
+            !clearBtn.contains(e.target)) {
+          closeDropdown();
+        }
+      });
+    }());
 
     // ── Check-in type, add-ons & discount: auto-calculate amount ──
     function recalcAmount() {
@@ -707,9 +848,14 @@ import MainLayout from '../layouts/MainLayout.astro';
       errEl.classList.add('hidden');
 
       var customerName  = document.getElementById('f-customer').value.trim();
+      var otherName     = document.getElementById('f-other-name').value.trim();
       var payment        = document.getElementById('f-payment').value;
       var amount         = document.getElementById('f-amount').value;
       var notes          = document.getElementById('f-notes').value.trim();
+      // When "Other" is chosen, prepend the noted name into notes for manual DB follow-up
+      if (customerName === 'Other' && otherName) {
+        notes = 'Unregistered: ' + otherName + (notes ? ' | ' + notes : '');
+      }
       var checkinType    = document.getElementById('f-checkin-type').value;
       var addonsArr      = [];
       document.querySelectorAll('.addon-cb:checked').forEach(function (cb) { addonsArr.push(cb.dataset.name); });
@@ -750,8 +896,10 @@ import MainLayout from '../layouts/MainLayout.astro';
       }
 
       if (!customerName) {
-        errEl.textContent = 'Please enter a customer name.';
-        errEl.classList.remove('hidden'); return;
+        errEl.textContent = 'Please select a customer from the dropdown.';
+        errEl.classList.remove('hidden');
+        document.getElementById('f-customer-search').focus();
+        return;
       }
       if (!payment) {
         errEl.textContent = 'Please select a payment method.';
@@ -795,25 +943,19 @@ import MainLayout from '../layouts/MainLayout.astro';
           loadCheckinsForRange(dateStr, dateStr);
           // Refresh punch card dropdown counts if a punch was used
           if (punchHolderId || ptPunchHolderId) buildCustomerDatalist();
-          document.getElementById('f-customer').value   = '';
-          document.getElementById('f-payment').value    = '';
+          clearCustomerSelection();
           document.getElementById('f-checkin-type').value = '';
           document.querySelectorAll('.addon-cb').forEach(function (cb) { cb.checked = false; });
           var noDiscRb = document.querySelector('.discount-rb[value=""]');
           if (noDiscRb) noDiscRb.checked = true;
           document.getElementById('f-amount').value     = '';
           document.getElementById('f-notes').value      = '';
-          document.getElementById('f-punch-from').value = '';
-          document.getElementById('punch-from-row').classList.add('hidden');
-          document.getElementById('f-pt-punch-from').value = '';
-          document.getElementById('pt-punch-from-row').classList.add('hidden');
           // Reset date+time to now for next entry
           var n = new Date();
           document.getElementById('f-checkin-date').value = n.toISOString().slice(0, 10);
           document.getElementById('f-checkin-time').value = n.toTimeString().slice(0, 5);
           updateTsPreview();
           showToast('✓ Check-in recorded for ' + customerName + '!');
-          document.getElementById('f-customer').focus();
         })
         .catch(function (err) {
           btn.disabled = false;
