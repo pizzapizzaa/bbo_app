@@ -143,26 +143,22 @@ export const prerender = false;
 
         <!-- ── Waiver Agreement ── -->
         <div class="rounded-xl border border-gray-700 overflow-hidden">
-          <!-- Collapse / expand toggle -->
-          <button
-            type="button"
-            id="waiver-toggle"
-            onclick="toggleWaiver()"
+          <a
+            href="https://docs.google.com/document/d/1ZPl1KfUmoXwD5YSNu4D4Fa4A1tQiFZqOdzIgwVE6z3w/edit?tab=t.0"
+            target="_blank"
+            rel="noopener noreferrer"
             class="w-full flex items-center justify-between px-4 py-3
                    bg-gray-800 hover:bg-gray-750 transition text-sm font-medium text-gray-200"
           >
             <span>Waiver Agreement</span>
-            <svg id="waiver-chevron"
-                 class="w-4 h-4 text-gray-400 transition-transform duration-200"
-                 fill="none" stroke="currentColor" stroke-width="2"
+            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" stroke-width="2"
                  viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+              <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
             </svg>
-          </button>
+          </a>
 
-          <!-- Waiver text body (collapsed by default) -->
-          <div id="waiver-body" class="hidden px-4 py-4 bg-gray-800/40 border-t border-gray-700/60
-                                       text-xs text-gray-400 leading-relaxed max-h-56 overflow-y-auto">
+          <!-- Waiver text body removed — full waiver opens in Google Docs -->
+          <div id="waiver-body" class="hidden">
             <!-- ╔════════════════════════════════════════╗ -->
             <!-- ║  PASTE YOUR WAIVER TEXT BELOW          ║ -->
             <!-- ╚════════════════════════════════════════╝ -->
@@ -287,10 +283,11 @@ Tôi hiểu rằng mô tả về những rủi ro này không đầy đủ và c
           />
           <span class="text-sm text-gray-300 group-hover:text-white transition leading-snug">
             I have read and agreed to the
-            <button type="button" onclick="openWaiver()"
-                    class="text-orange-400 underline underline-offset-2 hover:text-orange-300">
+            <a href="https://docs.google.com/document/d/1ZPl1KfUmoXwD5YSNu4D4Fa4A1tQiFZqOdzIgwVE6z3w/edit?tab=t.0"
+               target="_blank" rel="noopener noreferrer"
+               class="text-orange-400 underline underline-offset-2 hover:text-orange-300">
               waiver agreement
-            </button>.
+            </a>.
             <span class="text-red-400">*</span>
           </span>
         </label>
@@ -324,21 +321,6 @@ Tôi hiểu rằng mô tả về những rủi ro này không đầy đủ và c
   </div>
 
   <script is:inline>
-    // ── Waiver collapse/expand ───────────────────────────────────────────────
-    function toggleWaiver() {
-      const body    = document.getElementById('waiver-body');
-      const chevron = document.getElementById('waiver-chevron');
-      const open    = !body.classList.contains('hidden');
-      body.classList.toggle('hidden', open);
-      chevron.style.transform = open ? '' : 'rotate(180deg)';
-    }
-
-    function openWaiver() {
-      const body = document.getElementById('waiver-body');
-      if (body.classList.contains('hidden')) toggleWaiver();
-      body.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-
     // ── English-only name validator ──────────────────────────────────────────
     function isEnglishOnly(value) {
       return /^[A-Za-z0-9 '\-\.]+$/.test(value);
