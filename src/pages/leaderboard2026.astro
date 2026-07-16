@@ -260,35 +260,45 @@ export const prerender = false;
       padding: 14px 8px; border-radius: 12px; border: 2px solid rgba(255,255,255,.1);
       background: rgba(255,255,255,.04); color: #94a3b8; font-weight: 700; font-size: .9rem;
       cursor: pointer; transition: all .2s; font-family: inherit; text-align: center;
+      touch-action: manipulation; -webkit-tap-highlight-color: rgba(249,115,22,.2);
+      user-select: none; -webkit-user-select: none;
     }
     .wall-btn:hover { border-color: rgba(249,115,22,.4); color: #f1f5f9; background: rgba(249,115,22,.08); }
+    .wall-btn:active { background: rgba(249,115,22,.25); border-color: var(--orange); }
     .wall-btn.selected { border-color: var(--orange); background: rgba(249,115,22,.15); color: #fff; box-shadow: 0 0 16px rgba(249,115,22,.25); }
-    .wall-btn .wall-icon { font-size: 1.3rem; display: block; margin-bottom: 4px; }
+    .wall-btn .wall-icon { font-size: 1.3rem; display: block; margin-bottom: 4px; pointer-events: none; }
 
     /* Grade hexagons */
-    .grade-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-    .grade-item { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    .grade-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .grade-item {
+      display: flex; align-items: center; gap: 14px;
+      background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07);
+      border-radius: 14px; padding: 12px 14px;
+    }
     .hex-wrap {
-      width: 52px; height: 58px; position: relative; display: flex; align-items: center; justify-content: center;
+      width: 56px; height: 62px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
     }
     .hex-shape {
       width: 100%; height: 100%;
       clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
       display: flex; align-items: center; justify-content: center;
-      font-weight: 900; font-size: .9rem; transition: transform .15s;
+      font-weight: 900; font-size: 1rem; transition: transform .15s;
     }
-    .hex-shape:hover { transform: scale(1.08); }
-    .grade-pts { font-size: .7rem; color: #64748b; font-weight: 600; }
-    .grade-counter { display: flex; align-items: center; gap: 6px; }
+    .hex-shape:active { transform: scale(1.08); }
+    .grade-info { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
+    .grade-pts { font-size: .78rem; color: #64748b; font-weight: 600; }
+    .grade-counter { display: flex; align-items: center; gap: 0; }
     .counter-btn {
-      width: 28px; height: 28px; border-radius: 8px; border: none;
-      background: rgba(255,255,255,.08); color: #f1f5f9;
-      font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
+      width: 44px; height: 44px; border-radius: 10px; border: none;
+      background: rgba(255,255,255,.1); color: #f1f5f9;
+      font-size: 1.4rem; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center;
       transition: background .15s; font-family: inherit; font-weight: 700;
+      touch-action: manipulation; -webkit-tap-highlight-color: rgba(249,115,22,.2);
+      flex-shrink: 0;
     }
-    .counter-btn:hover { background: rgba(249,115,22,.3); }
+    .counter-btn:hover, .counter-btn:active { background: rgba(249,115,22,.4); }
     .counter-val {
-      min-width: 28px; text-align: center; font-size: 1rem; font-weight: 800;
+      min-width: 40px; text-align: center; font-size: 1.2rem; font-weight: 900;
       color: #f1f5f9;
     }
     .counter-val.has-count { color: var(--orange); }
@@ -513,10 +523,10 @@ export const prerender = false;
       { grade: 'V2', label: 'V2', bg: '#F97316', fg: '#FFFFFF', pts: 20,  emoji: '⬡' },
       { grade: 'V3', label: 'V3', bg: '#22C55E', fg: '#FFFFFF', pts: 25,  emoji: '⬡' },
       { grade: 'V4', label: 'V4', bg: '#3B82F6', fg: '#FFFFFF', pts: 40,  emoji: '⬡' },
-      { grade: 'V5', label: 'V5', bg: '#EF4444', fg: '#FFFFFF', pts: 15,  emoji: '⬡' },
-      { grade: 'V6', label: 'V6', bg: '#EC4899', fg: '#FFFFFF', pts: 15,  emoji: '⬡' },
-      { grade: 'V7', label: 'V7', bg: '#9CA3AF', fg: '#111827', pts: 15,  emoji: '⬡' },
-      { grade: 'V8', label: 'V8', bg: '#111827', fg: '#FFFFFF', pts: 15,  emoji: '⬡' },
+      { grade: 'V5', label: 'V5', bg: '#EF4444', fg: '#FFFFFF', pts: 60,  emoji: '⬡' },
+      { grade: 'V6', label: 'V6', bg: '#EC4899', fg: '#FFFFFF', pts: 80,  emoji: '⬡' },
+      { grade: 'V7', label: 'V7', bg: '#9CA3AF', fg: '#111827', pts: 100, emoji: '⬡' },
+      { grade: 'V8', label: 'V8', bg: '#111827', fg: '#FFFFFF', pts: 130, emoji: '⬡' },
     ];
 
     const WALLS = ['W1', 'W2', 'W3', 'W4', 'W5', 'W6'];
@@ -565,11 +575,13 @@ export const prerender = false;
         <div class="hex-wrap">
           <div class="hex-shape" style="background:${bg};color:${fg}">${grade}</div>
         </div>
-        <div class="grade-pts">+${pts} pts</div>
-        <div class="grade-counter">
-          <button class="counter-btn" data-grade="${grade}" data-action="dec">−</button>
-          <span class="counter-val" id="count-${grade}">0</span>
-          <button class="counter-btn" data-grade="${grade}" data-action="inc">+</button>
+        <div class="grade-info">
+          <div class="grade-pts">+${pts} pts</div>
+          <div class="grade-counter">
+            <button class="counter-btn" data-grade="${grade}" data-action="dec">−</button>
+            <span class="counter-val" id="count-${grade}">0</span>
+            <button class="counter-btn" data-grade="${grade}" data-action="inc">+</button>
+          </div>
         </div>
       `;
       gradeGrid.appendChild(item);

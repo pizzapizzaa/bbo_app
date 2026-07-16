@@ -8,7 +8,7 @@ const VALID_WALLS  = ['W1', 'W2', 'W3', 'W4', 'W5', 'W6'] as const;
 const VALID_GRADES = ['V0', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8'] as const;
 const GRADE_POINTS: Record<string, number> = {
   V0: 10, V1: 15, V2: 20, V3: 25, V4: 40,
-  V5: 15, V6: 15, V7: 15, V8: 15,
+  V5: 60, V6: 80, V7: 100, V8: 130,
 };
 const MAX_NICKNAME         = 30;
 const MAX_SENDS_PER_SUBMIT = 50;
