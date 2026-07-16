@@ -124,6 +124,7 @@ ALTER TABLE checkins  ADD COLUMN IF NOT EXISTS pt_punch_holder_name TEXT NOT NUL
 ALTER TABLE customers        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE schedule_entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE checkins         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE expenses         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE event_entries    ENABLE ROW LEVEL SECURITY;
 
 -- Allow public (anon key) SELECT on event_entries so the public schedule page
@@ -196,3 +197,44 @@ CREATE TABLE IF NOT EXISTS revoked_tokens (
 CREATE INDEX IF NOT EXISTS idx_revoked_tokens_expires ON revoked_tokens (expires_at);
 ALTER TABLE revoked_tokens ENABLE ROW LEVEL SECURITY;
 -- No anon-key policies → service key only.
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- Leaderboard 2026
+-- Public leaderboard where customers self-log boulder sends.
+-- All reads/writes go through server-side API routes (service key), so
+-- RLS is enabled with no anon-key policies (same secure pattern as above).
+-- ══════════════════════════════════════════════════════════════════════════════
+
+-- Stores the public display nickname chosen by each customer.
+-- One row per customer; upserted on every send submission.
+CREATE TABLE IF NOT EXISTS leaderboard_nicknames (
+  customer_id  UUID        PRIMARY KEY REFERENCES customers(id) ON DELETE CASCADE,
+  nickname     TEXT        NOT NULL,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Case-insensitive uniqueness so "RockKing" and "rockking" can't coexist.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_leaderboard_nicknames_lower
+  ON leaderboard_nicknames (lower(nickname));
+
+-- One row per individual route successfully sent.
+-- grade: 'V0'|'V1'|'V2'|'V3'|'V4'|'V5'|'V6'|'V7'|'V8'
+-- wall:  'W1'|'W2'|'W3'|'W4'|'W5'|'W6'
+-- points: V0=10  V1=15  V2=20  V3=25  V4=40
+--         V5=15  V6=15  V7=15  V8=15
+CREATE TABLE IF NOT EXISTS leaderboard_sends (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id UUID        NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  wall        TEXT        NOT NULL,
+  grade       TEXT        NOT NULL,
+  points      INTEGER     NOT NULL,
+  logged_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_lb_sends_customer ON leaderboard_sends (customer_id);
+CREATE INDEX IF NOT EXISTS idx_lb_sends_logged   ON leaderboard_sends (logged_at);
+
+ALTER TABLE leaderboard_nicknames ENABLE ROW LEVEL SECURITY;
+ALTER TABLE leaderboard_sends     ENABLE ROW LEVEL SECURITY;
+-- No anon-key policies → service key only (reads proxied through /api/public/leaderboard).
