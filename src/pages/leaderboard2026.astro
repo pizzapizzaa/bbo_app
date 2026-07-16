@@ -589,6 +589,10 @@ export const prerender = false;
         const data = await res.json();
         if (!res.ok) {
           showAlert(data.error ?? 'Could not load wall availability. Try again.');
+          // Set to empty object so all grade increments are blocked until
+          // a valid availability response is received.
+          state.availability = {};
+          applyAvailability();
           return;
         }
         state.availability = data.grades;
@@ -613,8 +617,9 @@ export const prerender = false;
         if (counter) counter.style.display = '';
 
         if (!avail || avail.max === 0) {
-          // Grade not set on this wall
+          // Grade not set on this wall — hide counter entirely
           item.classList.add('grade-na');
+          if (counter) counter.style.display = 'none';
           if (status) { status.textContent = 'Not on this wall'; status.className = 'grade-avail-status'; }
           state.counts[grade] = 0;
         } else if (avail.remaining === 0) {
@@ -672,7 +677,11 @@ export const prerender = false;
       const grade  = btn.dataset.grade;
       const action = btn.dataset.action;
       if (action === 'inc') {
-        const maxAllowed = state.availability ? (state.availability[grade]?.remaining ?? 0) : 20;
+        // Block completely if a wall is selected but availability hasn't loaded
+        if (state.selectedWall && !state.availability) return;
+        const avail      = state.availability?.[grade];
+        const maxAllowed = avail ? avail.remaining : 20;
+        if (maxAllowed <= 0) return;  // grade-na or fully sent
         state.counts[grade] = Math.min(state.counts[grade] + 1, maxAllowed);
       }
       if (action === 'dec') state.counts[grade] = Math.max(state.counts[grade] - 1, 0);
