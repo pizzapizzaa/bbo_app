@@ -257,7 +257,9 @@ export const prerender = false;
     /* Wall selector — now a native select */
 
     /* Grade hexagons */
-    .grade-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    /* 1 column on mobile, 2 columns on tablet/desktop */
+    .grade-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    @media (min-width: 540px) { .grade-grid { grid-template-columns: repeat(2, 1fr); } }
     .grade-item {
       display: flex; align-items: center; gap: 14px;
       background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07);
