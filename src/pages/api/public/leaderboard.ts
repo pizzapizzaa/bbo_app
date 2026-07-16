@@ -3,6 +3,7 @@ export const prerender = false;
 import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
 import { escapeLike, MAX_NAME } from '../../../lib/validate';
+import { getWallAvailability } from '../../../lib/wall-config';
 
 const VALID_WALLS  = ['W1', 'W2', 'W3', 'W4', 'W5', 'W6'] as const;
 const VALID_GRADES = ['V0', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8'] as const;
@@ -143,6 +144,35 @@ export const POST: APIRoute = async ({ request }) => {
   if (!customer) return json({ error: 'Customer not found. Please check your name.' }, 404);
 
   const customerId = customer.id as string;
+
+  // ── Wall route-limit validation ───────────────────────────────────────────
+  // Compute how many of each grade this customer has already sent on this wall
+  // in the current reset period, then reject if the submission would exceed the
+  // configured per-grade route count.
+  const availability = await getWallAvailability(customerId, wall);
+  if (!availability) {
+    return json({ error: 'Wall configuration not found. Please contact staff.' }, 404);
+  }
+
+  // Count submitted grades
+  const submittedCounts: Record<string, number> = {};
+  for (const row of rows) {
+    submittedCounts[row.grade] = (submittedCounts[row.grade] ?? 0) + 1;
+  }
+
+  for (const [grade, count] of Object.entries(submittedCounts)) {
+    const avail = availability.grades[grade];
+    if (!avail || count > avail.remaining) {
+      const rem = avail?.remaining ?? 0;
+      const max = avail?.max ?? 0;
+      const sent = avail?.sent ?? 0;
+      return json({
+        error: rem === 0
+          ? `${grade} on ${wall}: you've already sent all ${max} routes this period.`
+          : `${grade} on ${wall}: only ${rem} route${rem !== 1 ? 's' : ''} remaining this period (${sent}/${max} already sent).`,
+      }, 400);
+    }
+  }
 
   // ── Nickname uniqueness check ─────────────────────────────────────────────
   // Reject if another customer already holds this nickname (case-insensitive).

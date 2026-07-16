@@ -263,8 +263,20 @@ export const prerender = false;
     .grade-item {
       display: flex; align-items: center; gap: 14px;
       background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07);
-      border-radius: 14px; padding: 12px 14px;
+      border-radius: 14px; padding: 12px 14px; transition: opacity .2s, border-color .2s;
     }
+    /* Grade state: not on this wall */
+    .grade-item.grade-na { opacity: .35; pointer-events: none; }
+    /* Grade state: all routes sent this period */
+    .grade-item.grade-done { border-color: rgba(34,197,94,.35); background: rgba(34,197,94,.06); }
+    .grade-item.grade-done .grade-counter { display: none; }
+    /* Availability hint text */
+    .grade-avail-status { font-size: .72rem; font-weight: 600; min-height: 14px; }
+    .grade-item.grade-done .grade-avail-status { color: #22c55e; }
+    .grade-item.grade-na  .grade-avail-status { color: #475569; }
+    .grade-avail-status.has-avail { color: #f97316; }
+    /* Loading skeleton for availability */
+    .grade-grid-loading { opacity: .5; pointer-events: none; }
     .hex-wrap {
       width: 56px; height: 62px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
     }
@@ -531,6 +543,7 @@ export const prerender = false;
       nickname:     '',
       selectedWall: '',
       counts:       Object.fromEntries(GRADES.map(g => [g.grade, 0])),
+      availability: null,  // null = not loaded | Record<grade, {max,sent,remaining}>
     };
 
     // ── DOM refs ─────────────────────────────────────────────────────────────
@@ -545,21 +558,103 @@ export const prerender = false;
     const modalAlert   = document.getElementById('modal-alert');
 
     // ── Wall dropdown ────────────────────────────────────────────────────────
-    document.getElementById('wall-select').addEventListener('change', e => {
+    document.getElementById('wall-select').addEventListener('change', async e => {
       state.selectedWall = e.target.value;
+      clearAvailability();
+      if (state.selectedWall && state.customerName) {
+        await fetchAvailability();
+      }
     });
+
+    // ── Availability helpers ──────────────────────────────────────────────
+    function clearAvailability() {
+      state.availability = null;
+      GRADES.forEach(({ grade }) => {
+        const item = document.querySelector(`.grade-item[data-grade="${grade}"]`);
+        if (!item) return;
+        item.classList.remove('grade-na', 'grade-done');
+        const counter = item.querySelector('.grade-counter');
+        if (counter) counter.style.display = '';
+        const status = item.querySelector('.grade-avail-status');
+        if (status) { status.textContent = ''; status.className = 'grade-avail-status'; }
+      });
+    }
+
+    async function fetchAvailability() {
+      const gradeGrid = document.getElementById('grade-grid');
+      gradeGrid.classList.add('grade-grid-loading');
+      try {
+        const params = new URLSearchParams({ customer_name: state.customerName, wall: state.selectedWall });
+        const res  = await fetch(`/api/public/wall-availability?${params}`);
+        const data = await res.json();
+        if (!res.ok) {
+          showAlert(data.error ?? 'Could not load wall availability. Try again.');
+          return;
+        }
+        state.availability = data.grades;
+        applyAvailability();
+      } catch {
+        showAlert('Network error loading wall availability.');
+      } finally {
+        gradeGrid.classList.remove('grade-grid-loading');
+      }
+    }
+
+    function applyAvailability() {
+      if (!state.availability) return;
+      GRADES.forEach(({ grade }) => {
+        const avail  = state.availability[grade];
+        const item   = document.querySelector(`.grade-item[data-grade="${grade}"]`);
+        if (!item) return;
+        const counter = item.querySelector('.grade-counter');
+        const status  = item.querySelector('.grade-avail-status');
+
+        item.classList.remove('grade-na', 'grade-done');
+        if (counter) counter.style.display = '';
+
+        if (!avail || avail.max === 0) {
+          // Grade not set on this wall
+          item.classList.add('grade-na');
+          if (status) { status.textContent = 'Not on this wall'; status.className = 'grade-avail-status'; }
+          state.counts[grade] = 0;
+        } else if (avail.remaining === 0) {
+          // Customer sent all routes of this grade this period
+          item.classList.add('grade-done');
+          if (counter) counter.style.display = 'none';
+          if (status) { status.textContent = `✓ All ${avail.max} sent!`; status.className = 'grade-avail-status'; }
+          state.counts[grade] = 0;
+        } else {
+          // Partially or fully available — cap counter
+          if (state.counts[grade] > avail.remaining) state.counts[grade] = avail.remaining;
+          if (status) {
+            status.textContent = `${avail.remaining} of ${avail.max} left`;
+            status.className = 'grade-avail-status has-avail';
+          }
+        }
+
+        // Sync counter display
+        const valEl = document.getElementById(`count-${grade}`);
+        if (valEl) {
+          valEl.textContent = state.counts[grade];
+          valEl.className = 'counter-val' + (state.counts[grade] > 0 ? ' has-count' : '');
+        }
+      });
+      updatePtsPreview();
+    }
 
     // ── Build grade grid ─────────────────────────────────────────────────────
     const gradeGrid = document.getElementById('grade-grid');
     GRADES.forEach(({ grade, bg, fg, pts }) => {
       const item = document.createElement('div');
       item.className = 'grade-item';
+      item.dataset.grade = grade;
       item.innerHTML = `
         <div class="hex-wrap">
           <div class="hex-shape" style="background:${bg};color:${fg}">${grade}</div>
         </div>
         <div class="grade-info">
           <div class="grade-pts">+${pts} pts</div>
+          <div class="grade-avail-status"></div>
           <div class="grade-counter">
             <button class="counter-btn" data-grade="${grade}" data-action="dec">−</button>
             <span class="counter-val" id="count-${grade}">0</span>
@@ -576,7 +671,10 @@ export const prerender = false;
       if (!btn) return;
       const grade  = btn.dataset.grade;
       const action = btn.dataset.action;
-      if (action === 'inc') state.counts[grade] = Math.min(state.counts[grade] + 1, 20);
+      if (action === 'inc') {
+        const maxAllowed = state.availability ? (state.availability[grade]?.remaining ?? 0) : 20;
+        state.counts[grade] = Math.min(state.counts[grade] + 1, maxAllowed);
+      }
       if (action === 'dec') state.counts[grade] = Math.max(state.counts[grade] - 1, 0);
       document.getElementById(`count-${grade}`).textContent = state.counts[grade];
       document.getElementById(`count-${grade}`).className =
@@ -695,6 +793,7 @@ export const prerender = false;
     }
     function resetModal() {
       state.selectedWall = '';
+      state.availability = null;
       state.counts = Object.fromEntries(GRADES.map(g => [g.grade, 0]));
       GRADES.forEach(({ grade }) => {
         const el = document.getElementById(`count-${grade}`);
@@ -702,6 +801,7 @@ export const prerender = false;
       });
       const wallSel = document.getElementById('wall-select');
       if (wallSel) wallSel.value = '';
+      clearAvailability();
       updatePtsPreview();
       clearAlert();
     }

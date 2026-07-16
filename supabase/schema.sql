@@ -238,3 +238,44 @@ CREATE INDEX IF NOT EXISTS idx_lb_sends_logged   ON leaderboard_sends (logged_at
 ALTER TABLE leaderboard_nicknames ENABLE ROW LEVEL SECURITY;
 ALTER TABLE leaderboard_sends     ENABLE ROW LEVEL SECURITY;
 -- No anon-key policies → service key only (reads proxied through /api/public/leaderboard).
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- Wall Route Configuration  (Leaderboard 2026)
+-- One row per wall. next_reset is the next scheduled reset date; the current
+-- period starts at (next_reset + floor((today − next_reset) / period_days) * period_days).
+-- v0…v8 columns hold the number of routes of each grade available this period.
+-- Update next_reset after each reset so the period window rolls forward.
+-- ══════════════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS wall_configs (
+  wall          TEXT        PRIMARY KEY,            -- 'W1'|'W2'|'W3'|'W4'|'W5'|'W6'
+  next_reset    DATE        NOT NULL,               -- next scheduled reset date
+  period_weeks  INTEGER     NOT NULL DEFAULT 5,     -- cycle length in weeks
+  v0            INTEGER     NOT NULL DEFAULT 0,
+  v1            INTEGER     NOT NULL DEFAULT 0,
+  v2            INTEGER     NOT NULL DEFAULT 0,
+  v3            INTEGER     NOT NULL DEFAULT 0,
+  v4            INTEGER     NOT NULL DEFAULT 0,
+  v5            INTEGER     NOT NULL DEFAULT 0,
+  v6            INTEGER     NOT NULL DEFAULT 0,
+  v7            INTEGER     NOT NULL DEFAULT 0,
+  v8            INTEGER     NOT NULL DEFAULT 0,
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE wall_configs ENABLE ROW LEVEL SECURITY;
+-- No anon-key policies → service key only.
+
+-- Seed the initial wall configurations (safe to re-run; upserts on conflict).
+INSERT INTO wall_configs (wall, next_reset, period_weeks, v0,v1,v2,v3,v4,v5,v6,v7,v8) VALUES
+  ('W1', '2026-09-07', 5,  0,1,2,2,2,1,1,1,1),
+  ('W2', '2026-08-10', 5,  2,2,2,2,1,1,1,0,0),
+  ('W3', '2026-08-24', 5,  1,1,2,2,2,1,1,1,0),
+  ('W4', '2026-08-31', 5,  0,0,2,2,2,1,1,1,1),
+  ('W5', '2026-08-17', 5,  0,1,2,2,2,1,1,1,1),
+  ('W6', '2026-08-03', 5,  2,2,2,2,2,1,1,1,0)
+ON CONFLICT (wall) DO UPDATE SET
+  next_reset   = EXCLUDED.next_reset,
+  period_weeks = EXCLUDED.period_weeks,
+  v0=EXCLUDED.v0, v1=EXCLUDED.v1, v2=EXCLUDED.v2, v3=EXCLUDED.v3,
+  v4=EXCLUDED.v4, v5=EXCLUDED.v5, v6=EXCLUDED.v6, v7=EXCLUDED.v7,
+  v8=EXCLUDED.v8, updated_at=now();
