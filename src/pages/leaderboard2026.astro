@@ -13,7 +13,7 @@ export const prerender = false;
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
 
-  <style>
+  <style is:global>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
@@ -254,19 +254,7 @@ export const prerender = false;
     }
     .ac-item:hover, .ac-item.highlighted { background: rgba(249,115,22,.15); }
 
-    /* Wall selector */
-    .wall-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-    .wall-btn {
-      padding: 14px 8px; border-radius: 12px; border: 2px solid rgba(255,255,255,.1);
-      background: rgba(255,255,255,.04); color: #94a3b8; font-weight: 700; font-size: .9rem;
-      cursor: pointer; transition: all .2s; font-family: inherit; text-align: center;
-      touch-action: manipulation; -webkit-tap-highlight-color: rgba(249,115,22,.2);
-      user-select: none; -webkit-user-select: none;
-    }
-    .wall-btn:hover { border-color: rgba(249,115,22,.4); color: #f1f5f9; background: rgba(249,115,22,.08); }
-    .wall-btn:active { background: rgba(249,115,22,.25); border-color: var(--orange); }
-    .wall-btn.selected { border-color: var(--orange); background: rgba(249,115,22,.15); color: #fff; box-shadow: 0 0 16px rgba(249,115,22,.25); }
-    .wall-btn .wall-icon { font-size: 1.3rem; display: block; margin-bottom: 4px; pointer-events: none; }
+    /* Wall selector — now a native select */
 
     /* Grade hexagons */
     .grade-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
@@ -469,10 +457,16 @@ export const prerender = false;
       <!-- ── Step 2: Wall + Grades ─────────────────────────────────────── -->
       <div id="step-2" style="display:none">
         <div class="field">
-          <label>Choose Wall</label>
-          <div class="wall-grid" id="wall-grid">
-            <!-- Injected by JS -->
-          </div>
+          <label for="wall-select">Choose Wall</label>
+          <select id="wall-select">
+            <option value="">— Select a wall —</option>
+            <option value="W1">Wall 1</option>
+            <option value="W2">Wall 2</option>
+            <option value="W3">Wall 3</option>
+            <option value="W4">Wall 4</option>
+            <option value="W5">Wall 5</option>
+            <option value="W6">Wall 6</option>
+          </select>
         </div>
 
         <div class="field" style="margin-top:20px">
@@ -529,9 +523,6 @@ export const prerender = false;
       { grade: 'V8', label: 'V8', bg: '#111827', fg: '#FFFFFF', pts: 130, emoji: '⬡' },
     ];
 
-    const WALLS = ['W1', 'W2', 'W3', 'W4', 'W5', 'W6'];
-    const WALL_ICONS = ['🧗', '🧱', '⛰️', '🪨', '🏔️', '💎'];
-
     // ── State ────────────────────────────────────────────────────────────────
     let state = {
       customerName: '',
@@ -551,19 +542,9 @@ export const prerender = false;
     const acList       = document.getElementById('ac-list');
     const modalAlert   = document.getElementById('modal-alert');
 
-    // ── Build wall grid ──────────────────────────────────────────────────────
-    const wallGrid = document.getElementById('wall-grid');
-    WALLS.forEach((wall, i) => {
-      const btn = document.createElement('button');
-      btn.className = 'wall-btn';
-      btn.dataset.wall = wall;
-      btn.innerHTML = `<span class="wall-icon">${WALL_ICONS[i]}</span>${wall}`;
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.wall-btn').forEach(b => b.classList.remove('selected'));
-        btn.classList.add('selected');
-        state.selectedWall = wall;
-      });
-      wallGrid.appendChild(btn);
+    // ── Wall dropdown ────────────────────────────────────────────────────────
+    document.getElementById('wall-select').addEventListener('change', e => {
+      state.selectedWall = e.target.value;
     });
 
     // ── Build grade grid ─────────────────────────────────────────────────────
@@ -717,7 +698,8 @@ export const prerender = false;
         const el = document.getElementById(`count-${grade}`);
         if (el) { el.textContent = '0'; el.className = 'counter-val'; }
       });
-      document.querySelectorAll('.wall-btn').forEach(b => b.classList.remove('selected'));
+      const wallSel = document.getElementById('wall-select');
+      if (wallSel) wallSel.value = '';
       updatePtsPreview();
       clearAlert();
     }
