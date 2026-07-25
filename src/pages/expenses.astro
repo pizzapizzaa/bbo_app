@@ -287,7 +287,12 @@ import MainLayout from '../layouts/MainLayout.astro';
       var y = now.getFullYear();
       var m = now.getMonth();
       var q = Math.floor(m / 3) + 1;
-      var periodLabel = MONTHS[m] + ' ' + y;
+      // Finance month: 29th of prev calendar month → 28th of finance-end month
+      var finEndMon = (now.getDate() <= 28) ? m : m + 1;
+      var finStart  = new Date(y, finEndMon - 1, 29);
+      var finEnd    = new Date(y, finEndMon, 28);
+      var periodLabel = MONTHS[finStart.getMonth()] + ' ' + finStart.getDate() + '\u2013' +
+                        MONTHS[finEnd.getMonth()] + ' 28 ' + finEnd.getFullYear();
       var quarterLabel = 'Q' + q + ' ' + y;
       document.getElementById('lbl-month').textContent     = periodLabel;
       document.getElementById('lbl-quarter').textContent   = quarterLabel;
@@ -312,9 +317,12 @@ import MainLayout from '../layouts/MainLayout.astro';
       var y   = now.getFullYear();
       var m   = now.getMonth();
       var qs  = Math.floor(m / 3) * 3;
+      // Finance month: 29th of prev calendar month → 28th of finance-end month.
+      // After the 28th we roll into the next finance month.
+      var finEndMon = (now.getDate() <= 28) ? m : m + 1;
       return {
-        monthStart:   isoDate(new Date(y, m, 1)),
-        monthEnd:     isoDate(new Date(y, m + 1, 0)),
+        monthStart:   isoDate(new Date(y, finEndMon - 1, 29)),
+        monthEnd:     isoDate(new Date(y, finEndMon, 28)),
         quarterStart: isoDate(new Date(y, qs, 1)),
         quarterEnd:   isoDate(new Date(y, qs + 3, 0)),
         yearStart:    isoDate(new Date(y, 0, 1)),
@@ -377,34 +385,32 @@ import MainLayout from '../layouts/MainLayout.astro';
     }
 
     // ── Chart helpers ──
-    function buildMonthLabels(n) {
-      var labels = [];
-      var now    = new Date();
+    // Returns n finance periods (29th→28th cycle) ending at the current finance month.
+    function getFinancePeriods(n) {
+      var now = new Date();
+      // Anchor: the calendar month whose 28th closes the current finance month
+      var anchorMon = (now.getDate() <= 28) ? now.getMonth() : now.getMonth() + 1;
+      var anchorY   = now.getFullYear();
+      var periods   = [];
       for (var i = n - 1; i >= 0; i--) {
-        var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        labels.push(MONTHS[d.getMonth()] + ' ' + String(d.getFullYear()).slice(2));
+        var endDate   = new Date(anchorY, anchorMon - i, 28);
+        var startDate = new Date(endDate.getFullYear(), endDate.getMonth() - 1, 29);
+        periods.push({
+          start: isoDate(startDate),
+          end:   isoDate(endDate),
+          label: MONTHS[endDate.getMonth()] + ' ' + String(endDate.getFullYear()).slice(2)
+        });
       }
-      return labels;
+      return periods;
     }
 
-    function buildMonthKeys(n) {
-      var keys = [];
-      var now  = new Date();
-      for (var i = n - 1; i >= 0; i--) {
-        var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        keys.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'));
-      }
-      return keys;
-    }
-
-    function sumByMonth(rows, keys) {
-      var map = {};
-      keys.forEach(function (k) { map[k] = 0; });
-      rows.forEach(function (r) {
-        var k = (r.date || '').slice(0, 7);
-        if (map[k] !== undefined) map[k] += (Number(r.amount) || 0);
+    function sumByFinancePeriods(rows, periods) {
+      return periods.map(function (p) {
+        return rows.reduce(function (acc, r) {
+          var dt = r.date || '';
+          return (dt >= p.start && dt <= p.end) ? acc + (Number(r.amount) || 0) : acc;
+        }, 0);
       });
-      return keys.map(function (k) { return map[k]; });
     }
 
     var chartExpanded = true;
@@ -445,10 +451,10 @@ import MainLayout from '../layouts/MainLayout.astro';
     }
 
     function renderChart() {
-      var keys   = buildMonthKeys(chartMonths);
-      var labels = buildMonthLabels(chartMonths);
-      var expVals = sumByMonth(expenseData, keys);
-      var revVals = sumByMonth(revenueRows, keys);
+      var periods = getFinancePeriods(chartMonths);
+      var labels  = periods.map(function (p) { return p.label; });
+      var expVals = sumByFinancePeriods(expenseData, periods);
+      var revVals = sumByFinancePeriods(revenueRows, periods);
       var balVals = revVals.map(function (r, i) { return r - expVals[i]; });
 
       var ctx = document.getElementById('trend-chart').getContext('2d');
