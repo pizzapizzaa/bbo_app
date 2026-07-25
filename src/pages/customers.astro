@@ -722,14 +722,20 @@ import MainLayout from '../layouts/MainLayout.astro';
 
     // ── Column visibility ──
     var hiddenColumns = [];
-    var ALWAYS_HIDDEN_COLS = ['Waiver form (old)'];
+    var ALWAYS_HIDDEN_COLS  = ['Waiver form (old)'];
+    var DEFAULT_COLLAPSED_COLS = ['DOB', 'Email', 'Telephone no', 'Emergency contact', 'Note'];
 
     function loadHiddenColumns() {
       try {
         var stored = localStorage.getItem('bbo_hidden_cols');
-        hiddenColumns = stored ? JSON.parse(stored) : [];
-        if (!Array.isArray(hiddenColumns)) hiddenColumns = [];
-      } catch (e) { hiddenColumns = []; }
+        if (stored !== null) {
+          hiddenColumns = JSON.parse(stored);
+          if (!Array.isArray(hiddenColumns)) hiddenColumns = [];
+        } else {
+          // First visit — collapse verbose columns by default
+          hiddenColumns = DEFAULT_COLLAPSED_COLS.slice();
+        }
+      } catch (e) { hiddenColumns = DEFAULT_COLLAPSED_COLS.slice(); }
     }
 
     function saveHiddenColumns() {
@@ -957,7 +963,7 @@ import MainLayout from '../layouts/MainLayout.astro';
     }
 
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') { closeAddModal(); closeEditPunchModal(); closeEditMembershipModal(); closeEditPTPunchModal(); closeColumnsDropdown(); }
+      if (e.key === 'Escape') { closeAddModal(); closeEditPunchModal(); closeEditMembershipModal(); closeEditPTPunchModal(); closeColumnsDropdown(); closeRowActionsMenu(); }
     });
 
     function openAddModal() {
@@ -1269,36 +1275,16 @@ import MainLayout from '../layouts/MainLayout.astro';
         data: null,
         orderable: false,
         searchable: false,
+        className: 'dt-center',
+        width: '40px',
         render: function (data, type, row) {
-          return '<div class="flex items-center gap-1.5">' +
-            '<button onclick="openEditMembership(\'' + row._id + '\')" ' +
-            'class="inline-flex items-center gap-1 text-xs text-teal-500 hover:text-teal-700 ' +
-            'hover:bg-teal-50 px-2 py-1 rounded transition" title="Edit membership">' +
-            '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" ' +
-            'd="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0"/>' +
-            '</svg>Mbr</button>' +
-            '<button onclick="openEditPunchCard(\'' + row._id + '\')" ' +
-            'class="inline-flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700 ' +
-            'hover:bg-blue-50 px-2 py-1 rounded transition" title="Edit punch card">' +
-            '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" ' +
-            'd="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>' +
-            '</svg>Punch</button>' +
-            '<button onclick="openEditPTPunch(\'' + row._id + '\')" ' +
-            'class="inline-flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-700 ' +
-            'hover:bg-indigo-50 px-2 py-1 rounded transition" title="Edit PT punch">' +
-            '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" ' +
-            'd="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>' +
-            '</svg>PT</button>' +
-            '<button onclick="deleteCustomer(\'' + row._id + '\')" ' +
-            'class="inline-flex items-center gap-1 text-xs text-red-500 hover:text-red-700 ' +
-            'hover:bg-red-50 px-2 py-1 rounded transition">' +
-            '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" ' +
-            'd="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>' +
-            '</svg>Delete</button></div>';
+          if (type !== 'display') return '';
+          return '<button onclick="openRowActionsMenu(event,\'' + row._id + '\')" ' +
+            'class="row-actions-btn inline-flex items-center justify-center w-7 h-7 rounded-lg ' +
+            'text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition" title="Actions">' +
+            '<svg class="w-4 h-4 pointer-events-none" fill="currentColor" viewBox="0 0 24 24">' +
+            '<circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>' +
+            '</svg></button>';
         }
       });
 
@@ -1421,6 +1407,89 @@ import MainLayout from '../layouts/MainLayout.astro';
     function escHtml(str) {
       return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
+
+    // ── Row actions context menu ──
+    var _ramId = null;
+
+    function openRowActionsMenu(e, id) {
+      e.stopPropagation();
+      var btn  = e.currentTarget;
+      var menu = document.getElementById('row-actions-menu');
+
+      // If same button clicked again, toggle off
+      if (_ramId === id && !menu.classList.contains('hidden')) {
+        menu.classList.add('hidden');
+        _ramId = null;
+        return;
+      }
+      _ramId = id;
+
+      // Position menu below the button
+      var rect = btn.getBoundingClientRect();
+      var menuW = 176; // min-w-44
+      var left  = rect.right - menuW + window.scrollX;
+      if (left < 4) left = rect.left + window.scrollX;
+      menu.style.top  = (rect.bottom + window.scrollY + 4) + 'px';
+      menu.style.left = Math.max(4, left) + 'px';
+      menu.classList.remove('hidden');
+    }
+
+    function closeRowActionsMenu() {
+      document.getElementById('row-actions-menu').classList.add('hidden');
+      _ramId = null;
+    }
+
+    document.addEventListener('click', function (e) {
+      if (!e.target.closest('#row-actions-menu') && !e.target.closest('.row-actions-btn')) {
+        closeRowActionsMenu();
+      }
+    });
+
+    function ramAction(fn) {
+      if (!_ramId) return;
+      var id = _ramId;
+      closeRowActionsMenu();
+      fn(id);
+    }
   </script>
+
+  <!-- Row Actions Context Menu -->
+  <div id="row-actions-menu"
+       class="hidden fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl py-1.5 min-w-44"
+       style="min-width:176px">
+    <button onclick="ramAction(openEditMembership)"
+      class="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-teal-600 hover:bg-teal-50 transition text-left">
+      <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0"/>
+      </svg>
+      Membership
+    </button>
+    <button onclick="ramAction(openEditPunchCard)"
+      class="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 transition text-left">
+      <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+      </svg>
+      Edit Punch Card
+    </button>
+    <button onclick="ramAction(openEditPTPunch)"
+      class="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50 transition text-left">
+      <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+      </svg>
+      Edit PT Punch
+    </button>
+    <div class="border-t border-gray-100 my-1"></div>
+    <button onclick="ramAction(deleteCustomer)"
+      class="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-red-500 hover:bg-red-50 transition text-left">
+      <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+      </svg>
+      Delete Customer
+    </button>
+  </div>
 </div>
 </MainLayout>
