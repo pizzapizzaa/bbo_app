@@ -349,6 +349,60 @@ import MainLayout from '../layouts/MainLayout.astro';
     </div>
   </div>
 
+  <!-- ── Part-timer Hours Summary ── -->
+  <div id="pt-summary-panel" class="mt-6 bg-gray-900 rounded-xl shadow-lg p-6">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+      <div>
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest">Part-timer Hours</p>
+        <p class="text-[11px] text-gray-500 mt-0.5">Bao Anh · Danny · Minh Chau</p>
+      </div>
+      <p id="pt-finance-period" class="text-[11px] text-gray-500 italic"></p>
+    </div>
+
+    <!-- grid: 4 columns (3 staff + 1 combined) × 2 rows (weekly / monthly) -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-2">
+      <!-- Weekly -->
+      <div class="bg-gray-800 rounded-xl border border-gray-700 p-4">
+        <p class="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Bao Anh · This Week</p>
+        <p id="pt-week-baoAnh"  class="text-xl font-bold text-amber-300 tabular-nums mt-1">—</p>
+      </div>
+      <div class="bg-gray-800 rounded-xl border border-gray-700 p-4">
+        <p class="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Danny · This Week</p>
+        <p id="pt-week-danny"   class="text-xl font-bold text-amber-300 tabular-nums mt-1">—</p>
+      </div>
+      <div class="bg-gray-800 rounded-xl border border-gray-700 p-4">
+        <p class="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Minh Chau · This Week</p>
+        <p id="pt-week-minhChau" class="text-xl font-bold text-amber-300 tabular-nums mt-1">—</p>
+      </div>
+      <div class="bg-gray-800 rounded-xl border border-orange-800/60 p-4">
+        <p class="text-[10px] text-orange-400 uppercase tracking-wide mb-0.5">Combined · This Week</p>
+        <p id="pt-week-total"   class="text-xl font-bold text-orange-400 tabular-nums mt-1">—</p>
+      </div>
+    </div>
+
+    <div class="border-t border-gray-700/60 my-3"></div>
+
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <!-- Monthly (finance period) -->
+      <div class="bg-gray-800 rounded-xl border border-gray-700 p-4">
+        <p class="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Bao Anh · This Month</p>
+        <p id="pt-mon-baoAnh"  class="text-xl font-bold text-emerald-400 tabular-nums mt-1">—</p>
+      </div>
+      <div class="bg-gray-800 rounded-xl border border-gray-700 p-4">
+        <p class="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Danny · This Month</p>
+        <p id="pt-mon-danny"   class="text-xl font-bold text-emerald-400 tabular-nums mt-1">—</p>
+      </div>
+      <div class="bg-gray-800 rounded-xl border border-gray-700 p-4">
+        <p class="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Minh Chau · This Month</p>
+        <p id="pt-mon-minhChau" class="text-xl font-bold text-emerald-400 tabular-nums mt-1">—</p>
+      </div>
+      <div class="bg-gray-800 rounded-xl border border-emerald-800/60 p-4">
+        <p class="text-[10px] text-emerald-400 uppercase tracking-wide mb-0.5">Combined · This Month</p>
+        <p id="pt-mon-total"   class="text-xl font-bold text-emerald-400 tabular-nums mt-1">—</p>
+      </div>
+    </div>
+  </div>
+
   <!-- ── Edit Schedule Entry Modal ── -->
   <div id="edit-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40"
        onclick="if(event.target===this)closeEditModal()">
@@ -810,6 +864,8 @@ import MainLayout from '../layouts/MainLayout.astro';
         bodyHtml = '<tr><td colspan="9" class="py-10 text-center text-gray-400 text-sm">No schedule data yet.</td></tr>';
       }
       document.getElementById('cal-body').innerHTML = bodyHtml;
+
+      updatePartTimerStats();
     }
 
     function calcDuration() {
@@ -836,12 +892,82 @@ import MainLayout from '../layouts/MainLayout.astro';
       return parseInt(p[0]) * 60 + parseInt(p[1]);
     }
 
+    // ── Part-timer hours summary ──
+    var PART_TIMERS = ['Bao Anh', 'Danny', 'Minh Chau'];
+    var PT_IDS      = ['baoAnh',  'danny', 'minhChau'];
+
+    function fmtHours(totalMin) {
+      if (totalMin <= 0) return '0h';
+      var h = Math.floor(totalMin / 60), m = totalMin % 60;
+      return h + 'h' + (m ? ' ' + m + 'm' : '');
+    }
+
+    function getFinanceMonthRange() {
+      var now = new Date();
+      var d   = now.getDate();
+      var y   = now.getFullYear();
+      var m   = now.getMonth();
+      var finEndMon = (d <= 28) ? m : m + 1;
+      var start = new Date(y, finEndMon - 1, 29);
+      var end   = new Date(y, finEndMon, 28);
+      return { start: fmtDate(start), end: fmtDate(end), startDate: start, endDate: end };
+    }
+
+    function sumStaffMinutes(staffName, dateSet) {
+      return scheduleData.reduce(function (acc, s) {
+        if (s.staff_name !== staffName) return acc;
+        if (dateSet.indexOf(s.date) === -1) return acc;
+        var diff = timeToMin(s.end_time) - timeToMin(s.start_time);
+        if (diff <= 0) diff += 1440;
+        return acc + diff;
+      }, 0);
+    }
+
+    function sumStaffMinutesInRange(staffName, rangeStart, rangeEnd) {
+      return scheduleData.reduce(function (acc, s) {
+        if (s.staff_name !== staffName) return acc;
+        if (!s.date || s.date < rangeStart || s.date > rangeEnd) return acc;
+        var diff = timeToMin(s.end_time) - timeToMin(s.start_time);
+        if (diff <= 0) diff += 1440;
+        return acc + diff;
+      }, 0);
+    }
+
+    var MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    function updatePartTimerStats() {
+      // Weekly: the currently viewed week
+      var weekDates = [];
+      for (var i = 0; i < 7; i++) weekDates.push(fmtDate(addDays(currentWeekStart, i)));
+
+      // Finance month range
+      var fin = getFinanceMonthRange();
+
+      // Finance period label
+      var startLabel = MONTHS_SHORT[fin.startDate.getMonth()] + ' ' + fin.startDate.getDate();
+      var endLabel   = MONTHS_SHORT[fin.endDate.getMonth()]   + ' ' + fin.endDate.getDate() + ' ' + fin.endDate.getFullYear();
+      document.getElementById('pt-finance-period').textContent = 'Finance period: ' + startLabel + ' – ' + endLabel;
+
+      var weekTotal = 0, monTotal = 0;
+      PART_TIMERS.forEach(function (name, i) {
+        var wMin = sumStaffMinutes(name, weekDates);
+        var mMin = sumStaffMinutesInRange(name, fin.start, fin.end);
+        weekTotal += wMin;
+        monTotal  += mMin;
+        document.getElementById('pt-week-' + PT_IDS[i]).textContent = fmtHours(wMin);
+        document.getElementById('pt-mon-'  + PT_IDS[i]).textContent = fmtHours(mMin);
+      });
+      document.getElementById('pt-week-total').textContent = fmtHours(weekTotal);
+      document.getElementById('pt-mon-total').textContent  = fmtHours(monTotal);
+    }
+
     function loadSchedule() {
       apiFetch('/api/schedule')
         .then(function (res) { return res.json(); })
         .then(function (data) {
           scheduleData = data.entries || [];
           renderCalendar();
+          updatePartTimerStats();
         })
         .catch(function (err) { showToast('Failed to load schedule: ' + err.message, 'error'); });
     }
@@ -1328,6 +1454,7 @@ import MainLayout from '../layouts/MainLayout.astro';
       var isStaff = tab === 'staff';
       document.getElementById('page-panel-staff').classList.toggle('hidden', !isStaff);
       document.getElementById('page-panel-route').classList.toggle('hidden', isStaff);
+      document.getElementById('pt-summary-panel').classList.toggle('hidden', !isStaff);
       var activeClass   = 'px-5 py-3 text-sm font-semibold text-orange-500 border-b-2 border-orange-500 -mb-px transition';
       var inactiveClass = 'px-5 py-3 text-sm font-medium text-gray-400 border-b-2 border-transparent -mb-px hover:text-gray-600 transition';
       document.getElementById('page-tab-staff').className = isStaff ? activeClass : inactiveClass;
