@@ -313,14 +313,12 @@ import MainLayout from '../layouts/MainLayout.astro';
     }
 
     function getPeriods() {
-      var y   = statsMonth.getFullYear();
-      var m   = statsMonth.getMonth();
-      var qs  = Math.floor(m / 3) * 3;
-      // Finance month: 29th of prev calendar month → 28th of finance-end month.
-      var finEndMon = (statsMonth.getDate() <= 28) ? m : m + 1;
+      var y  = statsMonth.getFullYear();
+      var m  = statsMonth.getMonth();
+      var qs = Math.floor(m / 3) * 3;
       return {
-        monthStart:   isoDate(new Date(y, finEndMon - 1, 29)),
-        monthEnd:     isoDate(new Date(y, finEndMon, 28)),
+        monthStart:   isoDate(new Date(y, m - 1, 29)),
+        monthEnd:     isoDate(new Date(y, m, 28)),
         quarterStart: isoDate(new Date(y, qs, 1)),
         quarterEnd:   isoDate(new Date(y, qs + 3, 0)),
         yearStart:    isoDate(new Date(y, 0, 1)),
@@ -334,10 +332,9 @@ import MainLayout from '../layouts/MainLayout.astro';
       var q = Math.floor(m / 3) + 1;
       var now = new Date();
       var isCurrentMonth = (y === now.getFullYear() && m === now.getMonth());
-      // Finance month label: 29th of prev calendar month → 28th of end month
-      var finEndMon = (statsMonth.getDate() <= 28) ? m : m + 1;
-      var finStart  = new Date(y, finEndMon - 1, 29);
-      var finEnd    = new Date(y, finEndMon, 28);
+      // Finance period: 29th of previous calendar month → 28th of statsMonth
+      var finStart     = new Date(y, m - 1, 29);
+      var finEnd       = new Date(y, m, 28);
       var periodLabel  = MONTHS[finStart.getMonth()] + ' 29–' +
                          MONTHS[finEnd.getMonth()] + ' 28, ' + finEnd.getFullYear();
       var quarterLabel = 'Q' + q + ' ' + y;

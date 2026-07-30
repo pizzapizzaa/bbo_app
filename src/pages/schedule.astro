@@ -362,7 +362,23 @@ import MainLayout from '../layouts/MainLayout.astro';
         <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest">Part-timer Hours</p>
         <p class="text-[11px] text-gray-500 mt-0.5">Bao Anh · Danny · Minh Chau</p>
       </div>
-      <p id="pt-finance-period" class="text-[11px] text-gray-500 italic"></p>
+      <div class="flex items-center gap-2">
+        <p id="pt-finance-period" class="text-[11px] text-gray-400 italic"></p>
+        <div class="flex items-center gap-1 ml-2">
+          <button type="button" onclick="navPTMonth(-1)"
+            class="px-2 py-0.5 text-xs border border-gray-600 rounded hover:bg-gray-700 text-gray-300 transition">
+            ‹ Prev
+          </button>
+          <button type="button" onclick="navPTMonth(1)"
+            class="px-2 py-0.5 text-xs border border-gray-600 rounded hover:bg-gray-700 text-gray-300 transition">
+            Next ›
+          </button>
+          <button type="button" onclick="ptGoToday()"
+            class="px-2 py-0.5 text-xs bg-orange-500 hover:bg-orange-600 text-white rounded transition">
+            Current
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- grid: 4 columns (3 staff + 1 combined) × 2 rows (weekly / monthly) -->
@@ -725,6 +741,7 @@ import MainLayout from '../layouts/MainLayout.astro';
       document.getElementById('f-date').value = new Date().toISOString().slice(0, 10);
       currentWeekStart = getWeekStart(new Date());
       hoursMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+      ptMonth    = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 
       document.getElementById('btn-prev-week').addEventListener('click', function () {
         currentWeekStart = addDays(currentWeekStart, -7);
@@ -945,6 +962,7 @@ import MainLayout from '../layouts/MainLayout.astro';
     // ── Part-timer hours summary ──
     var PART_TIMERS = ['Bao Anh', 'Danny', 'Minh Chau'];
     var PT_IDS      = ['baoAnh',  'danny', 'minhChau'];
+    var ptMonth     = null; // Date set to 1st of the selected finance month
 
     function fmtHours(totalMin) {
       if (totalMin <= 0) return '0h';
@@ -952,14 +970,23 @@ import MainLayout from '../layouts/MainLayout.astro';
       return h + 'h' + (m ? ' ' + m + 'm' : '');
     }
 
-    function getFinanceMonthRange() {
+    function navPTMonth(delta) {
+      ptMonth = new Date(ptMonth.getFullYear(), ptMonth.getMonth() + delta, 1);
+      updatePartTimerStats();
+    }
+
+    function ptGoToday() {
       var now = new Date();
-      var d   = now.getDate();
-      var y   = now.getFullYear();
-      var m   = now.getMonth();
-      var finEndMon = (d <= 28) ? m : m + 1;
-      var start = new Date(y, finEndMon - 1, 29);
-      var end   = new Date(y, finEndMon, 28);
+      ptMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      updatePartTimerStats();
+    }
+
+    function getFinanceMonthRange() {
+      // Finance month: 29th of (ptMonth-1) → 28th of ptMonth
+      var y = ptMonth.getFullYear();
+      var m = ptMonth.getMonth();
+      var start = new Date(y, m - 1, 29);
+      var end   = new Date(y, m, 28);
       return { start: fmtDate(start), end: fmtDate(end), startDate: start, endDate: end };
     }
 
