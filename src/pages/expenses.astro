@@ -127,6 +127,19 @@ import MainLayout from '../layouts/MainLayout.astro';
     <div class="xl:col-span-2">
       <div class="bg-gray-900 rounded-xl shadow-lg p-6 h-full flex flex-col gap-6">
 
+        <!-- Month navigator -->
+        <div class="flex items-center justify-between">
+          <button onclick="navStatsMonth(-1)"
+            class="px-2.5 py-1 text-sm border border-gray-600 rounded-lg hover:bg-gray-700 text-gray-300 transition">
+            ‹ Prev
+          </button>
+          <span id="stats-month-nav-label" class="text-sm font-semibold text-white"></span>
+          <button onclick="navStatsMonth(1)"
+            class="px-2.5 py-1 text-sm border border-gray-600 rounded-lg hover:bg-gray-700 text-gray-300 transition">
+            Next ›
+          </button>
+        </div>
+
         <!-- Expense stats -->
         <div>
           <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Expenses</p>
@@ -256,6 +269,7 @@ import MainLayout from '../layouts/MainLayout.astro';
     var revenueRows = [];
     var trendChart  = null;
     var chartMonths = 12;
+    var statsMonth  = null; // Date set to 1st of the selected month
 
     var TYPE_COLORS = {
       'Construction Setup':    'bg-blue-100 text-blue-700',
@@ -276,6 +290,8 @@ import MainLayout from '../layouts/MainLayout.astro';
     $(document).ready(function () {
       var now = new Date();
 
+      statsMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
       // Date picker: default today, min = 72 months ago, max = today
       var minDate = new Date(now);
       minDate.setMonth(minDate.getMonth() - 72);
@@ -283,23 +299,7 @@ import MainLayout from '../layouts/MainLayout.astro';
       document.getElementById('f-date').min   = minDate.toISOString().slice(0, 10);
       document.getElementById('f-date').max   = now.toISOString().slice(0, 10);
 
-      // Period sub-labels
-      var y = now.getFullYear();
-      var m = now.getMonth();
-      var q = Math.floor(m / 3) + 1;
-      // Finance month: 29th of prev calendar month → 28th of finance-end month
-      var finEndMon = (now.getDate() <= 28) ? m : m + 1;
-      var finStart  = new Date(y, finEndMon - 1, 29);
-      var finEnd    = new Date(y, finEndMon, 28);
-      var periodLabel = MONTHS[finStart.getMonth()] + ' ' + finStart.getDate() + '\u2013' +
-                        MONTHS[finEnd.getMonth()] + ' 28 ' + finEnd.getFullYear();
-      var quarterLabel = 'Q' + q + ' ' + y;
-      document.getElementById('lbl-month').textContent     = periodLabel;
-      document.getElementById('lbl-quarter').textContent   = quarterLabel;
-      document.getElementById('lbl-year').textContent      = String(y);
-      document.getElementById('lbl-month-bal').textContent   = periodLabel;
-      document.getElementById('lbl-quarter-bal').textContent = quarterLabel;
-      document.getElementById('lbl-year-bal').textContent    = String(y);
+      updateStatsLabels();
 
       initTable();
       loadData();
@@ -313,13 +313,11 @@ import MainLayout from '../layouts/MainLayout.astro';
     }
 
     function getPeriods() {
-      var now = new Date();
-      var y   = now.getFullYear();
-      var m   = now.getMonth();
+      var y   = statsMonth.getFullYear();
+      var m   = statsMonth.getMonth();
       var qs  = Math.floor(m / 3) * 3;
       // Finance month: 29th of prev calendar month → 28th of finance-end month.
-      // After the 28th we roll into the next finance month.
-      var finEndMon = (now.getDate() <= 28) ? m : m + 1;
+      var finEndMon = (statsMonth.getDate() <= 28) ? m : m + 1;
       return {
         monthStart:   isoDate(new Date(y, finEndMon - 1, 29)),
         monthEnd:     isoDate(new Date(y, finEndMon, 28)),
@@ -328,6 +326,35 @@ import MainLayout from '../layouts/MainLayout.astro';
         yearStart:    isoDate(new Date(y, 0, 1)),
         yearEnd:      isoDate(new Date(y, 11, 31)),
       };
+    }
+
+    function updateStatsLabels() {
+      var y = statsMonth.getFullYear();
+      var m = statsMonth.getMonth();
+      var q = Math.floor(m / 3) + 1;
+      var now = new Date();
+      var isCurrentMonth = (y === now.getFullYear() && m === now.getMonth());
+      // Finance month label: 29th of prev calendar month → 28th of end month
+      var finEndMon = (statsMonth.getDate() <= 28) ? m : m + 1;
+      var finStart  = new Date(y, finEndMon - 1, 29);
+      var finEnd    = new Date(y, finEndMon, 28);
+      var periodLabel  = MONTHS[finStart.getMonth()] + ' 29–' +
+                         MONTHS[finEnd.getMonth()] + ' 28, ' + finEnd.getFullYear();
+      var quarterLabel = 'Q' + q + ' ' + y;
+      document.getElementById('lbl-month').textContent       = periodLabel;
+      document.getElementById('lbl-quarter').textContent     = quarterLabel;
+      document.getElementById('lbl-year').textContent        = String(y);
+      document.getElementById('lbl-month-bal').textContent   = periodLabel;
+      document.getElementById('lbl-quarter-bal').textContent = quarterLabel;
+      document.getElementById('lbl-year-bal').textContent    = String(y);
+      document.getElementById('stats-month-nav-label').textContent =
+        MONTHS[m] + ' ' + y + (isCurrentMonth ? ' (Current)' : '');
+    }
+
+    function navStatsMonth(delta) {
+      statsMonth = new Date(statsMonth.getFullYear(), statsMonth.getMonth() + delta, 1);
+      updateStatsLabels();
+      updateStats();
     }
 
     function sumInPeriod(rows, start, end) {

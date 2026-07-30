@@ -14,6 +14,10 @@ import MainLayout from '../layouts/MainLayout.astro';
       class="px-5 py-3 text-sm font-medium text-gray-400 border-b-2 border-transparent -mb-px hover:text-gray-600 transition">
       Route Setting Schedule
     </button>
+    <button id="page-tab-hours" type="button" onclick="switchPageTab('hours')"
+      class="px-5 py-3 text-sm font-medium text-gray-400 border-b-2 border-transparent -mb-px hover:text-gray-600 transition">
+      Monthly Hours
+    </button>
   </div>
 
   <!-- ══ Tab 1: Staff Schedule ══ -->
@@ -658,6 +662,49 @@ import MainLayout from '../layouts/MainLayout.astro';
     </div>
   </div><!-- end #page-panel-route -->
 
+  <!-- ══ Tab 3: Monthly Hours ══ -->
+  <div id="page-panel-hours" class="hidden">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+
+      <!-- Header: title + month nav -->
+      <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+        <h2 class="font-semibold text-gray-800">Staff Monthly Hours</h2>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="hoursNavMonth(-1)"
+            class="px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition">
+            ‹ Prev
+          </button>
+          <span id="hours-month-label" class="text-sm font-medium text-gray-700 min-w-[160px] text-center px-1"></span>
+          <button type="button" onclick="hoursNavMonth(1)"
+            class="px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition">
+            Next ›
+          </button>
+          <button type="button" onclick="hoursGoToday()"
+            class="px-2.5 py-1.5 text-sm bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-lg transition">
+            This Month
+          </button>
+        </div>
+      </div>
+
+      <!-- Hours table -->
+      <div class="overflow-x-auto">
+        <table class="w-full border-collapse text-sm">
+          <thead>
+            <tr class="border-b-2 border-gray-200">
+              <th class="pb-3 pr-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Staff</th>
+              <th class="pb-3 px-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Shifts</th>
+              <th class="pb-3 pl-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Total Hours</th>
+            </tr>
+          </thead>
+          <tbody id="hours-table-body">
+            <tr><td colspan="3" class="py-10 text-center text-gray-400 text-sm">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p id="hours-empty" class="hidden py-10 text-center text-gray-400 text-sm">No schedule data for this month.</p>
+    </div>
+  </div><!-- end #page-panel-hours -->
+
   <script is:inline>
     var scheduleData = [];
     var currentWeekStart;
@@ -677,6 +724,7 @@ import MainLayout from '../layouts/MainLayout.astro';
     $(document).ready(function () {
       document.getElementById('f-date').value = new Date().toISOString().slice(0, 10);
       currentWeekStart = getWeekStart(new Date());
+      hoursMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 
       document.getElementById('btn-prev-week').addEventListener('click', function () {
         currentWeekStart = addDays(currentWeekStart, -7);
@@ -1453,15 +1501,110 @@ import MainLayout from '../layouts/MainLayout.astro';
     // ── Page-level tab switching ──────────────────────────────────────────────
     // ══════════════════════════════════════════════════════════════════════════
     function switchPageTab(tab) {
-      var isStaff = tab === 'staff';
+      var isStaff  = tab === 'staff';
+      var isRoute  = tab === 'route';
+      var isHours  = tab === 'hours';
       document.getElementById('page-panel-staff').classList.toggle('hidden', !isStaff);
-      document.getElementById('page-panel-route').classList.toggle('hidden', isStaff);
+      document.getElementById('page-panel-route').classList.toggle('hidden', !isRoute);
+      document.getElementById('page-panel-hours').classList.toggle('hidden', !isHours);
       document.getElementById('pt-summary-panel').classList.toggle('hidden', !isStaff);
       var activeClass   = 'px-5 py-3 text-sm font-semibold text-orange-500 border-b-2 border-orange-500 -mb-px transition';
       var inactiveClass = 'px-5 py-3 text-sm font-medium text-gray-400 border-b-2 border-transparent -mb-px hover:text-gray-600 transition';
       document.getElementById('page-tab-staff').className = isStaff ? activeClass : inactiveClass;
-      document.getElementById('page-tab-route').className  = isStaff ? inactiveClass : activeClass;
-      if (!isStaff && !rsDataLoaded) loadRSData();
+      document.getElementById('page-tab-route').className = isRoute ? activeClass : inactiveClass;
+      document.getElementById('page-tab-hours').className = isHours ? activeClass : inactiveClass;
+      if (isRoute && !rsDataLoaded) loadRSData();
+      if (isHours) renderMonthlyHours();
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // ── Monthly Hours ─────────────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════════
+    var hoursMonth = null; // Date set to 1st of the displayed month
+
+    function hoursNavMonth(delta) {
+      hoursMonth = new Date(hoursMonth.getFullYear(), hoursMonth.getMonth() + delta, 1);
+      renderMonthlyHours();
+    }
+
+    function hoursGoToday() {
+      var now = new Date();
+      hoursMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      renderMonthlyHours();
+    }
+
+    function renderMonthlyHours() {
+      var MONTHS_FULL = ['January','February','March','April','May','June',
+                         'July','August','September','October','November','December'];
+      var y  = hoursMonth.getFullYear();
+      var m  = hoursMonth.getMonth();
+      var now = new Date();
+      var isCurrentMonth = (y === now.getFullYear() && m === now.getMonth());
+      document.getElementById('hours-month-label').textContent =
+        MONTHS_FULL[m] + ' ' + y + (isCurrentMonth ? ' (Current)' : '');
+
+      // Filter schedule entries for this month
+      var prefix = y + '-' + String(m + 1).padStart(2, '0');
+      var entries = scheduleData.filter(function (s) {
+        return (s.date || '').slice(0, 7) === prefix;
+      });
+
+      // Aggregate by staff
+      var staffMap = {};
+      entries.forEach(function (s) {
+        var name = s.staff_name || '?';
+        if (!staffMap[name]) staffMap[name] = { shifts: 0, totalMin: 0 };
+        staffMap[name].shifts++;
+        var diff = timeToMin(s.end_time) - timeToMin(s.start_time);
+        if (diff <= 0) diff += 1440;
+        staffMap[name].totalMin += diff;
+      });
+
+      var staffList = Object.keys(staffMap);
+      // Sort by canonical order first, then alphabetical
+      staffList.sort(function (a, b) {
+        var ia = STAFF_NAMES.indexOf(a), ib = STAFF_NAMES.indexOf(b);
+        if (ia !== -1 && ib !== -1) return ia - ib;
+        if (ia !== -1) return -1;
+        if (ib !== -1) return 1;
+        return a.localeCompare(b);
+      });
+
+      var tbody = document.getElementById('hours-table-body');
+      var empty = document.getElementById('hours-empty');
+
+      if (!staffList.length) {
+        tbody.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+
+      var totalMin = staffList.reduce(function (s, n) { return s + staffMap[n].totalMin; }, 0);
+
+      var html = staffList.map(function (name, idx) {
+        var d = staffMap[name];
+        var h = Math.floor(d.totalMin / 60), mm = d.totalMin % 60;
+        var label = h + 'h' + (mm ? ' ' + mm + 'm' : '');
+        var isLast = idx === staffList.length - 1;
+        return '<tr class="' + (isLast ? '' : 'border-b border-gray-100') + ' hover:bg-gray-50/40">' +
+          '<td class="py-3 pr-4 font-medium text-gray-800">' + escHtml(name) + '</td>' +
+          '<td class="py-3 px-4 text-right text-gray-500">' + d.shifts + '</td>' +
+          '<td class="py-3 pl-4 text-right font-semibold text-gray-800 tabular-nums">' + label + '</td>' +
+          '</tr>';
+      }).join('');
+
+      // Totals row
+      var th = Math.floor(totalMin / 60), tm = totalMin % 60;
+      var totalLabel = th + 'h' + (tm ? ' ' + tm + 'm' : '');
+      var totalShifts = staffList.reduce(function (s, n) { return s + staffMap[n].shifts; }, 0);
+      html += '<tr class="border-t-2 border-gray-200">' +
+        '<td class="py-3 pr-4 font-semibold text-gray-700">Total</td>' +
+        '<td class="py-3 px-4 text-right font-semibold text-gray-700">' + totalShifts + '</td>' +
+        '<td class="py-3 pl-4 text-right font-bold text-orange-500 tabular-nums">' + totalLabel + '</td>' +
+        '</tr>';
+
+      tbody.innerHTML = html;
     }
 
     // ══════════════════════════════════════════════════════════════════════════

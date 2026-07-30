@@ -57,6 +57,11 @@ import MainLayout from '../layouts/MainLayout.astro';
                      rounded-lg text-xs font-medium transition">
         This Month
       </button>
+      <button onclick="setQuick('prevmonth')"
+              class="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600
+                     rounded-lg text-xs font-medium transition">
+        Prev Month
+      </button>
     </div>
   </div>
 
@@ -633,6 +638,11 @@ import MainLayout from '../layouts/MainLayout.astro';
         from = today.slice(0, 7) + '-01';
         var lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
         to = lastDay.toISOString().slice(0, 10);
+      } else if (period === 'prevmonth') {
+        var pm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        from = pm.getFullYear() + '-' + String(pm.getMonth() + 1).padStart(2, '0') + '-01';
+        var pmLast = new Date(pm.getFullYear(), pm.getMonth() + 1, 0);
+        to = pmLast.toISOString().slice(0, 10);
       }
       document.getElementById('view-from').value = from;
       document.getElementById('view-to').value   = to;
