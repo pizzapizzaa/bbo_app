@@ -1215,6 +1215,13 @@ import MainLayout from '../layouts/MainLayout.astro';
           data: (function (key) {
             return function (row) { return row[key] != null ? String(row[key]) : ''; };
           })(h),
+          // DataTables writes cell content as HTML, so every value must be
+          // escaped on the way out. Customer fields (name, note, email…) can be
+          // set by anyone through the public self-registration form, so an
+          // unescaped cell here is a stored-XSS sink running with a staff
+          // session. Only 'display' is escaped — sorting and searching keep
+          // working on the raw value.
+          render: function (val, type) { return type === 'display' ? escHtml(val) : val; },
           defaultContent: ''
         };
       });
@@ -1405,7 +1412,9 @@ import MainLayout from '../layouts/MainLayout.astro';
     }
 
     function escHtml(str) {
-      return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      return String(str == null ? '' : str)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
     }
 
     // ── Row actions context menu ──

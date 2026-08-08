@@ -12,5 +12,6 @@ export default defineConfig({
     'import.meta.env.SUPABASE_SERVICE_KEY': JSON.stringify('test-service-key'),
     'import.meta.env.ADMIN_USERNAME':       JSON.stringify('admin'),
     'import.meta.env.ADMIN_PASSWORD':       JSON.stringify('test-password'),
+    'import.meta.env.LEADERBOARD_SIGNING_SECRET': JSON.stringify('vitest-leaderboard-secret-32-chars!!'),
   },
 });

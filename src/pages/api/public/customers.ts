@@ -2,6 +2,7 @@ export const prerender = false;
 
 import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
+import { escapeLike } from '../../../lib/validate';
 
 /** GET /api/public/customers?q=<search_term>
  *  Returns up to 10 customer full_names matching the query.
@@ -23,10 +24,12 @@ export const GET: APIRoute = async ({ url }) => {
     return new Response(JSON.stringify({ names: [] }), { status: 200 });
   }
 
+  // Only the surrounding %…% are wildcards; everything the caller typed is
+  // escaped so it cannot widen the search (see escapeLike).
   const { data, error } = await db
     .from('customers')
     .select('full_name')
-    .ilike('full_name', `%${safe.replace(/%/g, '\\%').replace(/_/g, '\\_')}%`)
+    .ilike('full_name', `%${escapeLike(safe)}%`)
     .order('full_name')
     .limit(10);
 

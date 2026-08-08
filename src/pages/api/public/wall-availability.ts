@@ -2,7 +2,7 @@ export const prerender = false;
 
 import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
-import { escapeLike, MAX_NAME } from '../../../lib/validate';
+import { escapeLike, namesMatch, MAX_NAME } from '../../../lib/validate';
 import { getWallAvailability } from '../../../lib/wall-config';
 
 const VALID_WALLS = ['W1', 'W2', 'W3', 'W4', 'W5', 'W6'] as const;
@@ -35,12 +35,14 @@ export const GET: APIRoute = async ({ url }) => {
   // Find customer
   const { data: customer } = await db
     .from('customers')
-    .select('id')
+    .select('id, full_name')
     .ilike('full_name', escapeLike(safe))
     .limit(1)
     .single();
 
-  if (!customer) return json({ error: 'Customer not found.' }, 404);
+  if (!customer || !namesMatch((customer as any).full_name, safe)) {
+    return json({ error: 'Customer not found.' }, 404);
+  }
 
   const availability = await getWallAvailability((customer as any).id as string, wall);
   if (!availability) return json({ error: 'Wall configuration not found.' }, 404);

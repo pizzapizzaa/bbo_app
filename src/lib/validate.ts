@@ -25,9 +25,34 @@ export function isValidTime(s: string):   boolean { return HH_MM.test(s); }
 export function isValidAmount(n: number): boolean { return Number.isFinite(n) && n >= 0 && n <= MAX_AMOUNT; }
 
 /**
- * Escape SQL LIKE/ILIKE wildcards (% and _) so that user-supplied strings
- * are treated as literals rather than patterns.
+ * Escape wildcards so a user-supplied string is matched literally by LIKE/ILIKE.
+ *
+ * Order matters — the backslash must be escaped first. Otherwise an input of
+ * "\%" would become "\\%": a literal backslash followed by a *live* wildcard,
+ * re-opening the very hole the other replacements close.
+ *
+ *   \  the LIKE escape character itself
+ *   %  SQL "any sequence of characters" wildcard
+ *   _  SQL "any single character" wildcard
+ *   *  PostgREST's alias for %, substituted into the pattern before it reaches
+ *      SQL — so an unescaped "*" is just as dangerous as an unescaped "%".
  */
 export function escapeLike(s: string): string {
-  return s.replace(/%/g, '\\%').replace(/_/g, '\\_');
+  return s
+    .replace(/\\/g, '\\\\')
+    .replace(/%/g,  '\\%')
+    .replace(/_/g,  '\\_')
+    .replace(/\*/g, '\\*');
+}
+
+/**
+ * Case-insensitive exact comparison of two customer names.
+ *
+ * Defence in depth for the `.ilike()` name lookups: even if a wildcard were to
+ * slip past escapeLike, the row it matched would not equal the supplied name,
+ * so the caller can reject it instead of acting on someone else's record.
+ */
+export function namesMatch(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
 }

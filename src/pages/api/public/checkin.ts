@@ -2,7 +2,7 @@ export const prerender = false;
 
 import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
-import { MAX_NAME, escapeLike } from '../../../lib/validate';
+import { MAX_NAME, escapeLike, namesMatch } from '../../../lib/validate';
 
 /** POST /api/public/checkin — unauthenticated self-check-in kiosk endpoint */
 export const POST: APIRoute = async ({ request }) => {
@@ -30,7 +30,9 @@ export const POST: APIRoute = async ({ request }) => {
     .limit(1)
     .single();
 
-  if (!customer) {
+  // Require an exact (case-insensitive) name match — a pattern match alone is
+  // not enough to check someone in under their name.
+  if (!customer || !namesMatch(customer.full_name, name)) {
     return new Response(
       JSON.stringify({ error: 'Name not found. Please register first or ask a staff member for help.' }),
       { status: 404 },

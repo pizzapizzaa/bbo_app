@@ -279,3 +279,70 @@ ON CONFLICT (wall) DO UPDATE SET
   v0=EXCLUDED.v0, v1=EXCLUDED.v1, v2=EXCLUDED.v2, v3=EXCLUDED.v3,
   v4=EXCLUDED.v4, v5=EXCLUDED.v5, v6=EXCLUDED.v6, v7=EXCLUDED.v7,
   v8=EXCLUDED.v8, updated_at=now();
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- Staff Sign-Off  (Leaderboard 2026)
+-- Every submission logged through the public leaderboard must be witnessed by a
+-- staff member, who picks their name and signs on the kiosk.
+--
+-- Each submission is sealed with an HMAC over its facts (see
+-- src/lib/leaderboard-sig.ts), so a row cannot be edited afterwards — here, in
+-- the dashboard, or through the API — without GET /api/leaderboard/audit
+-- flagging it. The seal proves the record is unaltered; it does not prove the
+-- person who signed was really staff.
+-- ══════════════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS leaderboard_submissions (
+  id            UUID        PRIMARY KEY,            -- set by the API; it is signed
+  customer_id   UUID        NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  wall          TEXT        NOT NULL,               -- 'W1'…'W6'
+  grades        JSONB       NOT NULL,               -- {"V3":2,"V5":1}
+  sends_count   INTEGER     NOT NULL,
+  points        INTEGER     NOT NULL,
+  staff_name    TEXT        NOT NULL,               -- roster name, snapshot
+  signed_at     TIMESTAMPTZ NOT NULL,
+  image_sha256  TEXT        NOT NULL,               -- hex SHA-256 of the signature PNG
+  signature     TEXT        NOT NULL,               -- base64url HMAC-SHA256 seal
+  sig_version   SMALLINT    NOT NULL DEFAULT 1,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_lb_submissions_customer ON leaderboard_submissions (customer_id);
+CREATE INDEX IF NOT EXISTS idx_lb_submissions_signed   ON leaderboard_submissions (signed_at);
+CREATE INDEX IF NOT EXISTS idx_lb_submissions_staff    ON leaderboard_submissions (staff_name);
+
+-- Signature images live apart from the submission row: at ~8 KB each they would
+-- otherwise be dragged into every leaderboard read.
+CREATE TABLE IF NOT EXISTS leaderboard_signature_images (
+  submission_id UUID PRIMARY KEY REFERENCES leaderboard_submissions(id) ON DELETE CASCADE,
+  image         TEXT NOT NULL                       -- data:image/png;base64,…
+);
+
+-- Link each send to the submission that authorised it.
+-- NULL = logged before staff sign-off existed; still counts, shown as unsigned.
+ALTER TABLE leaderboard_sends
+  ADD COLUMN IF NOT EXISTS submission_id UUID REFERENCES leaderboard_submissions(id) ON DELETE CASCADE;
+
+CREATE INDEX IF NOT EXISTS idx_lb_sends_submission ON leaderboard_sends (submission_id);
+
+ALTER TABLE leaderboard_submissions       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE leaderboard_signature_images  ENABLE ROW LEVEL SECURITY;
+-- No anon-key policies → service key only (same pattern as every other table).
+
+-- ── Staff roster (optional; see supabase/migration-staff-signoff.sql) ────────
+-- Mirrors the STAFF_NAMES constant in src/lib/staff.ts so the roster is also
+-- queryable from SQL. The app does not read this table yet.
+CREATE TABLE IF NOT EXISTS staff_roster (
+  name       TEXT        PRIMARY KEY,
+  is_active  BOOLEAN     NOT NULL DEFAULT true,
+  sort_order INTEGER     NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE staff_roster ENABLE ROW LEVEL SECURITY;
+
+INSERT INTO staff_roster (name, sort_order) VALUES
+  ('Huyen', 1), ('Duyen Ha', 2), ('Thanh Tu', 3),
+  ('Bao Anh', 4), ('Danny', 5), ('Minh Chau', 6)
+ON CONFLICT (name) DO UPDATE SET
+  sort_order = EXCLUDED.sort_order,
+  is_active  = true;

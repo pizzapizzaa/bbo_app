@@ -1,9 +1,17 @@
 export const prerender = false;
 
 import type { APIRoute } from 'astro';
+import { randomUUID } from 'crypto';
 import { db } from '../../../lib/db';
-import { escapeLike, MAX_NAME } from '../../../lib/validate';
+import { escapeLike, namesMatch, MAX_NAME } from '../../../lib/validate';
 import { getWallAvailability } from '../../../lib/wall-config';
+import { isKnownStaff } from '../../../lib/staff';
+import {
+  SIG_VERSION,
+  hashSignatureImage,
+  signSubmission,
+  validateSignatureImage,
+} from '../../../lib/leaderboard-sig';
 
 const VALID_WALLS  = ['W1', 'W2', 'W3', 'W4', 'W5', 'W6'] as const;
 const VALID_GRADES = ['V0', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8'] as const;
@@ -28,7 +36,7 @@ export const GET: APIRoute = async ({ url }) => {
 
   // Fetch all sends and all nicknames in parallel
   const [sendsResult, nicknamesResult] = await Promise.all([
-    db.from('leaderboard_sends').select('customer_id, points'),
+    db.from('leaderboard_sends').select('customer_id, points, submission_id'),
     db.from('leaderboard_nicknames').select('customer_id, nickname'),
   ]);
 
@@ -43,16 +51,22 @@ export const GET: APIRoute = async ({ url }) => {
     nicknameMap[n.customer_id] = n.nickname;
   }
 
-  // Aggregate points by customer_id
-  const totals: Record<string, { nickname: string; total: number; sends: number }> = {};
+  // Aggregate points by customer_id.
+  // `signed` counts sends linked to a staff-signed submission; sends logged
+  // before staff sign-off existed have no submission_id and stay unsigned.
+  const totals: Record<
+    string,
+    { nickname: string; total: number; sends: number; signed: number }
+  > = {};
   for (const row of sendsResult.data ?? []) {
     const nick = nicknameMap[row.customer_id];
     if (!nick) continue; // no nickname registered — skip
     if (!totals[row.customer_id]) {
-      totals[row.customer_id] = { nickname: nick, total: 0, sends: 0 };
+      totals[row.customer_id] = { nickname: nick, total: 0, sends: 0, signed: 0 };
     }
     totals[row.customer_id].total += row.points;
     totals[row.customer_id].sends += 1;
+    if (row.submission_id) totals[row.customer_id].signed += 1;
   }
 
   const leaderboard = Object.values(totals)
@@ -67,11 +81,11 @@ export const GET: APIRoute = async ({ url }) => {
     if (safe) {
       const { data: cust } = await db
         .from('customers')
-        .select('id')
+        .select('id, full_name')
         .ilike('full_name', escapeLike(safe))
         .limit(1)
         .single();
-      if (cust) {
+      if (cust && namesMatch(cust.full_name, safe)) {
         existingNickname = nicknameMap[cust.id] ?? null;
       }
     }
@@ -81,13 +95,17 @@ export const GET: APIRoute = async ({ url }) => {
 };
 
 // ── POST /api/public/leaderboard ────────────────────────────────────────────
-// Body: { customer_name, nickname, wall, grades: { V0: 2, V3: 1, … } }
+// Body: { customer_name, nickname, wall, grades: { V0: 2, V3: 1, … },
+//         staff_name, signature_image }
+// Every submission must be signed off by a staff member on the kiosk.
 export const POST: APIRoute = async ({ request }) => {
   let body: {
     customer_name?: unknown;
     nickname?: unknown;
     wall?: unknown;
     grades?: unknown;
+    staff_name?: unknown;
+    signature_image?: unknown;
   };
   try { body = await request.json(); }
   catch { return json({ error: 'Invalid JSON' }, 400); }
@@ -95,6 +113,7 @@ export const POST: APIRoute = async ({ request }) => {
   const customerName = String(body.customer_name ?? '').trim();
   const nickname     = String(body.nickname     ?? '').trim();
   const wall         = String(body.wall         ?? '').trim().toUpperCase();
+  const staffName    = String(body.staff_name   ?? '').trim();
   const gradesRaw    = body.grades;
 
   // ── Input validation ──────────────────────────────────────────────────────
@@ -111,6 +130,16 @@ export const POST: APIRoute = async ({ request }) => {
     return json({ error: `Wall must be one of: ${VALID_WALLS.join(', ')}.` }, 400);
   if (typeof gradesRaw !== 'object' || gradesRaw === null || Array.isArray(gradesRaw))
     return json({ error: 'grades must be an object mapping grade → count.' }, 400);
+
+  // ── Staff sign-off ────────────────────────────────────────────────────────
+  if (!staffName)
+    return json({ error: 'A staff member must sign off on this submission.' }, 400);
+  if (!isKnownStaff(staffName))
+    return json({ error: 'Please select a staff member from the list.' }, 400);
+
+  const signatureImage = validateSignatureImage(body.signature_image);
+  if (!signatureImage)
+    return json({ error: 'A staff signature is required.' }, 400);
 
   // Build the list of individual sends to insert
   const rows: Array<{ customer_id: string; wall: string; grade: string; points: number }> = [];
@@ -141,7 +170,11 @@ export const POST: APIRoute = async ({ request }) => {
     .limit(1)
     .single();
 
-  if (!customer) return json({ error: 'Customer not found. Please check your name.' }, 404);
+  // Exact (case-insensitive) match required — otherwise a pattern match could
+  // log sends onto a different climber's account.
+  if (!customer || !namesMatch(customer.full_name, safe)) {
+    return json({ error: 'Customer not found. Please check your name.' }, 404);
+  }
 
   const customerId = customer.id as string;
 
@@ -197,10 +230,65 @@ export const POST: APIRoute = async ({ request }) => {
 
   if (nickError) return json({ error: nickError.message }, 500);
 
-  // ── Insert sends ──────────────────────────────────────────────────────────
-  const insertRows = rows.map(r => ({ ...r, customer_id: customerId }));
-  const { error: insertError } = await db.from('leaderboard_sends').insert(insertRows);
-  if (insertError) return json({ error: insertError.message }, 500);
+  // ── Seal and record the signed submission ─────────────────────────────────
+  // The signature covers the facts below, so none of them can be altered later
+  // without the audit endpoint noticing.
+  const submissionId = randomUUID();
+  const signedAt     = new Date().toISOString();
+  const imageSha256  = hashSignatureImage(signatureImage);
 
-  return json({ success: true, points_earned: pointsEarned, sends_count: rows.length });
+  const signature = signSubmission({
+    submissionId,
+    customerId,
+    wall,
+    grades:     submittedCounts,
+    sendsCount: rows.length,
+    points:     pointsEarned,
+    staffName,
+    signedAt,
+    imageSha256,
+  });
+
+  const { error: submissionError } = await db.from('leaderboard_submissions').insert({
+    id:            submissionId,
+    customer_id:   customerId,
+    wall,
+    grades:        submittedCounts,
+    sends_count:   rows.length,
+    points:        pointsEarned,
+    staff_name:    staffName,
+    signed_at:     signedAt,
+    image_sha256:  imageSha256,
+    signature,
+    sig_version:   SIG_VERSION,
+  });
+  if (submissionError) return json({ error: submissionError.message }, 500);
+
+  // Image lives in its own table so the leaderboard query never drags it along.
+  const { error: imageError } = await db.from('leaderboard_signature_images').insert({
+    submission_id: submissionId,
+    image:         signatureImage,
+  });
+  if (imageError) {
+    await db.from('leaderboard_submissions').delete().eq('id', submissionId);
+    return json({ error: imageError.message }, 500);
+  }
+
+  // ── Insert sends ──────────────────────────────────────────────────────────
+  const insertRows = rows.map(r => ({ ...r, customer_id: customerId, submission_id: submissionId }));
+  const { error: insertError } = await db.from('leaderboard_sends').insert(insertRows);
+  if (insertError) {
+    // Roll back by hand — PostgREST gives us no transaction. Deleting the
+    // submission cascades to the image, so no orphan signature is left behind.
+    await db.from('leaderboard_submissions').delete().eq('id', submissionId);
+    return json({ error: insertError.message }, 500);
+  }
+
+  return json({
+    success:       true,
+    points_earned: pointsEarned,
+    sends_count:   rows.length,
+    signed_by:     staffName,
+    submission_id: submissionId,
+  });
 };

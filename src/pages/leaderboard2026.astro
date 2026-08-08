@@ -1,6 +1,10 @@
 ---
 // Public leaderboard page — no auth required
 export const prerender = false;
+
+// Staff roster for the sign-off dropdown. Rendered server-side so no public
+// endpoint is needed and Astro escapes the names for us.
+import { STAFF_NAMES } from '../lib/staff';
 ---
 
 <!DOCTYPE html>
@@ -240,6 +244,15 @@ export const prerender = false;
     .field input::placeholder { color: #334155; }
     .field-hint { font-size: .75rem; color: #475569; margin-top: 5px; }
 
+    /* A native select needs an opaque background: the browser paints the open
+       option list with it, and a translucent one falls back to near-white —
+       which made the near-white option text unreadable. */
+    .field select { background-color: #1e293b; color: #f1f5f9; cursor: pointer; }
+    .field select option {
+      background-color: #1e293b; color: #f1f5f9;
+    }
+    .field select option:checked { background-color: #334155; }
+
     /* Autocomplete dropdown */
     .autocomplete-wrap { position: relative; }
     .ac-list {
@@ -277,6 +290,13 @@ export const prerender = false;
     .grade-avail-status.has-avail { color: #f97316; }
     /* Loading skeleton for availability */
     .grade-grid-loading { opacity: .5; pointer-events: none; }
+    /* Shown in place of the grades until a wall is picked — the send log is
+       per-wall, so the hexagons mean nothing before then. */
+    .wall-prompt {
+      border: 1px dashed rgba(255,255,255,.12); border-radius: 14px;
+      padding: 22px 18px; text-align: center;
+      color: #64748b; font-size: .85rem; margin-top: 20px;
+    }
     .hex-wrap {
       width: 56px; height: 62px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
     }
@@ -318,6 +338,48 @@ export const prerender = false;
       background: linear-gradient(135deg, #fbbf24, #f97316);
       -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
     }
+
+    /* ── Staff sign-off ── */
+    .sig-pad {
+      position: relative;
+      background: #f8fafc; border: 1px solid rgba(255,255,255,.12);
+      border-radius: 14px; overflow: hidden;
+    }
+    .sig-pad canvas {
+      display: block; width: 100%; height: 170px;
+      /* Without this the tablet scrolls the page instead of drawing. */
+      touch-action: none; cursor: crosshair;
+    }
+    .sig-placeholder {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      color: #94a3b8; font-size: .85rem; font-weight: 600; pointer-events: none;
+    }
+    .sig-pad.has-ink .sig-placeholder { display: none; }
+    .sig-baseline {
+      position: absolute; left: 24px; right: 24px; bottom: 38px;
+      border-bottom: 1px dashed #cbd5e1; pointer-events: none;
+    }
+    .sig-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
+    .sig-clear {
+      background: none; border: none; color: #64748b; font-family: inherit;
+      font-size: .78rem; font-weight: 600; cursor: pointer; padding: 4px 2px;
+    }
+    .sig-clear:hover { color: #cbd5e1; }
+    .sign-summary {
+      background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08);
+      border-radius: 14px; padding: 14px 18px; margin-bottom: 18px;
+      font-size: .85rem; color: #cbd5e1; line-height: 1.6;
+    }
+    .sign-summary strong { color: #f1f5f9; }
+
+    /* Signed / unsigned badge on leaderboard rows */
+    .verified-tag {
+      display: inline-flex; align-items: center; gap: 3px;
+      font-size: .68rem; font-weight: 700; padding: 1px 7px; border-radius: 99px;
+      margin-left: 7px; vertical-align: middle; white-space: nowrap;
+    }
+    .verified-tag.signed   { background: rgba(34,197,94,.15);  color: #4ade80; }
+    .verified-tag.unsigned { background: rgba(148,163,184,.13); color: #94a3b8; }
 
     /* Navigation buttons inside modal */
     .modal-nav { display: flex; gap: 10px; margin-top: 8px; }
@@ -429,6 +491,7 @@ export const prerender = false;
       <div class="steps">
         <div class="step-dot active" id="dot-1"></div>
         <div class="step-dot" id="dot-2"></div>
+        <div class="step-dot" id="dot-3"></div>
       </div>
 
       <!-- Alert -->
@@ -483,29 +546,66 @@ export const prerender = false;
           </select>
         </div>
 
-        <div class="field" style="margin-top:20px">
-          <label>Routes Sent</label>
-          <div class="grade-grid" id="grade-grid">
-            <!-- Injected by JS -->
-          </div>
+        <div class="wall-prompt" id="wall-prompt">
+          👆 Choose your wall first — routes are logged per wall.
         </div>
 
-        <div class="pts-preview" id="pts-preview">
-          <div>
-            <div class="label">Points to earn</div>
-            <div style="font-size:.75rem;color:#475569;margin-top:2px" id="sends-summary">No sends selected</div>
+        <div id="routes-block" style="display:none">
+          <div class="field" style="margin-top:20px">
+            <label>Routes Sent</label>
+            <div class="grade-grid" id="grade-grid">
+              <!-- Injected by JS -->
+            </div>
           </div>
-          <div class="pts-val" id="pts-preview-val">0</div>
+
+          <div class="pts-preview" id="pts-preview">
+            <div>
+              <div class="label">Points to earn</div>
+              <div style="font-size:.75rem;color:#475569;margin-top:2px" id="sends-summary">No sends selected</div>
+            </div>
+            <div class="pts-val" id="pts-preview-val">0</div>
+          </div>
         </div>
 
         <div class="modal-nav">
           <button class="btn btn-back btn-secondary" id="btn-step2-back">← Back</button>
-          <button class="btn btn-primary btn-next" id="btn-step2-submit">🚀 Submit Sends</button>
+          <button class="btn btn-primary btn-next" id="btn-step2-next">Next → Staff Sign-Off</button>
         </div>
       </div>
 
-      <!-- ── Step 3: Success ───────────────────────────────────────────── -->
+      <!-- ── Step 3: Staff sign-off ────────────────────────────────────── -->
       <div id="step-3" style="display:none">
+        <div class="sign-summary" id="sign-summary"></div>
+
+        <div class="field">
+          <label for="staff-select">Staff Member <span style="color:#ef4444">*</span></label>
+          <select id="staff-select">
+            <option value="">— Select staff member —</option>
+            {STAFF_NAMES.map((name) => <option value={name}>{name}</option>)}
+          </select>
+          <div class="field-hint">Ask a staff member to confirm your sends and sign below.</div>
+        </div>
+
+        <div class="field">
+          <label for="sig-canvas">Staff Signature <span style="color:#ef4444">*</span></label>
+          <div class="sig-pad" id="sig-pad">
+            <canvas id="sig-canvas" aria-label="Staff signature pad"></canvas>
+            <div class="sig-baseline"></div>
+            <div class="sig-placeholder">✍️ Sign here</div>
+          </div>
+          <div class="sig-actions">
+            <button type="button" class="sig-clear" id="btn-sig-clear">Clear signature</button>
+          </div>
+        </div>
+
+        <div class="modal-nav">
+          <button class="btn btn-back btn-secondary" id="btn-step3-back">← Back</button>
+          <button class="btn btn-primary btn-next" id="btn-step3-submit">🚀 Submit Sends</button>
+        </div>
+      </div>
+
+      <!-- ── Step 4: Success ───────────────────────────────────────────── -->
+      <div id="step-4" style="display:none">
         <div class="celebrate">
           <span class="emoji" id="celebrate-emoji">🎉</span>
           <h3>Send logged!</h3>
@@ -561,10 +661,29 @@ export const prerender = false;
     document.getElementById('wall-select').addEventListener('change', async e => {
       state.selectedWall = e.target.value;
       clearAvailability();
+      resetCounts();
+      showRoutes(!!state.selectedWall);
       if (state.selectedWall && state.customerName) {
         await fetchAvailability();
       }
     });
+
+    /** The grade hexagons only make sense once a wall is picked — the send
+     *  log and its per-grade limits are per wall. */
+    function showRoutes(show) {
+      document.getElementById('routes-block').style.display = show ? '' : 'none';
+      document.getElementById('wall-prompt').style.display  = show ? 'none' : '';
+    }
+
+    /** Zero every counter and its display. */
+    function resetCounts() {
+      state.counts = Object.fromEntries(GRADES.map(g => [g.grade, 0]));
+      GRADES.forEach(({ grade }) => {
+        const el = document.getElementById(`count-${grade}`);
+        if (el) { el.textContent = '0'; el.className = 'counter-val'; }
+      });
+      updatePtsPreview();
+    }
 
     // ── Availability helpers ──────────────────────────────────────────────
     function clearAvailability() {
@@ -705,13 +824,15 @@ export const prerender = false;
 
     // ── Step navigation ──────────────────────────────────────────────────────
     function setStep(n) {
-      document.getElementById('step-1').style.display = n === 1 ? '' : 'none';
-      document.getElementById('step-2').style.display = n === 2 ? '' : 'none';
-      document.getElementById('step-3').style.display = n === 3 ? '' : 'none';
-      [1, 2].forEach(i => {
+      [1, 2, 3, 4].forEach(i => {
+        document.getElementById(`step-${i}`).style.display = i === n ? '' : 'none';
+      });
+      [1, 2, 3].forEach(i => {
         const dot = document.getElementById(`dot-${i}`);
         dot.className = 'step-dot' + (i < n ? ' done' : i === n ? ' active' : '');
       });
+      // The canvas has no size until its step is visible, so size it on entry.
+      if (n === 3) resizeSignaturePad();
       clearAlert();
     }
 
@@ -737,14 +858,53 @@ export const prerender = false;
     // ── Step 2 back ──────────────────────────────────────────────────────────
     document.getElementById('btn-step2-back').addEventListener('click', () => setStep(1));
 
-    // ── Step 2 submit ─────────────────────────────────────────────────────────
-    document.getElementById('btn-step2-submit').addEventListener('click', async () => {
+    // ── Step 2 → Step 3 ──────────────────────────────────────────────────────
+    document.getElementById('btn-step2-next').addEventListener('click', () => {
       if (!state.selectedWall) { showAlert('Please choose a wall.'); return; }
-      const gradesPayload = {};
-      GRADES.forEach(({ grade }) => { if (state.counts[grade] > 0) gradesPayload[grade] = state.counts[grade]; });
-      if (!Object.keys(gradesPayload).length) { showAlert('Please select at least one route to log.'); return; }
+      if (!buildGradesPayload()) { showAlert('Please select at least one route to log.'); return; }
+      renderSignSummary();
+      setStep(3);
+    });
 
-      const submitBtn = document.getElementById('btn-step2-submit');
+    /** Collect the non-zero grade counts, or null if nothing is selected. */
+    function buildGradesPayload() {
+      const payload = {};
+      GRADES.forEach(({ grade }) => {
+        if (state.counts[grade] > 0) payload[grade] = state.counts[grade];
+      });
+      return Object.keys(payload).length ? payload : null;
+    }
+
+    /** Restate what staff is about to put their name to. */
+    function renderSignSummary() {
+      let pts = 0, sends = 0;
+      const parts = [];
+      GRADES.forEach(({ grade, pts: p }) => {
+        const n = state.counts[grade];
+        if (n > 0) { pts += p * n; sends += n; parts.push(`${n}× ${grade}`); }
+      });
+      const el = document.getElementById('sign-summary');
+      el.innerHTML =
+        `<strong>${escHtml(state.customerName)}</strong> is logging ` +
+        `<strong>${sends}</strong> send${sends !== 1 ? 's' : ''} on ` +
+        `<strong>${escHtml(state.selectedWall)}</strong><br>` +
+        `${escHtml(parts.join(' · '))} — <strong>${pts} pts</strong>`;
+    }
+
+    // ── Step 3 back ──────────────────────────────────────────────────────────
+    document.getElementById('btn-step3-back').addEventListener('click', () => setStep(2));
+
+    // ── Step 3 submit ─────────────────────────────────────────────────────────
+    document.getElementById('btn-step3-submit').addEventListener('click', async () => {
+      const gradesPayload = buildGradesPayload();
+      if (!state.selectedWall)  { showAlert('Please choose a wall.'); setStep(2); return; }
+      if (!gradesPayload)       { showAlert('Please select at least one route to log.'); setStep(2); return; }
+
+      const staffName = document.getElementById('staff-select').value;
+      if (!staffName)      { showAlert('Please select the staff member signing off.'); return; }
+      if (!hasSignature()) { showAlert('Please ask staff to sign in the box above.'); return; }
+
+      const submitBtn = document.getElementById('btn-step3-submit');
       submitBtn.disabled = true;
       submitBtn.textContent = 'Submitting…';
 
@@ -753,10 +913,12 @@ export const prerender = false;
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
           body:    JSON.stringify({
-            customer_name: state.customerName,
-            nickname:      state.nickname,
-            wall:          state.selectedWall,
-            grades:        gradesPayload,
+            customer_name:   state.customerName,
+            nickname:        state.nickname,
+            wall:            state.selectedWall,
+            grades:          gradesPayload,
+            staff_name:      staffName,
+            signature_image: exportSignature(),
           }),
         });
         const data = await res.json();
@@ -765,10 +927,11 @@ export const prerender = false;
         // Show success
         document.getElementById('pts-earned-val').textContent = `+${data.points_earned} pts`;
         document.getElementById('celebrate-msg').textContent =
-          `${data.sends_count} send${data.sends_count !== 1 ? 's' : ''} logged on ${state.selectedWall} as "${state.nickname}". Keep crushing it!`;
+          `${data.sends_count} send${data.sends_count !== 1 ? 's' : ''} logged on ${state.selectedWall} as ` +
+          `"${state.nickname}", signed off by ${data.signed_by}. Keep crushing it!`;
         document.getElementById('celebrate-emoji').textContent =
           data.points_earned >= 100 ? '🔥' : data.points_earned >= 50 ? '🎉' : '✅';
-        setStep(3);
+        setStep(4);
         loadLeaderboard(); // refresh in background
       } catch {
         showAlert('Network error. Please check your connection and try again.');
@@ -776,6 +939,132 @@ export const prerender = false;
         submitBtn.disabled = false;
         submitBtn.textContent = '🚀 Submit Sends';
       }
+    });
+
+    // ── Signature pad ────────────────────────────────────────────────────────
+    // Plain canvas + pointer events: one handler covers mouse, touch and stylus.
+    const sigPad    = document.getElementById('sig-pad');
+    const sigCanvas = document.getElementById('sig-canvas');
+    const sigCtx    = sigCanvas.getContext('2d');
+
+    // Strokes are kept in CSS pixels so the pad can be re-rendered at any size
+    // (rotating a tablet, resizing a window) without losing what was drawn.
+    let sigStrokes = [];   // [[{x,y}, …], …]
+    let sigDrawing = false;
+
+    function resizeSignaturePad() {
+      const rect = sigCanvas.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;   // still hidden
+      const dpr = window.devicePixelRatio || 1;
+      sigCanvas.width  = Math.round(rect.width  * dpr);
+      sigCanvas.height = Math.round(rect.height * dpr);
+      sigCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      redrawSignature();
+    }
+
+    function redrawSignature() {
+      const rect = sigCanvas.getBoundingClientRect();
+      sigCtx.clearRect(0, 0, rect.width, rect.height);
+      sigCtx.lineWidth   = 2.2;
+      sigCtx.lineCap     = 'round';
+      sigCtx.lineJoin    = 'round';
+      sigCtx.strokeStyle = '#0f172a';
+      sigStrokes.forEach(stroke => {
+        if (stroke.length === 1) {
+          // A single tap still deserves a visible dot.
+          sigCtx.beginPath();
+          sigCtx.arc(stroke[0].x, stroke[0].y, 1.1, 0, Math.PI * 2);
+          sigCtx.fillStyle = '#0f172a';
+          sigCtx.fill();
+          return;
+        }
+        sigCtx.beginPath();
+        sigCtx.moveTo(stroke[0].x, stroke[0].y);
+        for (let i = 1; i < stroke.length; i++) sigCtx.lineTo(stroke[i].x, stroke[i].y);
+        sigCtx.stroke();
+      });
+      sigPad.classList.toggle('has-ink', sigStrokes.length > 0);
+    }
+
+    function sigPoint(e) {
+      const rect = sigCanvas.getBoundingClientRect();
+      return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    }
+
+    sigCanvas.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      sigCanvas.setPointerCapture(e.pointerId);
+      sigDrawing = true;
+      sigStrokes.push([sigPoint(e)]);
+      redrawSignature();
+    });
+    sigCanvas.addEventListener('pointermove', e => {
+      if (!sigDrawing) return;
+      e.preventDefault();
+      sigStrokes[sigStrokes.length - 1].push(sigPoint(e));
+      redrawSignature();
+    });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(evt => {
+      sigCanvas.addEventListener(evt, () => { sigDrawing = false; });
+    });
+
+    document.getElementById('btn-sig-clear').addEventListener('click', clearSignature);
+
+    function clearSignature() {
+      sigStrokes = [];
+      sigDrawing = false;
+      redrawSignature();
+    }
+
+    /**
+     * A stray tap shouldn't pass as a signature — require a real mark: either
+     * several strokes, or one stroke with enough points to be a squiggle.
+     */
+    function hasSignature() {
+      const points = sigStrokes.reduce((n, s) => n + s.length, 0);
+      return sigStrokes.length >= 2 || points >= 8;
+    }
+
+    /**
+     * Render the strokes onto a fixed 600×180 canvas so every stored signature
+     * has the same dimensions regardless of the device that drew it.
+     */
+    function exportSignature() {
+      const OUT_W = 600, OUT_H = 180;
+      const rect  = sigCanvas.getBoundingClientRect();
+      const scale = Math.min(OUT_W / rect.width, OUT_H / rect.height);
+
+      const out = document.createElement('canvas');
+      out.width  = OUT_W;
+      out.height = OUT_H;
+      const ctx = out.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, OUT_W, OUT_H);
+      ctx.setTransform(scale, 0, 0, scale, 0, 0);
+      ctx.lineWidth   = 2.2;
+      ctx.lineCap     = 'round';
+      ctx.lineJoin    = 'round';
+      ctx.strokeStyle = '#0f172a';
+      ctx.fillStyle   = '#0f172a';
+
+      sigStrokes.forEach(stroke => {
+        if (stroke.length === 1) {
+          ctx.beginPath();
+          ctx.arc(stroke[0].x, stroke[0].y, 1.1, 0, Math.PI * 2);
+          ctx.fill();
+          return;
+        }
+        ctx.beginPath();
+        ctx.moveTo(stroke[0].x, stroke[0].y);
+        for (let i = 1; i < stroke.length; i++) ctx.lineTo(stroke[i].x, stroke[i].y);
+        ctx.stroke();
+      });
+
+      return out.toDataURL('image/png');
+    }
+
+    window.addEventListener('resize', () => {
+      if (document.getElementById('step-3').style.display !== 'none') resizeSignaturePad();
     });
 
     // ── Log More / Done ──────────────────────────────────────────────────────
@@ -803,13 +1092,14 @@ export const prerender = false;
     function resetModal() {
       state.selectedWall = '';
       state.availability = null;
-      state.counts = Object.fromEntries(GRADES.map(g => [g.grade, 0]));
-      GRADES.forEach(({ grade }) => {
-        const el = document.getElementById(`count-${grade}`);
-        if (el) { el.textContent = '0'; el.className = 'counter-val'; }
-      });
+      resetCounts();
+      showRoutes(false);
       const wallSel = document.getElementById('wall-select');
       if (wallSel) wallSel.value = '';
+      // Staff must select their name and sign again for each submission.
+      const staffSel = document.getElementById('staff-select');
+      if (staffSel) staffSel.value = '';
+      clearSignature();
       clearAvailability();
       updatePtsPreview();
       clearAlert();
@@ -932,7 +1222,7 @@ export const prerender = false;
             <div class="podium-card ${cls}">
               <div class="podium-medal">${medal}</div>
               <div class="podium-rank">${lbl}</div>
-              <div class="podium-nick">${escHtml(entry.nickname)}</div>
+              <div class="podium-nick">${escHtml(entry.nickname)}${signedTag(entry)}</div>
               <div class="podium-pts">${entry.total.toLocaleString()}</div>
               <div class="podium-sends">${entry.sends} send${entry.sends !== 1 ? 's' : ''}</div>
               <div class="podium-bar"><div class="podium-bar-fill"></div></div>
@@ -955,7 +1245,7 @@ export const prerender = false;
           html += `
             <div class="rank-row" style="animation-delay:${i * 40}ms">
               <div class="rank-num${isTop10 ? ' top' : ''}">${rank}</div>
-              <div class="rank-nick">${escHtml(entry.nickname)}<span class="rank-fire">${fire}</span></div>
+              <div class="rank-nick">${escHtml(entry.nickname)}${signedTag(entry)}<span class="rank-fire">${fire}</span></div>
               <div class="rank-sends">${entry.sends} sends</div>
               <div class="rank-pts">${entry.total.toLocaleString()}</div>
             </div>`;
@@ -972,6 +1262,19 @@ export const prerender = false;
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
+    }
+
+    /**
+     * ✓ when every one of a climber's sends carries a staff signature.
+     * Sends logged before sign-off existed have no signature and stay marked
+     * as such rather than being quietly promoted.
+     */
+    function signedTag(entry) {
+      const signed = entry.signed ?? 0;
+      if (!entry.sends) return '';
+      if (signed >= entry.sends) return '<span class="verified-tag signed" title="Every send staff-signed">✓</span>';
+      const missing = entry.sends - signed;
+      return `<span class="verified-tag unsigned" title="${missing} send${missing !== 1 ? 's' : ''} logged without a staff signature">${missing} unsigned</span>`;
     }
 
     // ── Init ─────────────────────────────────────────────────────────────────

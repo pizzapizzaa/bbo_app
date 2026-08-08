@@ -5,6 +5,7 @@ import {
   isValidTime,
   isValidAmount,
   escapeLike,
+  namesMatch,
   MAX_NAME,
   MAX_TEXT,
   MAX_AMOUNT,
@@ -134,6 +135,57 @@ describe('escapeLike', () => {
 
   it('returns empty string unchanged', () =>
     expect(escapeLike('')).toBe(''));
+
+  // PostgREST substitutes * for % in like/ilike patterns, so a bare asterisk
+  // is a wildcard just like a percent sign.
+  it('escapes the PostgREST * wildcard alias', () =>
+    expect(escapeLike('*')).toBe('\\*'));
+
+  it('escapes * embedded in a name', () =>
+    expect(escapeLike('Bob*son')).toBe('Bob\\*son'));
+
+  // The backslash must be escaped first, or "\%" would come out as "\\%":
+  // a literal backslash followed by a still-live wildcard.
+  it('escapes a lone backslash', () =>
+    expect(escapeLike('a\\b')).toBe('a\\\\b'));
+
+  it('does not leave a live wildcard when input mixes a backslash and a %', () =>
+    expect(escapeLike('\\%')).toBe('\\\\\\%'));
+
+  it('escapes every wildcard class in one string', () =>
+    expect(escapeLike('a%b_c*d\\e')).toBe('a\\%b\\_c\\*d\\\\e'));
+});
+
+// ── namesMatch ────────────────────────────────────────────────────────────────
+describe('namesMatch', () => {
+  it('matches identical names', () =>
+    expect(namesMatch('Alice Nguyen', 'Alice Nguyen')).toBe(true));
+
+  it('ignores case', () =>
+    expect(namesMatch('ALICE NGUYEN', 'alice nguyen')).toBe(true));
+
+  it('ignores surrounding whitespace', () =>
+    expect(namesMatch('  Alice Nguyen  ', 'Alice Nguyen')).toBe(true));
+
+  it('rejects a different name', () =>
+    expect(namesMatch('Alice Nguyen', 'Bob Tran')).toBe(false));
+
+  // The point of the helper: a wildcard that matched a row must not be
+  // accepted as that row's name.
+  it('rejects a wildcard pattern against the name it matched', () =>
+    expect(namesMatch('Alice Nguyen', '*')).toBe(false));
+
+  it('rejects a prefix of the stored name', () =>
+    expect(namesMatch('Alice Nguyen', 'Alice')).toBe(false));
+
+  it('rejects null or undefined on either side', () => {
+    expect(namesMatch(null, 'Alice')).toBe(false);
+    expect(namesMatch('Alice', undefined)).toBe(false);
+    expect(namesMatch(null, null)).toBe(false);
+  });
+
+  it('rejects a non-string value', () =>
+    expect(namesMatch(123 as any, '123')).toBe(false));
 });
 
 // ── Constants ─────────────────────────────────────────────────────────────────

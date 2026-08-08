@@ -2,7 +2,7 @@ export const prerender = false;
 
 import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
-import { MAX_NAME, MAX_TEXT, escapeLike } from '../../../lib/validate';
+import { MAX_NAME, MAX_TEXT, escapeLike, namesMatch } from '../../../lib/validate';
 
 /** POST /api/public/register — unauthenticated new customer self-registration */
 export const POST: APIRoute = async ({ request }) => {
@@ -48,12 +48,12 @@ export const POST: APIRoute = async ({ request }) => {
   // Check for duplicate name
   const { data: existing } = await db
     .from('customers')
-    .select('id')
+    .select('id, full_name')
     .ilike('full_name', escapeLike(full_name))
     .limit(1)
     .single();
 
-  if (existing) {
+  if (existing && namesMatch(existing.full_name, full_name)) {
     return new Response(
       JSON.stringify({ error: 'A customer with this name already exists. Please ask a staff member for help.' }),
       { status: 409 },
