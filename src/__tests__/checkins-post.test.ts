@@ -279,6 +279,90 @@ describe('POST /api/checkins — successful insert', () => {
   });
 });
 
+// ── Referral codes ────────────────────────────────────────────────────────────
+describe('POST /api/checkins — referral code', () => {
+  /** Wires the customers table to a single code owner and captures the insert. */
+  function mockOwner(owner: any) {
+    const captured: { payload: any } = { payload: null };
+    mockFromFn.mockImplementation((table: string) => {
+      if (table === 'checkins') {
+        const builder = makeBuilder({ data: mockCheckin, error: null });
+        builder.insert = vi.fn().mockImplementation((payload: any) => {
+          captured.payload = payload;
+          return makeBuilder({ data: mockCheckin, error: null });
+        });
+        return builder;
+      }
+      return makeBuilder({ data: owner, error: null });
+    });
+    return captured;
+  }
+
+  it('records the owner on the check-in when the code is valid', async () => {
+    const captured = mockOwner({
+      id: 'cccc0000-0000-0000-0000-000000000003',
+      full_name: 'Bao Tran',
+      referral_code: 'BAOTRAN-4F2K',
+      referral_discount_pct: 15,
+    });
+
+    const res = await POST({
+      request: makeReq({ ...validBody, referral_code: 'baotran-4f2k' }),
+    } as any);
+
+    expect(res.status).toBe(200);
+    expect(captured.payload).toMatchObject({
+      referral_code:         'BAOTRAN-4F2K',   // normalised to uppercase
+      referred_by_id:        'cccc0000-0000-0000-0000-000000000003',
+      referred_by_name:      'Bao Tran',
+      referral_discount_pct: 15,
+    });
+  });
+
+  it('returns 400 when the code does not belong to any customer', async () => {
+    mockOwner(null);
+    const res = await POST({
+      request: makeReq({ ...validBody, referral_code: 'NOPE-1234' }),
+    } as any);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error: 'Referral code not found.' });
+  });
+
+  it('returns 400 for a malformed code without hitting the DB', async () => {
+    const res = await POST({
+      request: makeReq({ ...validBody, referral_code: 'ab' }),
+    } as any);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error: 'Invalid referral code format.' });
+  });
+
+  it('rejects a customer using their own code, case-insensitively', async () => {
+    mockOwner({
+      id: 'cccc0000-0000-0000-0000-000000000003',
+      full_name: 'alice nguyen',
+      referral_code: 'ALICE-9XYZ',
+      referral_discount_pct: 10,
+    });
+    const res = await POST({
+      request: makeReq({ ...validBody, referral_code: 'ALICE-9XYZ' }),
+    } as any);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error: 'A customer cannot use their own referral code.' });
+  });
+
+  it('stores empty referral fields when no code is supplied', async () => {
+    const captured = mockOwner({ id: 'cust-1' });
+    const res = await POST({ request: makeReq(validBody) } as any);
+    expect(res.status).toBe(200);
+    expect(captured.payload).toMatchObject({
+      referral_code:         '',
+      referred_by_id:        null,
+      referred_by_name:      '',
+      referral_discount_pct: 0,
+    });
+  });
+});
+
 // ── Punch card purchase ───────────────────────────────────────────────────────
 describe('POST /api/checkins — punch card purchase via checkin_type', () => {
   it('adds 10 punches to the customer account when buying "10 Punches – Adult"', async () => {

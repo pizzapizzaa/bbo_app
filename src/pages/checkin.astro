@@ -269,6 +269,25 @@ import MainLayout from '../layouts/MainLayout.astro';
                   <input type="radio" name="discount" class="discount-rb accent-orange-500 w-4 h-4 cursor-pointer" value="birthday" />
                   <span>Birthday discount <span class="text-gray-500 text-xs">Free shoes or 20,000 ₫ off</span></span>
                 </label>
+                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input type="radio" name="discount" class="discount-rb accent-orange-500 w-4 h-4 cursor-pointer" value="referral" />
+                  <span>Referral code <span class="text-gray-500 text-xs">Discount set by the code owner</span></span>
+                </label>
+                <!-- Code entry — only relevant when "Referral code" is picked -->
+                <div id="referral-code-row" class="hidden pl-6">
+                  <input
+                    id="f-referral-code"
+                    type="text"
+                    maxlength="20"
+                    placeholder="Enter referral code…"
+                    autocomplete="off"
+                    class="w-full bg-gray-900 border border-gray-600 text-white placeholder-gray-500 font-mono uppercase
+                           rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                  />
+                  <p id="referral-status" class="text-xs text-gray-500 mt-1">
+                    Ask the customer for the code shared with them.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -413,6 +432,7 @@ import MainLayout from '../layouts/MainLayout.astro';
                 <th>Add-ons</th>
                 <th>Punch From</th>
                 <th>PT Punch From</th>
+                <th>Referral</th>
                 <th>Notes</th>
                 <th>Actions</th>
               </tr>
@@ -549,6 +569,7 @@ import MainLayout from '../layouts/MainLayout.astro';
           { title: 'Add-ons' },
           { title: 'Punch From' },
           { title: 'PT Punch From' },
+          { title: 'Referral' },
           { title: 'Notes' },
           { title: 'Actions', orderable: false, searchable: false }
         ],
@@ -581,6 +602,13 @@ import MainLayout from '../layouts/MainLayout.astro';
             : '<span class="text-gray-300">—</span>',
           c.pt_punch_holder_name
             ? '<span class="text-xs text-indigo-600 font-medium">' + escHtml(c.pt_punch_holder_name) + '</span>'
+            : '<span class="text-gray-300">—</span>',
+          c.referral_code
+            ? '<span class="font-mono text-xs font-semibold bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">' +
+                escHtml(c.referral_code) + '</span>' +
+              '<span class="block text-xs text-gray-500 mt-0.5">' +
+                escHtml(c.referred_by_name || '') +
+                (c.referral_discount_pct ? ' · ' + c.referral_discount_pct + '% off' : '') + '</span>'
             : '<span class="text-gray-300">—</span>',
           escHtml(c.notes || ''),
           '<button onclick="deleteCheckin(\'' + c.id + '\')" ' +
@@ -661,6 +689,8 @@ import MainLayout from '../layouts/MainLayout.astro';
 
     // ── Punch card: auto-select based on selected customer ───────────────────────
     function onCustomerSelected(name) {
+      // Re-check any entered code — it may now be the customer's own.
+      if (document.getElementById('f-referral-code').value.trim()) validateReferralCode();
       var customer = allCustomers.find(function (c) { return c['Full Name'] === name; });
       if (!customer) return;
       var checkinDate = document.getElementById('f-checkin-date').value || new Date().toISOString().slice(0, 10);
@@ -716,6 +746,11 @@ import MainLayout from '../layouts/MainLayout.astro';
         document.getElementById('f-punch-from').value        = '';
         document.getElementById('pt-punch-from-row').classList.add('hidden');
         document.getElementById('f-pt-punch-from').value     = '';
+        // Reset the referral entry along with the rest of the form
+        document.getElementById('f-referral-code').value = '';
+        document.getElementById('referral-code-row').classList.add('hidden');
+        _referral = null;
+        _setReferralStatus('Ask the customer for the code shared with them.', 'muted');
         closeDropdown();
         searchInput.focus();
       };
@@ -805,6 +840,56 @@ import MainLayout from '../layouts/MainLayout.astro';
       });
     }());
 
+    // ── Referral code: look up owner + discount % ─────────────────────────────
+    // _referral holds the last verified lookup; null while unverified/invalid.
+    var _referral       = null;
+    var _referralTimer  = null;
+
+    function _setReferralStatus(msg, tone) {
+      var el = document.getElementById('referral-status');
+      el.textContent = msg;
+      el.className = 'text-xs mt-1 ' +
+        (tone === 'ok' ? 'text-green-400' : tone === 'error' ? 'text-red-400' : 'text-gray-500');
+    }
+
+    function validateReferralCode() {
+      var code = document.getElementById('f-referral-code').value.trim().toUpperCase();
+      _referral = null;
+      if (!code) {
+        _setReferralStatus('Ask the customer for the code shared with them.', 'muted');
+        recalcAmount();
+        return;
+      }
+      _setReferralStatus('Checking…', 'muted');
+      var customer = document.getElementById('f-customer').value.trim();
+      apiFetch('/api/referral?code=' + encodeURIComponent(code) +
+               (customer ? '&customer=' + encodeURIComponent(customer) : ''))
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          // A newer keystroke may have changed the field while this was in flight.
+          if (document.getElementById('f-referral-code').value.trim().toUpperCase() !== code) return;
+          if (!data.valid) {
+            _referral = null;
+            _setReferralStatus(data.error || 'Referral code not found.', 'error');
+          } else {
+            _referral = data;
+            _setReferralStatus('✓ ' + data.owner_name + ' — ' + data.discount_pct + '% off', 'ok');
+          }
+          recalcAmount();
+        })
+        .catch(function () {
+          _referral = null;
+          _setReferralStatus('Could not verify the code. Try again.', 'error');
+          recalcAmount();
+        });
+    }
+
+    document.getElementById('f-referral-code').addEventListener('input', function () {
+      this.value = this.value.toUpperCase();
+      clearTimeout(_referralTimer);
+      _referralTimer = setTimeout(validateReferralCode, 350);
+    });
+
     // ── Check-in type, add-ons & discount: auto-calculate amount ──
     function recalcAmount() {
       var typeSelect  = document.getElementById('f-checkin-type');
@@ -825,6 +910,10 @@ import MainLayout from '../layouts/MainLayout.astro';
         total = Math.round(basePrice * 0.5) + addonTotal;
       } else if (discountVal === 'birthday') {
         total = Math.max(0, (basePrice + addonTotal) - 20000);
+      } else if (discountVal === 'referral') {
+        // Only a verified code discounts anything; add-ons are never discounted.
+        var pct = _referral ? (_referral.discount_pct || 0) : 0;
+        total = Math.round(basePrice * (1 - pct / 100)) + addonTotal;
       } else {
         total = basePrice + addonTotal;
       }
@@ -835,7 +924,18 @@ import MainLayout from '../layouts/MainLayout.astro';
       cb.addEventListener('change', recalcAmount);
     });
     document.querySelectorAll('.discount-rb').forEach(function (rb) {
-      rb.addEventListener('change', recalcAmount);
+      rb.addEventListener('change', function () {
+        var isReferral = this.value === 'referral';
+        document.getElementById('referral-code-row').classList.toggle('hidden', !isReferral);
+        if (isReferral) {
+          document.getElementById('f-referral-code').focus();
+        } else {
+          document.getElementById('f-referral-code').value = '';
+          _referral = null;
+          _setReferralStatus('Ask the customer for the code shared with them.', 'muted');
+        }
+        recalcAmount();
+      });
     });
 
     function toggleAddons() {
@@ -879,6 +979,18 @@ import MainLayout from '../layouts/MainLayout.astro';
       var discountValSub = discountRbSub ? discountRbSub.value : '';
       if (discountValSub && DISCOUNT_LABELS[discountValSub]) addonsArr.push('Discount: ' + DISCOUNT_LABELS[discountValSub]);
       var addonsStr      = addonsArr.join(', ');
+
+      // Referral discount requires a code that verified successfully
+      var referralCode = '';
+      if (discountValSub === 'referral') {
+        if (!_referral) {
+          errEl.textContent = 'Enter a valid referral code, or choose a different discount.';
+          errEl.classList.remove('hidden');
+          document.getElementById('f-referral-code').focus();
+          return;
+        }
+        referralCode = _referral.code;
+      }
       var punchFromSel   = document.getElementById('f-punch-from');
       var punchHolderId  = '';
       var punchHolderName = '';
@@ -934,6 +1046,7 @@ import MainLayout from '../layouts/MainLayout.astro';
           notes:                notes,
           checkin_type:         checkinType,
           addons:               addonsStr,
+          referral_code:        referralCode,
           punch_card_holder_id:   punchHolderId   || undefined,
           punch_card_holder_name: punchHolderName || undefined,
           pt_punch_holder_id:     ptPunchHolderId   || undefined,
@@ -990,11 +1103,14 @@ import MainLayout from '../layouts/MainLayout.astro';
     function exportCheckins() {
       if (!allCheckins.length) { showToast('No check-ins to export for this period.', 'warning'); return; }
       var label = activeFrom === activeTo ? activeFrom : (activeFrom + '_to_' + activeTo);
-      var headers = ['Date', 'Time', 'Customer Name', 'Check-in Type', 'Payment Method', 'Amount', 'Add-ons', 'Punch From', 'PT Punch From', 'Notes'];
+      var headers = ['Date', 'Time', 'Customer Name', 'Check-in Type', 'Payment Method', 'Amount', 'Add-ons',
+                     'Punch From', 'PT Punch From', 'Referral Code', 'Referred By', 'Referral Discount %', 'Notes'];
       var csvContent = [headers].concat(allCheckins.map(function (c) {
         return [c.date, (c.time || '').slice(0, 5), c.customer_name, c.checkin_type || '',
                 c.payment_method, Math.round(c.amount || 0), c.addons || '',
-                c.punch_card_holder_name || '', c.pt_punch_holder_name || '', c.notes || ''];
+                c.punch_card_holder_name || '', c.pt_punch_holder_name || '',
+                c.referral_code || '', c.referred_by_name || '',
+                c.referral_code ? (c.referral_discount_pct || 0) : '', c.notes || ''];
       })).map(function (row) {
         return row.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(',');
       }).join('\n');

@@ -21,6 +21,8 @@ CREATE TABLE IF NOT EXISTS customers (
   membership_start_date DATE,
   membership_end_date   DATE,
   pt_punches_remaining  INTEGER     NOT NULL DEFAULT 0,
+  referral_code         TEXT        NOT NULL DEFAULT '',   -- '' = no affiliated code; stored uppercase
+  referral_discount_pct INTEGER     NOT NULL DEFAULT 0,    -- 1..100, discount given to whoever uses the code
   created_at            TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -56,7 +58,11 @@ CREATE TABLE IF NOT EXISTS checkins (
   punch_card_holder_id   UUID        REFERENCES customers(id) ON DELETE SET NULL,
   punch_card_holder_name TEXT        NOT NULL DEFAULT '',
   pt_punch_holder_id     UUID        REFERENCES customers(id) ON DELETE SET NULL,
-  pt_punch_holder_name   TEXT        NOT NULL DEFAULT ''
+  pt_punch_holder_name   TEXT        NOT NULL DEFAULT '',
+  referral_code          TEXT        NOT NULL DEFAULT '',   -- code redeemed on this visit (uppercase)
+  referred_by_id         UUID        REFERENCES customers(id) ON DELETE SET NULL,
+  referred_by_name       TEXT        NOT NULL DEFAULT '',
+  referral_discount_pct  INTEGER     NOT NULL DEFAULT 0     -- % applied at redemption time
 );
 
 CREATE INDEX IF NOT EXISTS idx_checkins_date ON checkins (date);
@@ -161,6 +167,27 @@ ALTER TABLE customers
 ALTER TABLE checkins
   ADD COLUMN IF NOT EXISTS checkin_type TEXT NOT NULL DEFAULT '',
   ADD COLUMN IF NOT EXISTS addons       TEXT NOT NULL DEFAULT '';
+
+-- ── Referral Code Migration ──────────────────────────────────────────────────
+-- Staff assign an affiliated referral code to selected customers, each with its
+-- own discount percentage. Anyone else may quote that code at check-in to get
+-- the discount; the redemption is recorded against the code owner.
+ALTER TABLE customers
+  ADD COLUMN IF NOT EXISTS referral_code         TEXT    NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS referral_discount_pct INTEGER NOT NULL DEFAULT 0;
+
+-- Case-insensitive uniqueness so "bbo-abc" and "BBO-ABC" can't both exist.
+-- Partial index: the '' default (no code) is exempt.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_referral_code
+  ON customers (upper(referral_code)) WHERE referral_code <> '';
+
+ALTER TABLE checkins
+  ADD COLUMN IF NOT EXISTS referral_code         TEXT    NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS referred_by_id        UUID REFERENCES customers(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS referred_by_name      TEXT    NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS referral_discount_pct INTEGER NOT NULL DEFAULT 0;
+
+CREATE INDEX IF NOT EXISTS idx_checkins_referred_by ON checkins (referred_by_id);
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- Staff Users  (Issue #2 — multi-user auth with roles)

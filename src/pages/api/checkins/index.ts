@@ -4,7 +4,10 @@ import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
 import { ok, serverError } from '../../../lib/auth';
 import { fetchAllPages } from '../../../lib/paginate';
-import { isValidDate, isValidTime, MAX_NAME, MAX_TEXT, escapeLike } from '../../../lib/validate';
+import {
+  isValidDate, isValidTime, MAX_NAME, MAX_TEXT, escapeLike,
+  normalizeReferralCode, isValidReferralCode, referralCodesMatch, namesMatch,
+} from '../../../lib/validate';
 
 /** GET /api/checkins?date=YYYY-MM-DD          — single date
  *  GET /api/checkins?from=YYYY-MM-DD&to=YYYY-MM-DD — inclusive date range */
@@ -55,6 +58,7 @@ export const POST: APIRoute = async ({ request }) => {
     pt_punch_holder_name?: string;
     checkin_type?: string;
     addons?: string;
+    referral_code?: string;
   };
   try { body = await request.json(); }
   catch { return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400 }); }
@@ -62,7 +66,7 @@ export const POST: APIRoute = async ({ request }) => {
   const { customer_name, date, time, payment_method, amount, notes,
           punch_card_holder_id, punch_card_holder_name,
           pt_punch_holder_id, pt_punch_holder_name,
-          checkin_type, addons } = body;
+          checkin_type, addons, referral_code } = body;
   if (!customer_name || !date || !time || !payment_method) {
     return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400 });
   }
@@ -96,6 +100,37 @@ export const POST: APIRoute = async ({ request }) => {
     }
   }
 
+  // ── Referral code: resolve the owner and record the redemption ──
+  // The code may be quoted on every visit; only self-referral is rejected.
+  const referralCode = normalizeReferralCode(referral_code ?? '');
+  let referredById:  string | null = null;
+  let referredByName = '';
+  let referralPct    = 0;
+
+  if (referralCode) {
+    if (!isValidReferralCode(referralCode)) {
+      return new Response(JSON.stringify({ error: 'Invalid referral code format.' }), { status: 400 });
+    }
+    const { data: owner } = await db
+      .from('customers')
+      .select('id, full_name, referral_code, referral_discount_pct')
+      .ilike('referral_code', escapeLike(referralCode))
+      .limit(1)
+      .maybeSingle();
+
+    // Require an exact (case-insensitive) code match — a pattern match alone is
+    // not enough to bill a discount against someone else's code.
+    if (!owner || !referralCodesMatch(owner.referral_code, referralCode)) {
+      return new Response(JSON.stringify({ error: 'Referral code not found.' }), { status: 400 });
+    }
+    if (namesMatch(owner.full_name, customer_name)) {
+      return new Response(JSON.stringify({ error: 'A customer cannot use their own referral code.' }), { status: 400 });
+    }
+    referredById   = owner.id;
+    referredByName = owner.full_name ?? '';
+    referralPct    = owner.referral_discount_pct ?? 0;
+  }
+
   const { data, error } = await db
     .from('checkins')
     .insert({
@@ -111,6 +146,10 @@ export const POST: APIRoute = async ({ request }) => {
       pt_punch_holder_name:   pt_punch_holder_name   || '',
       checkin_type: checkin_type ?? '',
       addons:       addons       ?? '',
+      referral_code:         referralCode,
+      referred_by_id:        referredById,
+      referred_by_name:      referredByName,
+      referral_discount_pct: referralPct,
     })
     .select()
     .single();

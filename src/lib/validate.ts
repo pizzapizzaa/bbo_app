@@ -56,3 +56,29 @@ export function namesMatch(a: string | null | undefined, b: string | null | unde
   if (typeof a !== 'string' || typeof b !== 'string') return false;
   return a.trim().toLowerCase() === b.trim().toLowerCase();
 }
+
+/**
+ * Referral codes — 3–20 characters, letters/digits/dashes, must start with a
+ * letter or digit. Stored and compared uppercase.
+ */
+export const REFERRAL_CODE_RE = /^[A-Z0-9][A-Z0-9-]{2,19}$/;
+
+/** Canonical stored form of a referral code (trimmed + uppercased). */
+export function normalizeReferralCode(s: string): string {
+  return (s ?? '').trim().toUpperCase();
+}
+export function isValidReferralCode(s: string): boolean { return REFERRAL_CODE_RE.test(s); }
+
+/** Referral discount percentage must be a whole 1–100. */
+export function isValidReferralPct(n: number): boolean {
+  return Number.isInteger(n) && n >= 1 && n <= 100;
+}
+
+/**
+ * Case-insensitive exact comparison of two referral codes — the same defence in
+ * depth as namesMatch, for the `.ilike()` code lookups.
+ */
+export function referralCodesMatch(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  return normalizeReferralCode(a) === normalizeReferralCode(b);
+}

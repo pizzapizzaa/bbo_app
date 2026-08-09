@@ -6,6 +6,10 @@ import {
   isValidAmount,
   escapeLike,
   namesMatch,
+  normalizeReferralCode,
+  isValidReferralCode,
+  isValidReferralPct,
+  referralCodesMatch,
   MAX_NAME,
   MAX_TEXT,
   MAX_AMOUNT,
@@ -186,6 +190,87 @@ describe('namesMatch', () => {
 
   it('rejects a non-string value', () =>
     expect(namesMatch(123 as any, '123')).toBe(false));
+});
+
+// ── Referral codes ────────────────────────────────────────────────────────────
+describe('normalizeReferralCode', () => {
+  it('trims and uppercases', () =>
+    expect(normalizeReferralCode('  baotran-4f2k ')).toBe('BAOTRAN-4F2K'));
+
+  it('returns empty string for empty input', () =>
+    expect(normalizeReferralCode('')).toBe(''));
+
+  it('treats null/undefined as empty', () =>
+    expect(normalizeReferralCode(undefined as any)).toBe(''));
+});
+
+describe('isValidReferralCode', () => {
+  it('accepts letters, digits and dashes', () =>
+    expect(isValidReferralCode('BAOTRAN-4F2K')).toBe(true));
+
+  it('accepts the 3-character minimum', () =>
+    expect(isValidReferralCode('BBO')).toBe(true));
+
+  it('accepts the 20-character maximum', () =>
+    expect(isValidReferralCode('A'.repeat(20))).toBe(true));
+
+  it('rejects 2 characters', () =>
+    expect(isValidReferralCode('AB')).toBe(false));
+
+  it('rejects 21 characters', () =>
+    expect(isValidReferralCode('A'.repeat(21))).toBe(false));
+
+  it('rejects lowercase (callers must normalize first)', () =>
+    expect(isValidReferralCode('baotran')).toBe(false));
+
+  it('rejects a leading dash', () =>
+    expect(isValidReferralCode('-ABC')).toBe(false));
+
+  it('rejects spaces', () =>
+    expect(isValidReferralCode('BAO TRAN')).toBe(false));
+
+  it('rejects SQL wildcard characters', () =>
+    expect(isValidReferralCode('BAO%_')).toBe(false));
+
+  it('rejects an empty string', () =>
+    expect(isValidReferralCode('')).toBe(false));
+});
+
+describe('referralCodesMatch', () => {
+  it('matches identical codes', () =>
+    expect(referralCodesMatch('BAOTRAN-4F2K', 'BAOTRAN-4F2K')).toBe(true));
+
+  it('ignores case and surrounding whitespace', () =>
+    expect(referralCodesMatch('  baotran-4f2k ', 'BAOTRAN-4F2K')).toBe(true));
+
+  it('rejects a different code', () =>
+    expect(referralCodesMatch('BAOTRAN-4F2K', 'ALICE-9XYZ')).toBe(false));
+
+  // The point of the helper: a wildcard that matched a row must not be
+  // accepted as that row's code.
+  it('rejects a wildcard pattern against the code it matched', () =>
+    expect(referralCodesMatch('BAOTRAN-4F2K', '*')).toBe(false));
+
+  it('rejects a prefix of the stored code', () =>
+    expect(referralCodesMatch('BAOTRAN-4F2K', 'BAOTRAN')).toBe(false));
+
+  it('rejects a code against a customer with none stored', () =>
+    expect(referralCodesMatch('', 'BAOTRAN-4F2K')).toBe(false));
+
+  it('rejects null or undefined on either side', () => {
+    expect(referralCodesMatch(null, 'BBO')).toBe(false);
+    expect(referralCodesMatch('BBO', undefined)).toBe(false);
+  });
+});
+
+describe('isValidReferralPct', () => {
+  it('accepts 1', ()   => expect(isValidReferralPct(1)).toBe(true));
+  it('accepts 100', () => expect(isValidReferralPct(100)).toBe(true));
+  it('rejects 0', ()   => expect(isValidReferralPct(0)).toBe(false));
+  it('rejects 101', () => expect(isValidReferralPct(101)).toBe(false));
+  it('rejects negatives', ()   => expect(isValidReferralPct(-10)).toBe(false));
+  it('rejects fractions', ()   => expect(isValidReferralPct(12.5)).toBe(false));
+  it('rejects NaN', ()         => expect(isValidReferralPct(NaN)).toBe(false));
 });
 
 // ── Constants ─────────────────────────────────────────────────────────────────
