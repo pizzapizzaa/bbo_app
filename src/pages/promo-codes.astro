@@ -1,0 +1,469 @@
+---
+import MainLayout from '../layouts/MainLayout.astro';
+---
+
+<MainLayout title="Promo Codes" activePage="promo-codes">
+<div>
+
+  <!-- ── Intro / stats ────────────────────────────────────────────────────── -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-6">
+    <div class="flex flex-wrap items-start justify-between gap-4">
+      <div>
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Codes in circulation</p>
+        <div class="flex items-baseline gap-4">
+          <span><span id="stat-promo" class="text-3xl font-bold text-gray-800">—</span>
+            <span class="text-xs text-gray-400">promo</span></span>
+          <span><span id="stat-customer" class="text-3xl font-bold text-gray-800">—</span>
+            <span class="text-xs text-gray-400">customer referral</span></span>
+          <span><span id="stat-paused" class="text-3xl font-bold text-gray-400">—</span>
+            <span class="text-xs text-gray-400">paused</span></span>
+        </div>
+      </div>
+      <p class="text-xs text-gray-400 max-w-md">
+        A <strong>promo code</strong> belongs to the gym — anyone may quote it at check-in.
+        A <strong>customer referral code</strong> belongs to one customer and cannot be used by
+        that customer themselves; add those from the
+        <a href="/customers" class="text-purple-500 hover:underline">Customers</a> page.
+        Every code discounts the check-in base price by its percentage; add-ons are never discounted.
+      </p>
+    </div>
+  </div>
+
+  <!-- ── Action bar ───────────────────────────────────────────────────────── -->
+  <div class="flex flex-wrap items-center gap-3 mb-6">
+    <button onclick="openCodeModal(null)"
+            class="inline-flex items-center gap-2 bg-purple-500 hover:bg-purple-600
+                   text-white font-medium text-sm px-4 py-2.5 rounded-lg transition">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+      </svg>
+      New Promo Code
+    </button>
+
+    <!-- Scope tabs -->
+    <div class="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-medium bg-white">
+      <button id="tab-all"      onclick="setScope('all')"
+              class="px-3 py-2 bg-orange-500 text-white">All</button>
+      <button id="tab-promo"    onclick="setScope('promo')"
+              class="px-3 py-2 text-gray-600 hover:bg-gray-50 border-l border-gray-200">Promo</button>
+      <button id="tab-customer" onclick="setScope('customer')"
+              class="px-3 py-2 text-gray-600 hover:bg-gray-50 border-l border-gray-200">Customer</button>
+    </div>
+
+    <button onclick="loadCodes()"
+            class="inline-flex items-center gap-2 bg-white hover:bg-gray-50 border border-gray-300
+                   text-gray-700 font-medium text-sm px-4 py-2.5 rounded-lg transition">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+      </svg>
+      Refresh
+    </button>
+
+    <span id="code-count" class="text-sm text-gray-400 ml-auto"></span>
+  </div>
+
+  <div id="page-status" class="hidden mb-4"></div>
+
+  <!-- ── Add / edit modal ─────────────────────────────────────────────────── -->
+  <div id="code-modal"
+       class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+       onclick="if(event.target===this)closeCodeModal()">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h2 id="code-modal-title" class="font-semibold text-gray-800 text-lg">New Promo Code</h2>
+        <button onclick="closeCodeModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+      </div>
+      <div class="px-6 py-5 space-y-4">
+        <p id="code-owner-note" class="hidden text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2"></p>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Code</label>
+          <div class="flex items-center gap-2">
+            <input id="code-input" type="text" maxlength="20" placeholder="e.g. SUMMER26"
+                   class="flex-1 min-w-0 border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono uppercase
+                          focus:outline-none focus:ring-2 focus:ring-purple-300"
+                   oninput="this.value = this.value.toUpperCase()" />
+            <button type="button" onclick="generateCode()"
+                    class="shrink-0 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700
+                           text-xs font-medium px-3 py-2 rounded-lg transition">Generate</button>
+          </div>
+          <p class="text-xs text-gray-400 mt-1">3–20 characters: letters, numbers or dashes.</p>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Discount (%)</label>
+          <input id="code-pct" type="number" min="1" max="100" step="1" value="10"
+                 class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
+                        focus:outline-none focus:ring-2 focus:ring-purple-300" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Label <span class="text-gray-300">(optional)</span></label>
+          <input id="code-label" type="text" maxlength="60" placeholder="e.g. Summer 2026 campaign"
+                 class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
+                        focus:outline-none focus:ring-2 focus:ring-purple-300" />
+        </div>
+        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
+          <input id="code-active" type="checkbox" checked class="w-4 h-4 rounded accent-purple-500" />
+          Active — the code works at check-in
+        </label>
+        <div id="code-error"
+             class="hidden text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2"></div>
+        <div class="flex justify-end gap-3 pt-1">
+          <button type="button" onclick="closeCodeModal()"
+                  class="bg-white hover:bg-gray-50 border border-gray-300 text-gray-700
+                         font-medium text-sm px-4 py-2 rounded-lg transition">Cancel</button>
+          <button id="code-submit" onclick="submitCode()"
+                  class="bg-purple-500 hover:bg-purple-600 text-white font-medium text-sm
+                         px-5 py-2 rounded-lg transition">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Table ────────────────────────────────────────────────────────────── -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 overflow-x-auto">
+    <div id="table-loading" class="hidden py-16 flex flex-col items-center justify-center gap-3">
+      <div class="w-10 h-10 border-4 border-purple-200 border-t-purple-500 rounded-full animate-spin"></div>
+      <p class="text-sm text-gray-400">Loading codes…</p>
+    </div>
+    <div id="table-wrapper" class="hidden">
+      <table id="codes-table" class="w-full" style="width:100%">
+        <thead><tr></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div id="no-data-msg" class="hidden py-16 text-center text-gray-400">
+      <svg class="w-12 h-12 mx-auto mb-3 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+          d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.99 1.99 0 013 12V7a4 4 0 014-4z"/>
+      </svg>
+      <p class="text-sm">No codes here yet.</p>
+    </div>
+  </div>
+
+  <script is:inline>
+    var allCodes  = [];
+    var scope     = 'all';
+    var codeTable = null;
+    var editingId = null;   // null = creating a new promo code
+
+    function escHtml(str) {
+      return String(str == null ? '' : str)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
+    function showToast(msg, type) {
+      var t = document.createElement('div');
+      t.textContent = msg;
+      t.className = 'fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-lg text-sm font-medium shadow-lg ' +
+        (type === 'warning' ? 'bg-yellow-500 text-white' : type === 'error' ? 'bg-red-500 text-white' : 'bg-green-500 text-white');
+      document.body.appendChild(t);
+      setTimeout(function () { t.remove(); }, 2500);
+    }
+
+    function showStatus(msg, type) {
+      var el = document.getElementById('page-status');
+      el.className = 'mb-4 px-4 py-3 rounded-xl border text-sm ' + (type === 'error'
+        ? 'bg-red-50 border-red-200 text-red-700'
+        : 'bg-green-50 border-green-200 text-green-700');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+    }
+
+    // ── Load & render ────────────────────────────────────────────────────────
+    function loadCodes() {
+      document.getElementById('table-loading').classList.remove('hidden');
+      document.getElementById('table-wrapper').classList.add('hidden');
+      document.getElementById('no-data-msg').classList.add('hidden');
+
+      apiFetch('/api/referral-codes')
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          document.getElementById('table-loading').classList.add('hidden');
+          if (data.error) { showStatus(data.error, 'error'); return; }
+          document.getElementById('page-status').classList.add('hidden');
+          allCodes = data.codes || [];
+          updateStats();
+          renderTable();
+        })
+        .catch(function (err) {
+          document.getElementById('table-loading').classList.add('hidden');
+          showStatus('Could not load codes: ' + err.message, 'error');
+        });
+    }
+
+    function updateStats() {
+      var promo    = allCodes.filter(function (c) { return !c.owner_id; }).length;
+      var customer = allCodes.length - promo;
+      var paused   = allCodes.filter(function (c) { return !c.is_active; }).length;
+      document.getElementById('stat-promo').textContent    = promo;
+      document.getElementById('stat-customer').textContent = customer;
+      document.getElementById('stat-paused').textContent   = paused;
+    }
+
+    function visibleCodes() {
+      if (scope === 'promo')    return allCodes.filter(function (c) { return !c.owner_id; });
+      if (scope === 'customer') return allCodes.filter(function (c) { return !!c.owner_id; });
+      return allCodes;
+    }
+
+    function setScope(next) {
+      scope = next;
+      ['all', 'promo', 'customer'].forEach(function (s) {
+        var btn = document.getElementById('tab-' + s);
+        btn.className = 'px-3 py-2 ' + (s === next ? 'bg-orange-500 text-white' : 'text-gray-600 hover:bg-gray-50') +
+          (s === 'all' ? '' : ' border-l border-gray-200');
+      });
+      renderTable();
+    }
+
+    function renderTable() {
+      var rows = visibleCodes();
+      document.getElementById('code-count').textContent =
+        rows.length ? rows.length + ' code' + (rows.length !== 1 ? 's' : '') : '';
+
+      if ($.fn.DataTable.isDataTable('#codes-table')) $('#codes-table').DataTable().destroy();
+      codeTable = null;
+      document.querySelector('#codes-table thead tr').innerHTML = '';
+      document.querySelector('#codes-table tbody').innerHTML    = '';
+
+      if (!rows.length) {
+        document.getElementById('table-wrapper').classList.add('hidden');
+        document.getElementById('no-data-msg').classList.remove('hidden');
+        return;
+      }
+      document.getElementById('no-data-msg').classList.add('hidden');
+      document.getElementById('table-wrapper').classList.remove('hidden');
+
+      codeTable = $('#codes-table').DataTable({
+        data: rows,
+        columns: [
+          {
+            title: 'Code',
+            data: 'code',
+            render: function (val, type, row) {
+              if (type !== 'display') return val;
+              var tone = row.is_active ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-400 line-through';
+              return '<span class="font-mono text-xs font-semibold ' + tone + ' px-2 py-1 rounded">' +
+                escHtml(val) + '</span>';
+            }
+          },
+          {
+            title: 'Discount',
+            data: 'discount_pct',
+            render: function (val, type) {
+              return type === 'display'
+                ? '<span class="font-semibold text-gray-700">' + (val || 0) + '%</span>'
+                : val;
+            }
+          },
+          {
+            title: 'Label',
+            data: 'label',
+            render: function (val, type) {
+              if (type !== 'display') return val;
+              return val ? escHtml(val) : '<span class="text-gray-300">—</span>';
+            }
+          },
+          {
+            title: 'Belongs to',
+            data: function (row) { return row.owner_id ? (row.owner_name || 'Customer') : 'Promo (gym-wide)'; },
+            render: function (val, type, row) {
+              if (type !== 'display') return val;
+              return row.owner_id
+                ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">' +
+                    escHtml(row.owner_name || 'Customer') + '</span>'
+                : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">Promo</span>';
+            }
+          },
+          {
+            title: 'Status',
+            data: function (row) { return row.is_active ? 'Active' : 'Paused'; },
+            render: function (val, type, row) {
+              if (type !== 'display') return val;
+              return '<label class="inline-flex items-center gap-1.5 text-xs cursor-pointer select-none ' +
+                (row.is_active ? 'text-green-600' : 'text-gray-400') + '">' +
+                '<input type="checkbox" ' + (row.is_active ? 'checked' : '') + ' ' +
+                'onchange="toggleActive(\'' + row.id + '\', this.checked)" ' +
+                'class="w-3.5 h-3.5 rounded accent-purple-500" />' + escHtml(val) + '</label>';
+            }
+          },
+          {
+            title: 'Created',
+            data: 'created_at',
+            render: function (val, type) {
+              if (type !== 'display') return val || '';
+              return val ? '<span class="text-xs text-gray-500">' + escHtml(String(val).slice(0, 10)) + '</span>'
+                         : '<span class="text-gray-300">—</span>';
+            }
+          },
+          {
+            title: 'Actions',
+            data: null,
+            orderable: false,
+            searchable: false,
+            className: 'dt-center',
+            render: function (data, type, row) {
+              if (type !== 'display') return '';
+              return '<div class="flex items-center justify-center gap-1">' +
+                '<button onclick="copyCode(\'' + row.code.replace(/'/g, "\\'") + '\')" title="Copy" ' +
+                  'class="text-gray-400 hover:text-gray-700 text-xs font-medium px-2 py-1 rounded hover:bg-gray-100">Copy</button>' +
+                '<button onclick="openCodeModal(\'' + row.id + '\')" title="Edit" ' +
+                  'class="text-purple-500 hover:text-purple-700 text-xs font-medium px-2 py-1 rounded hover:bg-purple-50">Edit</button>' +
+                '<button onclick="deleteCode(\'' + row.id + '\')" title="Delete" ' +
+                  'class="text-gray-400 hover:text-red-600 text-xs font-medium px-2 py-1 rounded hover:bg-red-50">Delete</button>' +
+                '</div>';
+            }
+          }
+        ],
+        dom: "<'flex flex-wrap items-center gap-3 mb-3'<''f>>" +
+             "t" +
+             "<'flex flex-wrap items-center justify-between mt-3'<'text-sm text-gray-500'i><'flex gap-1'p>>",
+        order: [[3, 'asc']],
+        pageLength: 25,
+        language: { emptyTable: 'No codes found.' }
+      });
+    }
+
+    // ── Modal ────────────────────────────────────────────────────────────────
+    function openCodeModal(id) {
+      editingId = id || null;
+      var row   = id ? allCodes.find(function (c) { return c.id === id; }) : null;
+      var note  = document.getElementById('code-owner-note');
+
+      document.getElementById('code-modal-title').textContent = row ? 'Edit Code' : 'New Promo Code';
+      document.getElementById('code-input').value  = row ? row.code : '';
+      document.getElementById('code-pct').value    = row ? row.discount_pct : 10;
+      document.getElementById('code-label').value  = row ? (row.label || '') : '';
+      document.getElementById('code-active').checked = row ? row.is_active !== false : true;
+      document.getElementById('code-error').classList.add('hidden');
+
+      if (row && row.owner_id) {
+        note.textContent = 'This is ' + (row.owner_name || 'a customer') +
+          "'s referral code. Redemptions are credited to them, and they cannot use it themselves.";
+        note.classList.remove('hidden');
+      } else {
+        note.classList.add('hidden');
+      }
+
+      document.getElementById('code-modal').classList.remove('hidden');
+      setTimeout(function () { document.getElementById('code-input').focus(); }, 50);
+    }
+
+    function closeCodeModal() {
+      document.getElementById('code-modal').classList.add('hidden');
+      editingId = null;
+    }
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeCodeModal();
+    });
+
+    function generateCode() {
+      var ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no look-alikes (0/O, 1/I)
+      var rand = '';
+      for (var i = 0; i < 5; i++) rand += ALPHABET[Math.floor(Math.random() * ALPHABET.length)];
+      document.getElementById('code-input').value = 'BBO-' + rand;
+    }
+
+    function copyCode(code) {
+      if (!code) return;
+      var done = function () { showToast('Code copied: ' + code, 'success'); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(code).then(done).catch(function () { showToast('Copy failed.', 'error'); });
+      } else {
+        var ta = document.createElement('textarea');
+        ta.value = code;
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); done(); } catch (e) { showToast('Copy failed.', 'error'); }
+        document.body.removeChild(ta);
+      }
+    }
+
+    function submitCode() {
+      var code  = document.getElementById('code-input').value.trim().toUpperCase();
+      var pct   = parseInt(document.getElementById('code-pct').value, 10) || 0;
+      var label = document.getElementById('code-label').value.trim();
+      var active = document.getElementById('code-active').checked;
+      var errEl = document.getElementById('code-error');
+      var btn   = document.getElementById('code-submit');
+
+      if (!/^[A-Z0-9][A-Z0-9-]{2,19}$/.test(code)) {
+        errEl.textContent = 'Code must be 3–20 characters: letters, numbers or dashes.';
+        errEl.classList.remove('hidden'); return;
+      }
+      if (pct < 1 || pct > 100) {
+        errEl.textContent = 'Discount must be between 1 and 100 percent.';
+        errEl.classList.remove('hidden'); return;
+      }
+      errEl.classList.add('hidden');
+      btn.disabled = true; btn.textContent = 'Saving…';
+
+      var url    = editingId ? '/api/referral-codes/' + editingId : '/api/referral-codes';
+      var method = editingId ? 'PATCH' : 'POST';
+      var body   = { code: code, discount_pct: pct, label: label, is_active: active };
+      if (!editingId) body.owner_id = null;   // gym-wide promo code
+
+      apiFetch(url, { method: method, body: JSON.stringify(body) })
+        .then(function (res) { return res.json(); })
+        .then(function (result) {
+          btn.disabled = false; btn.textContent = 'Save';
+          if (result.error) { errEl.textContent = result.error; errEl.classList.remove('hidden'); return; }
+          var saved = result.row;
+          if (editingId) {
+            allCodes = allCodes.map(function (c) {
+              return c.id === editingId ? Object.assign({}, c, saved) : c;
+            });
+          } else {
+            allCodes = [saved].concat(allCodes);
+          }
+          updateStats();
+          renderTable();
+          closeCodeModal();
+          showToast('Code saved.', 'success');
+        })
+        .catch(function (err) {
+          btn.disabled = false; btn.textContent = 'Save';
+          errEl.textContent = 'Failed: ' + err.message; errEl.classList.remove('hidden');
+        });
+    }
+
+    function toggleActive(id, active) {
+      apiFetch('/api/referral-codes/' + id, {
+        method: 'PATCH',
+        body: JSON.stringify({ is_active: active })
+      })
+        .then(function (res) { return res.json(); })
+        .then(function (result) {
+          if (result.error) { showToast(result.error, 'error'); renderTable(); return; }
+          allCodes = allCodes.map(function (c) {
+            return c.id === id ? Object.assign({}, c, { is_active: result.row.is_active !== false }) : c;
+          });
+          updateStats();
+          renderTable();
+          showToast(active ? 'Code activated.' : 'Code paused.', active ? 'success' : 'warning');
+        })
+        .catch(function (err) { showToast('Failed: ' + err.message, 'error'); renderTable(); });
+    }
+
+    function deleteCode(id) {
+      var row = allCodes.find(function (c) { return c.id === id; });
+      if (!confirm('Delete ' + (row ? row.code : 'this code') +
+                   '? It stops working immediately. Past check-ins keep their record.')) return;
+      apiFetch('/api/referral-codes/' + id, { method: 'DELETE' })
+        .then(function (res) { return res.json(); })
+        .then(function (result) {
+          if (result.error) { showToast(result.error, 'error'); return; }
+          allCodes = allCodes.filter(function (c) { return c.id !== id; });
+          updateStats();
+          renderTable();
+          showToast('Code deleted.', 'warning');
+        })
+        .catch(function (err) { showToast('Delete failed: ' + err.message, 'error'); });
+    }
+
+    loadCodes();
+  </script>
+</div>
+</MainLayout>

@@ -74,6 +74,14 @@ export function isValidReferralPct(n: number): boolean {
   return Number.isInteger(n) && n >= 1 && n <= 100;
 }
 
+/** Max length of the optional label attached to a code (e.g. 'Summer 2026'). */
+export const MAX_CODE_LABEL = 60;
+
+/** Canonical stored form of a code label (trimmed, collapsed whitespace). */
+export function normalizeCodeLabel(s: string): string {
+  return (s ?? '').trim().replace(/\s+/g, ' ').slice(0, MAX_CODE_LABEL);
+}
+
 /**
  * Case-insensitive exact comparison of two referral codes — the same defence in
  * depth as namesMatch, for the `.ilike()` code lookups.

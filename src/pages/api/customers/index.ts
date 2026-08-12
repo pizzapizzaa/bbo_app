@@ -17,14 +17,14 @@ const COL_MAP: Record<string, string> = {
 };
 
 // DB column → display header (inverse map)
-const DISPLAY_HEADERS = ['Full Name', 'DOB', 'Email', 'Telephone no', 'Emergency contact', 'Note', 'Waiver form (old)', 'Punches', 'PT Punches', 'Membership', 'Member Until', 'Referral Code'];
+const DISPLAY_HEADERS = ['Full Name', 'DOB', 'Email', 'Telephone no', 'Emergency contact', 'Note', 'Waiver form (old)', 'Punches', 'PT Punches', 'Membership', 'Member Until', 'Referral Codes'];
 
 /** GET /api/customers — return all customers */
 export const GET: APIRoute = async () => {
   try {
   const { data, error } = await fetchAllPages((from, to) =>
     db.from('customers')
-      .select('id, full_name, dob, email, telephone, emergency_contact, note, waiver_form, is_punch_card_holder, punches_remaining, pt_punches_remaining, membership_type, membership_start_date, membership_end_date, referral_code, referral_discount_pct')
+      .select('id, full_name, dob, email, telephone, emergency_contact, note, waiver_form, is_punch_card_holder, punches_remaining, pt_punches_remaining, membership_type, membership_start_date, membership_end_date')
       .order('full_name')
       .range(from, to)
   );
@@ -32,6 +32,31 @@ export const GET: APIRoute = async () => {
   if (error) return serverError(error.message);
 
   const total = data.length;
+
+  // Referral codes live in their own table — a customer may hold several.
+  // A missing table (migration not run yet) degrades to "no codes" rather
+  // than breaking the whole customer list.
+  const codesByOwner = new Map<string, any[]>();
+  const codesResult = await fetchAllPages((from, to) =>
+    db.from('referral_codes')
+      .select('id, code, discount_pct, owner_id, label, is_active, created_at')
+      .not('owner_id', 'is', null)
+      .order('created_at', { ascending: true })
+      .range(from, to)
+  );
+  if (!codesResult.error) {
+    codesResult.data.forEach((c: any) => {
+      const list = codesByOwner.get(c.owner_id) ?? [];
+      list.push({
+        id:           c.id,
+        code:         c.code ?? '',
+        discount_pct: c.discount_pct ?? 0,
+        label:        c.label ?? '',
+        is_active:    c.is_active !== false,
+      });
+      codesByOwner.set(c.owner_id, list);
+    });
+  }
 
   // Map DB rows back to the original CSV-style header names for the frontend
   const rows = data.map((r: any) => ({
@@ -54,9 +79,9 @@ export const GET: APIRoute = async () => {
     _membership_type:       r.membership_type ?? '',
     _membership_start_date: r.membership_start_date ?? '',
     _membership_end_date:   r.membership_end_date ?? '',
-    'Referral Code':        r.referral_code ?? '',
-    _referral_code:         r.referral_code ?? '',
-    _referral_discount_pct: r.referral_discount_pct ?? 0,
+    // Searchable/sortable text for the column; _referral_codes drives the cell.
+    'Referral Codes':       (codesByOwner.get(r.id) ?? []).map((c: any) => c.code).join(', '),
+    _referral_codes:        codesByOwner.get(r.id) ?? [],
   }));
 
   return ok({ headers: DISPLAY_HEADERS, rows, total });
@@ -189,9 +214,8 @@ export const PUT: APIRoute = async ({ request }) => {
     _membership_type:       '',
     _membership_start_date: '',
     _membership_end_date:   '',
-    'Referral Code':        '',
-    _referral_code:         '',
-    _referral_discount_pct: 0,
+    'Referral Codes':       '',
+    _referral_codes:        [],
   };
 
   return ok({ row: newRow });

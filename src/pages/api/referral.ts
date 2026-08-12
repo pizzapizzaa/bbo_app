@@ -1,50 +1,39 @@
 export const prerender = false;
 
 import type { APIRoute } from 'astro';
-import { db } from '../../lib/db';
 import { ok, serverError } from '../../lib/auth';
-import {
-  escapeLike, normalizeReferralCode, isValidReferralCode, referralCodesMatch, namesMatch,
-} from '../../lib/validate';
+import { lookupReferralCode } from '../../lib/referral';
+import { namesMatch } from '../../lib/validate';
 
 /** GET /api/referral?code=BBO-1234[&customer=<full name>]
- *  Looks up a referral code so the check-in form can show the owner and the
- *  discount before submitting. `customer` is optional and only used to warn
- *  early about self-referral — POST /api/checkins enforces it regardless.
+ *  Looks up a referral or promo code so the check-in form can show who it
+ *  belongs to and the discount before submitting. `customer` is optional and
+ *  only used to warn early about self-referral — POST /api/checkins enforces
+ *  it regardless.
  *
  *  Always 200; `valid` says whether the code can be used. */
 export const GET: APIRoute = async ({ url }) => {
   try {
-    const code     = normalizeReferralCode(url.searchParams.get('code') ?? '');
     const customer = (url.searchParams.get('customer') ?? '').trim();
+    const result   = await lookupReferralCode(url.searchParams.get('code') ?? '');
 
-    if (!code) return ok({ valid: false, error: 'Enter a referral code.' });
-    if (!isValidReferralCode(code)) {
-      return ok({ valid: false, error: 'Codes are 3–20 letters, numbers or dashes.' });
-    }
+    if (result.status !== 'ok') return ok({ valid: false, error: result.error });
 
-    const { data: owner, error } = await db
-      .from('customers')
-      .select('id, full_name, referral_code, referral_discount_pct')
-      .ilike('referral_code', escapeLike(code))
-      .limit(1)
-      .maybeSingle();
-
-    if (error) return serverError(error.message);
-    // Exact (case-insensitive) match required — a pattern match is not enough.
-    if (!owner || !referralCodesMatch(owner.referral_code, code)) {
-      return ok({ valid: false, error: 'Referral code not found.' });
-    }
-    if (customer && namesMatch(owner.full_name, customer)) {
+    const code = result.code;
+    // Universal promo codes have no owner, so self-referral cannot apply.
+    if (code.owner_id && customer && namesMatch(code.owner_name, customer)) {
       return ok({ valid: false, error: 'A customer cannot use their own referral code.' });
     }
 
     return ok({
       valid:        true,
-      code:         owner.referral_code,
-      owner_id:     owner.id,
-      owner_name:   owner.full_name ?? '',
-      discount_pct: owner.referral_discount_pct ?? 0,
+      code:         code.code,
+      code_id:      code.id,
+      kind:         code.owner_id ? 'referral' : 'promo',
+      owner_id:     code.owner_id,
+      owner_name:   code.owner_name,
+      label:        code.label,
+      discount_pct: code.discount_pct,
     });
   } catch (e: any) { return serverError(e?.message ?? String(e)); }
 };

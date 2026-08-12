@@ -393,54 +393,64 @@ import MainLayout from '../layouts/MainLayout.astro';
     </div>
   </div>
 
-  <!-- Referral Code Modal -->
+  <!-- Referral Codes Modal — a customer may hold any number of codes -->
   <div id="edit-referral-modal"
        class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
        onclick="if(event.target===this)closeEditReferralModal()">
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm">
-      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-        <h2 class="font-semibold text-gray-800 text-lg">Referral Code — <span id="edit-referral-name" class="text-purple-500"></span></h2>
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+        <h2 class="font-semibold text-gray-800 text-lg">Referral Codes — <span id="edit-referral-name" class="text-purple-500"></span></h2>
         <button onclick="closeEditReferralModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
       </div>
-      <div class="px-6 py-5 space-y-4">
+      <div class="px-6 py-5 space-y-5 overflow-y-auto">
         <p class="text-xs text-gray-400">
-          Give this customer an affiliated code to share. Anyone who quotes it at check-in
-          gets the discount below, on every visit.
+          Codes this customer shares. Anyone else who quotes one at check-in gets its
+          discount, on every visit. Pause a code instead of deleting it to keep past
+          check-ins readable. Gym-wide promo codes live on the
+          <a href="/promo-codes" class="text-purple-500 hover:underline">Promo Codes</a> page.
         </p>
-        <div>
-          <label class="block text-xs font-medium text-gray-600 mb-1">Code</label>
-          <div class="flex items-center gap-2">
-            <input id="edit-referral-code" type="text" maxlength="20" placeholder="e.g. OLIVIA-4F2K"
-                   class="flex-1 min-w-0 border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono uppercase
-                          focus:outline-none focus:ring-2 focus:ring-purple-300"
-                   oninput="this.value = this.value.toUpperCase()" />
-            <button type="button" onclick="generateReferralCode()"
-                    class="shrink-0 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700
-                           text-xs font-medium px-3 py-2 rounded-lg transition">Generate</button>
-          </div>
-          <p class="text-xs text-gray-400 mt-1">3–20 characters: letters, numbers or dashes.</p>
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-gray-600 mb-1">Discount for whoever uses it (%)</label>
-          <input id="edit-referral-pct" type="number" min="1" max="100" step="1" value="10"
-                 class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
-                        focus:outline-none focus:ring-2 focus:ring-purple-300" />
-          <p class="text-xs text-gray-400 mt-1">Applied to the check-in base price (add-ons excluded).</p>
-        </div>
-        <div id="edit-referral-error"
-             class="hidden text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2"></div>
-        <div class="flex items-center justify-between gap-3 pt-1">
-          <button type="button" id="edit-referral-copy" onclick="copyReferralCode()"
-                  class="hidden bg-white hover:bg-gray-50 border border-gray-300 text-gray-600
-                         font-medium text-xs px-3 py-2 rounded-lg transition">Copy code</button>
-          <div class="flex justify-end gap-3 ml-auto">
-            <button type="button" id="edit-referral-remove" onclick="removeReferralCode()"
-                    class="hidden bg-white hover:bg-red-50 border border-gray-300 hover:border-red-300
-                           text-gray-500 hover:text-red-600 font-medium text-sm px-4 py-2 rounded-lg transition">Remove</button>
-            <button id="edit-referral-submit" onclick="submitEditReferral()"
+
+        <!-- Existing codes -->
+        <div id="referral-list" class="space-y-2"></div>
+
+        <!-- Add a code -->
+        <div class="border-t border-gray-100 pt-4 space-y-3">
+          <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Add a code</p>
+          <div class="flex flex-wrap items-end gap-2">
+            <div class="flex-1 min-w-[190px]">
+              <label class="block text-xs font-medium text-gray-600 mb-1">Code</label>
+              <div class="flex items-center gap-2">
+                <input id="edit-referral-code" type="text" maxlength="20" placeholder="e.g. OLIVIA-4F2K"
+                       class="flex-1 min-w-0 border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono uppercase
+                              focus:outline-none focus:ring-2 focus:ring-purple-300"
+                       oninput="this.value = this.value.toUpperCase()" />
+                <button type="button" onclick="generateReferralCode()"
+                        class="shrink-0 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700
+                               text-xs font-medium px-3 py-2 rounded-lg transition">Generate</button>
+              </div>
+            </div>
+            <div class="w-24">
+              <label class="block text-xs font-medium text-gray-600 mb-1">Discount %</label>
+              <input id="edit-referral-pct" type="number" min="1" max="100" step="1" value="10"
+                     class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
+                            focus:outline-none focus:ring-2 focus:ring-purple-300" />
+            </div>
+            <div class="flex-1 min-w-[150px]">
+              <label class="block text-xs font-medium text-gray-600 mb-1">Label <span class="text-gray-300">(optional)</span></label>
+              <input id="edit-referral-label" type="text" maxlength="60" placeholder="e.g. Instagram bio"
+                     class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
+                            focus:outline-none focus:ring-2 focus:ring-purple-300" />
+            </div>
+            <button id="edit-referral-submit" onclick="submitAddReferralCode()"
                     class="bg-purple-500 hover:bg-purple-600 text-white font-medium text-sm
-                           px-5 py-2 rounded-lg transition">Save</button>
+                           px-5 py-2 rounded-lg transition">Add</button>
           </div>
+          <p class="text-xs text-gray-400">
+            3–20 characters: letters, numbers or dashes. The discount applies to the
+            check-in base price only (add-ons excluded).
+          </p>
+          <div id="edit-referral-error"
+               class="hidden text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2"></div>
         </div>
       </div>
     </div>
@@ -1015,26 +1025,79 @@ import MainLayout from '../layouts/MainLayout.astro';
         });
     }
 
-    // ── Referral Code Modal ──
+    // ── Referral Codes Modal ──
+    // A customer holds any number of codes; they live in the referral_codes
+    // table and are served on each customer row as _referral_codes.
     var editReferralId = null;
 
     function openEditReferral(id) {
       var row = customerRows.find(function (r) { return r._id === id; });
       if (!row) return;
       editReferralId = id;
-      var code = row._referral_code || '';
       document.getElementById('edit-referral-name').textContent = row['Full Name'] || '';
-      document.getElementById('edit-referral-code').value = code;
-      document.getElementById('edit-referral-pct').value  = row._referral_discount_pct || 10;
-      document.getElementById('edit-referral-remove').classList.toggle('hidden', !code);
-      document.getElementById('edit-referral-copy').classList.toggle('hidden', !code);
+      document.getElementById('edit-referral-code').value  = '';
+      document.getElementById('edit-referral-pct').value   = 10;
+      document.getElementById('edit-referral-label').value = '';
       document.getElementById('edit-referral-error').classList.add('hidden');
+      renderReferralList();
       document.getElementById('edit-referral-modal').classList.remove('hidden');
     }
 
     function closeEditReferralModal() {
       document.getElementById('edit-referral-modal').classList.add('hidden');
       editReferralId = null;
+    }
+
+    /** The codes held by the customer whose modal is open. */
+    function _openReferralCodes() {
+      var row = customerRows.find(function (r) { return r._id === editReferralId; });
+      return (row && row._referral_codes) || [];
+    }
+
+    function renderReferralList() {
+      var el    = document.getElementById('referral-list');
+      var codes = _openReferralCodes();
+      if (!codes.length) {
+        el.innerHTML = '<p class="text-sm text-gray-400 italic py-2">No codes yet — add one below.</p>';
+        return;
+      }
+      el.innerHTML = codes.map(function (c) {
+        var q = function (s) { return String(s).replace(/'/g, "\\'"); };
+        return '<div class="flex flex-wrap items-center gap-2 border border-gray-200 rounded-xl px-3 py-2 ' +
+            (c.is_active ? '' : 'bg-gray-50 opacity-70') + '">' +
+          '<span class="font-mono text-xs font-semibold bg-purple-100 text-purple-700 px-2 py-1 rounded">' +
+            escHtml(c.code) + '</span>' +
+          (c.is_active ? '' : '<span class="text-xs font-medium text-gray-400 uppercase">Paused</span>') +
+          '<input type="number" min="1" max="100" step="1" value="' + (c.discount_pct || 0) + '" ' +
+            'onchange="updateReferralCode(\'' + q(c.id) + '\', { discount_pct: parseInt(this.value, 10) })" ' +
+            'class="w-16 border border-gray-200 rounded-lg px-2 py-1 text-sm ' +
+            'focus:outline-none focus:ring-2 focus:ring-purple-300" />' +
+          '<span class="text-xs text-gray-500">% off</span>' +
+          '<input type="text" maxlength="60" value="' + escHtml(c.label || '') + '" placeholder="Label" ' +
+            'onchange="updateReferralCode(\'' + q(c.id) + '\', { label: this.value })" ' +
+            'class="flex-1 min-w-[110px] border border-gray-200 rounded-lg px-2 py-1 text-sm ' +
+            'focus:outline-none focus:ring-2 focus:ring-purple-300" />' +
+          '<label class="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">' +
+            '<input type="checkbox" ' + (c.is_active ? 'checked' : '') + ' ' +
+              'onchange="updateReferralCode(\'' + q(c.id) + '\', { is_active: this.checked })" ' +
+              'class="w-3.5 h-3.5 rounded accent-purple-500" />Active</label>' +
+          '<button type="button" onclick="copyReferralCode(\'' + q(c.code) + '\')" title="Copy code" ' +
+            'class="text-gray-400 hover:text-gray-700 text-xs font-medium px-2 py-1 rounded hover:bg-gray-100">Copy</button>' +
+          '<button type="button" onclick="deleteReferralCode(\'' + q(c.id) + '\')" title="Delete code" ' +
+            'class="text-gray-400 hover:text-red-600 text-xs font-medium px-2 py-1 rounded hover:bg-red-50">Delete</button>' +
+          '</div>';
+      }).join('');
+    }
+
+    /** Write `codes` back onto the customer row and refresh modal + table. */
+    function _setReferralCodes(codes) {
+      var row = customerRows.find(function (r) { return r._id === editReferralId; });
+      if (row) {
+        row._referral_codes  = codes;
+        row['Referral Codes'] = codes.map(function (c) { return c.code; }).join(', ');
+      }
+      renderReferralList();
+      if (customerTable) { customerTable.clear(); customerTable.rows.add(customerRows).draw(false); }
     }
 
     // Suggest a code from the customer's name plus a short random suffix.
@@ -1047,8 +1110,7 @@ import MainLayout from '../layouts/MainLayout.astro';
       document.getElementById('edit-referral-code').value = base + '-' + rand;
     }
 
-    function copyReferralCode() {
-      var code = document.getElementById('edit-referral-code').value.trim();
+    function copyReferralCode(code) {
       if (!code) return;
       var done = function () { showToast('Code copied: ' + code, 'success'); };
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -1063,16 +1125,15 @@ import MainLayout from '../layouts/MainLayout.astro';
       }
     }
 
-    function removeReferralCode() {
-      if (!confirm('Remove this referral code? It will stop working immediately.')) return;
-      _saveReferral('', 0);
-    }
+    function submitAddReferralCode() {
+      if (!editReferralId) return;
+      var ownerId = editReferralId;
+      var code    = document.getElementById('edit-referral-code').value.trim().toUpperCase();
+      var pct     = parseInt(document.getElementById('edit-referral-pct').value, 10) || 0;
+      var label   = document.getElementById('edit-referral-label').value.trim();
+      var errEl   = document.getElementById('edit-referral-error');
+      var btn     = document.getElementById('edit-referral-submit');
 
-    function submitEditReferral() {
-      var code = document.getElementById('edit-referral-code').value.trim().toUpperCase();
-      var pct  = parseInt(document.getElementById('edit-referral-pct').value, 10) || 0;
-      var errEl = document.getElementById('edit-referral-error');
-      if (!code) { errEl.textContent = 'Enter a code, or use Remove to clear it.'; errEl.classList.remove('hidden'); return; }
       if (!/^[A-Z0-9][A-Z0-9-]{2,19}$/.test(code)) {
         errEl.textContent = 'Code must be 3–20 characters: letters, numbers or dashes.';
         errEl.classList.remove('hidden'); return;
@@ -1081,37 +1142,75 @@ import MainLayout from '../layouts/MainLayout.astro';
         errEl.textContent = 'Discount must be between 1 and 100 percent.';
         errEl.classList.remove('hidden'); return;
       }
-      _saveReferral(code, pct);
-    }
-
-    function _saveReferral(code, pct) {
-      if (!editReferralId) return;
-      var id    = editReferralId;
-      var errEl = document.getElementById('edit-referral-error');
-      var btn   = document.getElementById('edit-referral-submit');
       errEl.classList.add('hidden');
-      btn.disabled = true; btn.textContent = 'Saving…';
+      btn.disabled = true; btn.textContent = 'Adding…';
 
-      apiFetch('/api/customers/' + id, {
-        method: 'PATCH',
-        body: JSON.stringify({ referral_code: code, referral_discount_pct: pct })
+      apiFetch('/api/referral-codes', {
+        method: 'POST',
+        body: JSON.stringify({ code: code, discount_pct: pct, label: label, owner_id: ownerId })
       })
         .then(function (res) { return res.json(); })
         .then(function (result) {
-          btn.disabled = false; btn.textContent = 'Save';
+          btn.disabled = false; btn.textContent = 'Add';
           if (result.error) { errEl.textContent = result.error; errEl.classList.remove('hidden'); return; }
-          var row = customerRows.find(function (r) { return r._id === id; });
-          if (row) {
-            row['Referral Code']       = result.row.referral_code || '';
-            row._referral_code         = result.row.referral_code || '';
-            row._referral_discount_pct = result.row.referral_discount_pct || 0;
-          }
-          if (customerTable) { customerTable.clear(); customerTable.rows.add(customerRows).draw(); }
-          closeEditReferralModal();
-          showToast(code ? 'Referral code saved.' : 'Referral code removed.', code ? 'success' : 'warning');
+          _setReferralCodes(_openReferralCodes().concat([{
+            id:           result.row.id,
+            code:         result.row.code,
+            discount_pct: result.row.discount_pct,
+            label:        result.row.label || '',
+            is_active:    result.row.is_active !== false
+          }]));
+          document.getElementById('edit-referral-code').value  = '';
+          document.getElementById('edit-referral-label').value = '';
+          showToast('Referral code added.', 'success');
         })
         .catch(function (err) {
-          btn.disabled = false; btn.textContent = 'Save';
+          btn.disabled = false; btn.textContent = 'Add';
+          errEl.textContent = 'Failed: ' + err.message; errEl.classList.remove('hidden');
+        });
+    }
+
+    /** PATCH one field of one code, then mirror the saved row back into state. */
+    function updateReferralCode(codeId, patch) {
+      var errEl = document.getElementById('edit-referral-error');
+      errEl.classList.add('hidden');
+      apiFetch('/api/referral-codes/' + codeId, {
+        method: 'PATCH',
+        body: JSON.stringify(patch)
+      })
+        .then(function (res) { return res.json(); })
+        .then(function (result) {
+          if (result.error) {
+            errEl.textContent = result.error; errEl.classList.remove('hidden');
+            renderReferralList();   // revert the input to the stored value
+            return;
+          }
+          _setReferralCodes(_openReferralCodes().map(function (c) {
+            return c.id === codeId
+              ? { id: c.id, code: result.row.code, discount_pct: result.row.discount_pct,
+                  label: result.row.label || '', is_active: result.row.is_active !== false }
+              : c;
+          }));
+          showToast('Code updated.', 'success');
+        })
+        .catch(function (err) {
+          errEl.textContent = 'Failed: ' + err.message; errEl.classList.remove('hidden');
+          renderReferralList();
+        });
+    }
+
+    function deleteReferralCode(codeId) {
+      if (!confirm('Delete this code? It will stop working immediately. Past check-ins keep their record.')) return;
+      var errEl = document.getElementById('edit-referral-error');
+      errEl.classList.add('hidden');
+      apiFetch('/api/referral-codes/' + codeId, { method: 'DELETE' })
+        .then(function (res) { return res.json(); })
+        .then(function (result) {
+          if (result.error) { errEl.textContent = result.error; errEl.classList.remove('hidden'); return; }
+          _setReferralCodes(_openReferralCodes().filter(function (c) { return c.id !== codeId; }));
+          showToast('Referral code deleted.', 'warning');
+        })
+        .catch(function (err) {
           errEl.textContent = 'Failed: ' + err.message; errEl.classList.remove('hidden');
         });
     }
@@ -1416,15 +1515,23 @@ import MainLayout from '../layouts/MainLayout.astro';
             }
           });
         }
-        if (h === 'Referral Code') {
+        if (h === 'Referral Codes') {
           return Object.assign({}, col, {
             render: function (val, type, row) {
               if (type !== 'display') return val;
-              if (!row._referral_code) return '<span class="text-gray-300">—</span>';
-              return '<span class="inline-flex items-center gap-1.5">' +
-                '<span class="font-mono text-xs font-semibold bg-purple-100 text-purple-700 px-2 py-0.5 rounded">' +
-                escHtml(row._referral_code) + '</span>' +
-                '<span class="text-xs text-gray-500">' + (row._referral_discount_pct || 0) + '% off</span>' +
+              var codes = row._referral_codes || [];
+              if (!codes.length) return '<span class="text-gray-300">—</span>';
+              return '<span class="inline-flex flex-wrap items-center gap-1.5">' +
+                codes.map(function (c) {
+                  var tone = c.is_active
+                    ? 'bg-purple-100 text-purple-700'
+                    : 'bg-gray-100 text-gray-400 line-through';
+                  return '<span class="inline-flex items-center gap-1">' +
+                    '<span class="font-mono text-xs font-semibold ' + tone + ' px-2 py-0.5 rounded">' +
+                      escHtml(c.code) + '</span>' +
+                    '<span class="text-xs text-gray-500">' + (c.discount_pct || 0) + '%</span>' +
+                    '</span>';
+                }).join('') +
                 '</span>';
             }
           });
@@ -1531,12 +1638,16 @@ import MainLayout from '../layouts/MainLayout.astro';
         showStatus('No customer data to export.', 'error');
         return;
       }
-      var headers = DEFAULT_HEADERS.concat(['Referral Code', 'Referral Discount %']);
+      var headers = DEFAULT_HEADERS.concat(['Referral Codes']);
       var lines = [headers.map(function (h) { return '"' + h.replace(/"/g, '""') + '"'; }).join(',')];
       customerRows.forEach(function (row) {
         lines.push(headers.map(function (h) {
-          if (h === 'Referral Discount %') {
-            return '"' + (row._referral_code ? String(row._referral_discount_pct || 0) : '') + '"';
+          if (h === 'Referral Codes') {
+            // "CODE (15%)" per code, paused ones marked, semicolon-separated.
+            var v = (row._referral_codes || []).map(function (c) {
+              return c.code + ' (' + (c.discount_pct || 0) + '%' + (c.is_active ? '' : ', paused') + ')';
+            }).join('; ');
+            return '"' + v.replace(/"/g, '""') + '"';
           }
           var v = row[h] != null ? String(row[h]) : '';
           return '"' + v.replace(/"/g, '""') + '"';
@@ -1666,7 +1777,7 @@ import MainLayout from '../layouts/MainLayout.astro';
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
           d="M8.684 13.342A3 3 0 108.658 10.658M15.316 10.658a3 3 0 10.026 2.684m0 0l-6.632-2.684"/>
       </svg>
-      Referral Code
+      Referral Codes
     </button>
     <div class="border-t border-gray-100 my-1"></div>
     <button onclick="ramAction(deleteCustomer)"

@@ -10,9 +10,11 @@ import {
   isValidReferralCode,
   isValidReferralPct,
   referralCodesMatch,
+  normalizeCodeLabel,
   MAX_NAME,
   MAX_TEXT,
   MAX_AMOUNT,
+  MAX_CODE_LABEL,
 } from '../lib/validate';
 
 // ── isValidUUID ───────────────────────────────────────────────────────────────
@@ -261,6 +263,23 @@ describe('referralCodesMatch', () => {
     expect(referralCodesMatch(null, 'BBO')).toBe(false);
     expect(referralCodesMatch('BBO', undefined)).toBe(false);
   });
+});
+
+describe('normalizeCodeLabel', () => {
+  it('trims surrounding whitespace', () =>
+    expect(normalizeCodeLabel('  Summer 2026  ')).toBe('Summer 2026'));
+
+  it('collapses runs of whitespace', () =>
+    expect(normalizeCodeLabel('Summer\n\t  2026')).toBe('Summer 2026'));
+
+  it('truncates to MAX_CODE_LABEL', () =>
+    expect(normalizeCodeLabel('x'.repeat(MAX_CODE_LABEL + 40))).toHaveLength(MAX_CODE_LABEL));
+
+  it('returns empty string for empty input', () =>
+    expect(normalizeCodeLabel('')).toBe(''));
+
+  it('returns empty string for undefined', () =>
+    expect(normalizeCodeLabel(undefined as any)).toBe(''));
 });
 
 describe('isValidReferralPct', () => {

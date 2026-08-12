@@ -271,15 +271,15 @@ import MainLayout from '../layouts/MainLayout.astro';
                 </label>
                 <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
                   <input type="radio" name="discount" class="discount-rb accent-orange-500 w-4 h-4 cursor-pointer" value="referral" />
-                  <span>Referral code <span class="text-gray-500 text-xs">Discount set by the code owner</span></span>
+                  <span>Referral / promo code <span class="text-gray-500 text-xs">Discount set by the code</span></span>
                 </label>
-                <!-- Code entry — only relevant when "Referral code" is picked -->
+                <!-- Code entry — only relevant when "Referral / promo code" is picked -->
                 <div id="referral-code-row" class="hidden pl-6">
                   <input
                     id="f-referral-code"
                     type="text"
                     maxlength="20"
-                    placeholder="Enter referral code…"
+                    placeholder="Enter referral or promo code…"
                     autocomplete="off"
                     class="w-full bg-gray-900 border border-gray-600 text-white placeholder-gray-500 font-mono uppercase
                            rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
@@ -287,7 +287,12 @@ import MainLayout from '../layouts/MainLayout.astro';
                   <p id="referral-status" class="text-xs text-gray-500 mt-1">
                     Ask the customer for the code shared with them.
                   </p>
+                  <!-- Cross-check: flags a fixed discount above that would beat this code -->
+                  <p id="referral-overlap" class="hidden text-xs text-yellow-400 mt-1"></p>
                 </div>
+                <p class="text-xs text-gray-500 pt-1 border-t border-gray-700">
+                  Only one discount applies per check-in — picking one clears the others.
+                </p>
               </div>
             </div>
           </div>
@@ -607,7 +612,8 @@ import MainLayout from '../layouts/MainLayout.astro';
             ? '<span class="font-mono text-xs font-semibold bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">' +
                 escHtml(c.referral_code) + '</span>' +
               '<span class="block text-xs text-gray-500 mt-0.5">' +
-                escHtml(c.referred_by_name || '') +
+                // No referrer recorded → the code was a gym-wide promo.
+                escHtml(c.referred_by_name || 'Promo') +
                 (c.referral_discount_pct ? ' · ' + c.referral_discount_pct + '% off' : '') + '</span>'
             : '<span class="text-gray-300">—</span>',
           escHtml(c.notes || ''),
@@ -749,6 +755,7 @@ import MainLayout from '../layouts/MainLayout.astro';
         // Reset the referral entry along with the rest of the form
         document.getElementById('f-referral-code').value = '';
         document.getElementById('referral-code-row').classList.add('hidden');
+        document.getElementById('referral-overlap').classList.add('hidden');
         _referral = null;
         _setReferralStatus('Ask the customer for the code shared with them.', 'muted');
         closeDropdown();
@@ -840,8 +847,9 @@ import MainLayout from '../layouts/MainLayout.astro';
       });
     }());
 
-    // ── Referral code: look up owner + discount % ─────────────────────────────
+    // ── Referral / promo code: look up owner (or promo) + discount % ──────────
     // _referral holds the last verified lookup; null while unverified/invalid.
+    // kind === 'promo' means a gym-wide code with no owner.
     var _referral       = null;
     var _referralTimer  = null;
 
@@ -850,6 +858,46 @@ import MainLayout from '../layouts/MainLayout.astro';
       el.textContent = msg;
       el.className = 'text-xs mt-1 ' +
         (tone === 'ok' ? 'text-green-400' : tone === 'error' ? 'text-red-400' : 'text-gray-500');
+    }
+
+    /** How a verified code describes itself in the status line. */
+    function _referralWho(data) {
+      if (data.kind === 'promo') return 'Promo' + (data.label ? ' · ' + data.label : '');
+      return (data.owner_name || 'Referral') + (data.label ? ' · ' + data.label : '');
+    }
+
+    // ── Discount cross-check ──────────────────────────────────────────────────
+    // The discount options are mutually exclusive radios, so nothing stacks.
+    // What staff can still miss is picking a code when a fixed discount above
+    // would have taken more off, so compare them and say so.
+    var FIXED_DISCOUNTS = [
+      { label: '30% (setting day, less disturbance)', apply: function (p) { return Math.round(p * 0.7); } },
+      { label: '40% (setting day, more disturbance)', apply: function (p) { return Math.round(p * 0.6); } },
+      { label: '50% (late entry)',                    apply: function (p) { return Math.round(p * 0.5); } },
+      { label: 'Birthday (20,000 ₫ off)',             apply: function (p) { return Math.max(0, p - 20000); } }
+    ];
+
+    function _fmtVnd(n) { return Number(n || 0).toLocaleString('en-US') + ' ₫'; }
+
+    function checkDiscountOverlap() {
+      var el = document.getElementById('referral-overlap');
+      var typeSelect  = document.getElementById('f-checkin-type');
+      var selectedOpt = typeSelect.options[typeSelect.selectedIndex];
+      var basePrice   = selectedOpt ? (parseInt(selectedOpt.dataset.price || '0') || 0) : 0;
+
+      if (!_referral || !basePrice) { el.classList.add('hidden'); return; }
+
+      var codeBase = Math.round(basePrice * (1 - (_referral.discount_pct || 0) / 100));
+      var best = null;
+      FIXED_DISCOUNTS.forEach(function (d) {
+        var v = d.apply(basePrice);
+        if (v < codeBase && (!best || v < best.value)) best = { label: d.label, value: v };
+      });
+
+      if (!best) { el.classList.add('hidden'); return; }
+      el.textContent = 'Heads-up: the ' + best.label + ' option takes more off — ' +
+        _fmtVnd(best.value) + ' vs ' + _fmtVnd(codeBase) + ' with this code. Only one discount applies.';
+      el.classList.remove('hidden');
     }
 
     function validateReferralCode() {
@@ -870,10 +918,10 @@ import MainLayout from '../layouts/MainLayout.astro';
           if (document.getElementById('f-referral-code').value.trim().toUpperCase() !== code) return;
           if (!data.valid) {
             _referral = null;
-            _setReferralStatus(data.error || 'Referral code not found.', 'error');
+            _setReferralStatus(data.error || 'Referral or promo code not found.', 'error');
           } else {
             _referral = data;
-            _setReferralStatus('✓ ' + data.owner_name + ' — ' + data.discount_pct + '% off', 'ok');
+            _setReferralStatus('✓ ' + _referralWho(data) + ' — ' + data.discount_pct + '% off', 'ok');
           }
           recalcAmount();
         })
@@ -918,6 +966,8 @@ import MainLayout from '../layouts/MainLayout.astro';
         total = basePrice + addonTotal;
       }
       document.getElementById('f-amount').value = total > 0 ? total : '';
+      if (discountVal === 'referral') checkDiscountOverlap();
+      else document.getElementById('referral-overlap').classList.add('hidden');
     }
     document.getElementById('f-checkin-type').addEventListener('change', recalcAmount);
     document.querySelectorAll('.addon-cb').forEach(function (cb) {
@@ -933,6 +983,7 @@ import MainLayout from '../layouts/MainLayout.astro';
           document.getElementById('f-referral-code').value = '';
           _referral = null;
           _setReferralStatus('Ask the customer for the code shared with them.', 'muted');
+          document.getElementById('referral-overlap').classList.add('hidden');
         }
         recalcAmount();
       });
@@ -980,11 +1031,11 @@ import MainLayout from '../layouts/MainLayout.astro';
       if (discountValSub && DISCOUNT_LABELS[discountValSub]) addonsArr.push('Discount: ' + DISCOUNT_LABELS[discountValSub]);
       var addonsStr      = addonsArr.join(', ');
 
-      // Referral discount requires a code that verified successfully
+      // Referral / promo discount requires a code that verified successfully
       var referralCode = '';
       if (discountValSub === 'referral') {
         if (!_referral) {
-          errEl.textContent = 'Enter a valid referral code, or choose a different discount.';
+          errEl.textContent = 'Enter a valid referral or promo code, or choose a different discount.';
           errEl.classList.remove('hidden');
           document.getElementById('f-referral-code').focus();
           return;
@@ -1109,7 +1160,7 @@ import MainLayout from '../layouts/MainLayout.astro';
         return [c.date, (c.time || '').slice(0, 5), c.customer_name, c.checkin_type || '',
                 c.payment_method, Math.round(c.amount || 0), c.addons || '',
                 c.punch_card_holder_name || '', c.pt_punch_holder_name || '',
-                c.referral_code || '', c.referred_by_name || '',
+                c.referral_code || '', c.referral_code ? (c.referred_by_name || 'Promo') : '',
                 c.referral_code ? (c.referral_discount_pct || 0) : '', c.notes || ''];
       })).map(function (row) {
         return row.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(',');

@@ -24,7 +24,7 @@ export function makeBuilder(defaultResult: { data: any; error: any } = { data: n
   for (const m of [
     'select', 'insert', 'update', 'upsert', 'delete',
     'eq', 'neq', 'ilike', 'gte', 'lte',
-    'limit', 'order', 'range', 'not', 'in',
+    'limit', 'order', 'range', 'not', 'in', 'is',
   ]) {
     b[m] = vi.fn().mockReturnValue(b);
   }

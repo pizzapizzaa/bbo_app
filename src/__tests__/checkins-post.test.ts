@@ -279,10 +279,13 @@ describe('POST /api/checkins — successful insert', () => {
   });
 });
 
-// ── Referral codes ────────────────────────────────────────────────────────────
-describe('POST /api/checkins — referral code', () => {
-  /** Wires the customers table to a single code owner and captures the insert. */
-  function mockOwner(owner: any) {
+// ── Referral / promo codes ────────────────────────────────────────────────────
+describe('POST /api/checkins — referral & promo codes', () => {
+  /**
+   * Wires referral_codes to a single code row, customers to its owner, and
+   * captures the check-in insert payload.
+   */
+  function mockCode(code: any, owner: any = null) {
     const captured: { payload: any } = { payload: null };
     mockFromFn.mockImplementation((table: string) => {
       if (table === 'checkins') {
@@ -293,18 +296,24 @@ describe('POST /api/checkins — referral code', () => {
         });
         return builder;
       }
+      if (table === 'referral_codes') return makeBuilder({ data: code, error: null });
       return makeBuilder({ data: owner, error: null });
     });
     return captured;
   }
 
-  it('records the owner on the check-in when the code is valid', async () => {
-    const captured = mockOwner({
-      id: 'cccc0000-0000-0000-0000-000000000003',
-      full_name: 'Bao Tran',
-      referral_code: 'BAOTRAN-4F2K',
-      referral_discount_pct: 15,
-    });
+  it('records the owner on the check-in when a customer code is valid', async () => {
+    const captured = mockCode(
+      {
+        id: 'dddd0000-0000-0000-0000-000000000004',
+        code: 'BAOTRAN-4F2K',
+        discount_pct: 15,
+        owner_id: 'cccc0000-0000-0000-0000-000000000003',
+        label: '',
+        is_active: true,
+      },
+      { id: 'cccc0000-0000-0000-0000-000000000003', full_name: 'Bao Tran' },
+    );
 
     const res = await POST({
       request: makeReq({ ...validBody, referral_code: 'baotran-4f2k' }),
@@ -319,13 +328,68 @@ describe('POST /api/checkins — referral code', () => {
     });
   });
 
-  it('returns 400 when the code does not belong to any customer', async () => {
-    mockOwner(null);
+  it('records a universal promo code with no referrer', async () => {
+    const captured = mockCode({
+      id: 'dddd0000-0000-0000-0000-000000000005',
+      code: 'SUMMER26',
+      discount_pct: 20,
+      owner_id: null,
+      label: 'Summer 2026',
+      is_active: true,
+    });
+
+    const res = await POST({
+      request: makeReq({ ...validBody, referral_code: 'summer26' }),
+    } as any);
+
+    expect(res.status).toBe(200);
+    expect(captured.payload).toMatchObject({
+      referral_code:         'SUMMER26',
+      referred_by_id:        null,
+      referred_by_name:      '',
+      referral_discount_pct: 20,
+    });
+  });
+
+  it('lets a customer use a promo code that no one owns', async () => {
+    const captured = mockCode({
+      id: 'dddd0000-0000-0000-0000-000000000006',
+      code: 'PROMO-1234',
+      discount_pct: 10,
+      owner_id: null,
+      label: '',
+      is_active: true,
+    });
+    const res = await POST({
+      request: makeReq({ ...validBody, referral_code: 'PROMO-1234' }),
+    } as any);
+    expect(res.status).toBe(200);
+    expect(captured.payload).toMatchObject({ referral_code: 'PROMO-1234' });
+  });
+
+  it('returns 400 when the code does not exist', async () => {
+    mockCode(null);
     const res = await POST({
       request: makeReq({ ...validBody, referral_code: 'NOPE-1234' }),
     } as any);
     expect(res.status).toBe(400);
-    expect(await res.json()).toMatchObject({ error: 'Referral code not found.' });
+    expect(await res.json()).toMatchObject({ error: 'Referral or promo code not found.' });
+  });
+
+  it('returns 400 when the code has been paused', async () => {
+    mockCode({
+      id: 'dddd0000-0000-0000-0000-000000000007',
+      code: 'OLDPROMO',
+      discount_pct: 25,
+      owner_id: null,
+      label: '',
+      is_active: false,
+    });
+    const res = await POST({
+      request: makeReq({ ...validBody, referral_code: 'OLDPROMO' }),
+    } as any);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error: 'That code is no longer active.' });
   });
 
   it('returns 400 for a malformed code without hitting the DB', async () => {
@@ -337,12 +401,17 @@ describe('POST /api/checkins — referral code', () => {
   });
 
   it('rejects a customer using their own code, case-insensitively', async () => {
-    mockOwner({
-      id: 'cccc0000-0000-0000-0000-000000000003',
-      full_name: 'alice nguyen',
-      referral_code: 'ALICE-9XYZ',
-      referral_discount_pct: 10,
-    });
+    mockCode(
+      {
+        id: 'dddd0000-0000-0000-0000-000000000008',
+        code: 'ALICE-9XYZ',
+        discount_pct: 10,
+        owner_id: 'cccc0000-0000-0000-0000-000000000003',
+        label: '',
+        is_active: true,
+      },
+      { id: 'cccc0000-0000-0000-0000-000000000003', full_name: 'alice nguyen' },
+    );
     const res = await POST({
       request: makeReq({ ...validBody, referral_code: 'ALICE-9XYZ' }),
     } as any);
@@ -351,7 +420,7 @@ describe('POST /api/checkins — referral code', () => {
   });
 
   it('stores empty referral fields when no code is supplied', async () => {
-    const captured = mockOwner({ id: 'cust-1' });
+    const captured = mockCode(null, { id: 'cust-1' });
     const res = await POST({ request: makeReq(validBody) } as any);
     expect(res.status).toBe(200);
     expect(captured.payload).toMatchObject({

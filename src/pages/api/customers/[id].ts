@@ -3,12 +3,9 @@ export const prerender = false;
 import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
 import { ok, serverError } from '../../../lib/auth';
-import {
-  isValidUUID, escapeLike,
-  normalizeReferralCode, isValidReferralCode, isValidReferralPct, referralCodesMatch,
-} from '../../../lib/validate';
+import { isValidUUID } from '../../../lib/validate';
 
-/** PATCH /api/customers/:id — update punch card, membership and/or referral info */
+/** PATCH /api/customers/:id — update punch card and/or membership info */
 export const PATCH: APIRoute = async ({ params, request }) => {
   try {
     const { id } = params;
@@ -21,8 +18,6 @@ export const PATCH: APIRoute = async ({ params, request }) => {
       membership_type?: string;
       membership_start_date?: string | null;
       membership_end_date?: string | null;
-      referral_code?: string | null;
-      referral_discount_pct?: number;
     };
     try { body = await request.json(); }
     catch { return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400 }); }
@@ -72,50 +67,8 @@ export const PATCH: APIRoute = async ({ params, request }) => {
       }
     }
 
-    // Referral code fields. Sending an empty code revokes the customer's code
-    // (and clears the percentage with it) — a code without a discount is useless.
-    if ('referral_code' in body) {
-      const code = normalizeReferralCode(body.referral_code ?? '');
-      if (!code) {
-        updates.referral_code         = '';
-        updates.referral_discount_pct = 0;
-      } else {
-        if (!isValidReferralCode(code)) {
-          return new Response(JSON.stringify({
-            error: 'Referral code must be 3–20 characters using letters, numbers or dashes.',
-          }), { status: 400 });
-        }
-        const pct = Math.round(Number(body.referral_discount_pct));
-        if (!isValidReferralPct(pct)) {
-          return new Response(JSON.stringify({
-            error: 'Referral discount must be a whole number between 1 and 100.',
-          }), { status: 400 });
-        }
-        // Codes are unique across customers (case-insensitively).
-        const { data: clash } = await db
-          .from('customers')
-          .select('id, full_name, referral_code')
-          .ilike('referral_code', escapeLike(code))
-          .neq('id', id)
-          .limit(1)
-          .maybeSingle();
-        if (clash && referralCodesMatch(clash.referral_code, code)) {
-          return new Response(JSON.stringify({
-            error: `That code is already assigned to ${clash.full_name || 'another customer'}.`,
-          }), { status: 409 });
-        }
-        updates.referral_code         = code;
-        updates.referral_discount_pct = pct;
-      }
-    } else if ('referral_discount_pct' in body) {
-      const pct = Math.round(Number(body.referral_discount_pct));
-      if (!isValidReferralPct(pct)) {
-        return new Response(JSON.stringify({
-          error: 'Referral discount must be a whole number between 1 and 100.',
-        }), { status: 400 });
-      }
-      updates.referral_discount_pct = pct;
-    }
+    // Referral codes are no longer stored on the customer row — they live in
+    // `referral_codes` (many per customer). See /api/referral-codes.
 
     if (Object.keys(updates).length === 0) {
       return new Response(JSON.stringify({ error: 'No fields to update' }), { status: 400 });
@@ -125,16 +78,11 @@ export const PATCH: APIRoute = async ({ params, request }) => {
       .from('customers')
       .update(updates)
       .eq('id', id)
-      .select('id, is_punch_card_holder, punches_remaining, pt_punches_remaining, membership_type, membership_start_date, membership_end_date, referral_code, referral_discount_pct')
+      .select('id, is_punch_card_holder, punches_remaining, pt_punches_remaining, membership_type, membership_start_date, membership_end_date')
       .single();
 
     if (error) {
-      // 23505 = unique violation on idx_customers_referral_code (race with a
-      // concurrent assignment that slipped past the check above).
-      if (error.code === '23505') {
-        return new Response(JSON.stringify({ error: 'That referral code is already taken.' }), { status: 409 });
-      }
-      if (error.code === '42703' || error.message?.includes('is_punch_card_holder') || error.message?.includes('membership_type') || error.message?.includes('referral_code')) {
+      if (error.code === '42703' || error.message?.includes('is_punch_card_holder') || error.message?.includes('membership_type')) {
         return new Response(JSON.stringify({ error: 'Required columns not found. Please run the database migration first.' }), { status: 400 });
       }
       return serverError(error.message);

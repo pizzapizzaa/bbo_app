@@ -189,6 +189,44 @@ ALTER TABLE checkins
 
 CREATE INDEX IF NOT EXISTS idx_checkins_referred_by ON checkins (referred_by_id);
 
+-- ── Multi-Code Referral / Promo Migration ────────────────────────────────────
+-- Supersedes the single customers.referral_code column above. A customer may
+-- now hold any number of codes, and a code with owner_id = NULL is a universal
+-- promo code that belongs to the gym rather than to a customer.
+--   owner_id NOT NULL → affiliated referral code (self-referral is blocked)
+--   owner_id NULL     → universal promo code (anyone may quote it)
+CREATE TABLE IF NOT EXISTS referral_codes (
+  id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  code         TEXT        NOT NULL,                 -- stored uppercase
+  discount_pct INTEGER     NOT NULL,                 -- 1..100, applied to the base price
+  owner_id     UUID        REFERENCES customers(id) ON DELETE CASCADE,
+  label        TEXT        NOT NULL DEFAULT '',      -- e.g. 'Summer 2026'
+  is_active    BOOLEAN     NOT NULL DEFAULT true,    -- false = paused, kept for history
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Case-insensitive uniqueness across every code, owned or universal.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_referral_codes_code ON referral_codes (upper(code));
+CREATE INDEX IF NOT EXISTS idx_referral_codes_owner ON referral_codes (owner_id);
+
+ALTER TABLE referral_codes ENABLE ROW LEVEL SECURITY;
+-- No anon-key policies → service key only (same pattern as all other tables).
+
+-- Backfill the codes that live on customers.referral_code, once.
+INSERT INTO referral_codes (code, discount_pct, owner_id)
+SELECT c.referral_code, GREATEST(c.referral_discount_pct, 1), c.id
+FROM customers c
+WHERE c.referral_code <> ''
+  AND NOT EXISTS (
+    SELECT 1 FROM referral_codes rc WHERE upper(rc.code) = upper(c.referral_code)
+  );
+
+-- customers.referral_code / referral_discount_pct are no longer read or written
+-- by the app. They are kept as a backup of the pre-migration state; drop them
+-- once the backfill above has been verified in production:
+--   DROP INDEX IF EXISTS idx_customers_referral_code;
+--   ALTER TABLE customers DROP COLUMN referral_code, DROP COLUMN referral_discount_pct;
+
 -- ══════════════════════════════════════════════════════════════════════════════
 -- Staff Users  (Issue #2 — multi-user auth with roles)
 -- Replaces single env-var admin. Bootstrap: if table is empty, the app falls
