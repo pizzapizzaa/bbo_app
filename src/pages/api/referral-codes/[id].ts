@@ -5,7 +5,7 @@ import { db } from '../../../lib/db';
 import { ok, serverError } from '../../../lib/auth';
 import {
   isValidUUID, escapeLike,
-  normalizeReferralCode, isValidReferralCode, isValidReferralPct,
+  normalizeReferralCode, isValidReferralCode, isValidReferralPct, isValidRentalPct,
   referralCodesMatch, normalizeCodeLabel,
 } from '../../../lib/validate';
 
@@ -18,6 +18,7 @@ export const PATCH: APIRoute = async ({ params, request }) => {
     let body: {
       code?: string;
       discount_pct?: number;
+      rental_discount_pct?: number;
       label?: string;
       is_active?: boolean;
     };
@@ -56,6 +57,16 @@ export const PATCH: APIRoute = async ({ params, request }) => {
       updates.discount_pct = pct;
     }
 
+    if ('rental_discount_pct' in body) {
+      const rentalPct = Math.round(Number(body.rental_discount_pct));
+      if (!isValidRentalPct(rentalPct)) {
+        return new Response(JSON.stringify({
+          error: 'Rental discount must be a whole number between 0 and 100.',
+        }), { status: 400 });
+      }
+      updates.rental_discount_pct = rentalPct;
+    }
+
     if ('label' in body)     updates.label     = normalizeCodeLabel(body.label ?? '');
     if ('is_active' in body) updates.is_active = Boolean(body.is_active);
 
@@ -67,7 +78,7 @@ export const PATCH: APIRoute = async ({ params, request }) => {
       .from('referral_codes')
       .update(updates)
       .eq('id', id)
-      .select('id, code, discount_pct, owner_id, label, is_active, created_at')
+      .select('id, code, discount_pct, rental_discount_pct, owner_id, label, is_active, created_at')
       .single();
 
     if (error) {

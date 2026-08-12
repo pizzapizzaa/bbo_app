@@ -202,11 +202,11 @@ import MainLayout from '../layouts/MainLayout.astro';
                   <span>Chalk Ball <span class="text-gray-500 text-xs">75,000 ₫</span></span>
                 </label>
                 <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Liquid Chalk Rental" data-price="25000" />
+                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Liquid Chalk Rental" data-price="25000" data-rental="1" />
                   <span>Liquid Chalk Rental <span class="text-gray-500 text-xs">25,000 ₫</span></span>
                 </label>
                 <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Shoes Rental" data-price="20000" />
+                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Shoes Rental" data-price="20000" data-rental="1" />
                   <span>Shoes Rental <span class="text-gray-500 text-xs">20,000 ₫</span></span>
                 </label>
                 <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
@@ -871,32 +871,28 @@ import MainLayout from '../layouts/MainLayout.astro';
     // What staff can still miss is picking a code when a fixed discount above
     // would have taken more off, so compare them and say so.
     var FIXED_DISCOUNTS = [
-      { label: '30% (setting day, less disturbance)', apply: function (p) { return Math.round(p * 0.7); } },
-      { label: '40% (setting day, more disturbance)', apply: function (p) { return Math.round(p * 0.6); } },
-      { label: '50% (late entry)',                    apply: function (p) { return Math.round(p * 0.5); } },
-      { label: 'Birthday (20,000 ₫ off)',             apply: function (p) { return Math.max(0, p - 20000); } }
+      { value: 'day30',      label: '30% (setting day, less disturbance)' },
+      { value: 'day40',      label: '40% (setting day, more disturbance)' },
+      { value: 'lasthour50', label: '50% (late entry)' },
+      { value: 'birthday',   label: 'Birthday (20,000 ₫ off)' }
     ];
 
     function _fmtVnd(n) { return Number(n || 0).toLocaleString('en-US') + ' ₫'; }
 
     function checkDiscountOverlap() {
       var el = document.getElementById('referral-overlap');
-      var typeSelect  = document.getElementById('f-checkin-type');
-      var selectedOpt = typeSelect.options[typeSelect.selectedIndex];
-      var basePrice   = selectedOpt ? (parseInt(selectedOpt.dataset.price || '0') || 0) : 0;
+      if (!_referral || !_basePrice()) { el.classList.add('hidden'); return; }
 
-      if (!_referral || !basePrice) { el.classList.add('hidden'); return; }
-
-      var codeBase = Math.round(basePrice * (1 - (_referral.discount_pct || 0) / 100));
+      var codeTotal = totalFor('referral');
       var best = null;
       FIXED_DISCOUNTS.forEach(function (d) {
-        var v = d.apply(basePrice);
-        if (v < codeBase && (!best || v < best.value)) best = { label: d.label, value: v };
+        var v = totalFor(d.value);
+        if (v < codeTotal && (!best || v < best.value)) best = { label: d.label, value: v };
       });
 
       if (!best) { el.classList.add('hidden'); return; }
       el.textContent = 'Heads-up: the ' + best.label + ' option takes more off — ' +
-        _fmtVnd(best.value) + ' vs ' + _fmtVnd(codeBase) + ' with this code. Only one discount applies.';
+        _fmtVnd(best.value) + ' vs ' + _fmtVnd(codeTotal) + ' with this code. Only one discount applies.';
       el.classList.remove('hidden');
     }
 
@@ -921,7 +917,10 @@ import MainLayout from '../layouts/MainLayout.astro';
             _setReferralStatus(data.error || 'Referral or promo code not found.', 'error');
           } else {
             _referral = data;
-            _setReferralStatus('✓ ' + _referralWho(data) + ' — ' + data.discount_pct + '% off', 'ok');
+            _setReferralStatus('✓ ' + _referralWho(data) + ' — ' + data.discount_pct + '% off' +
+              (data.rental_discount_pct
+                ? ' · ' + data.rental_discount_pct + '% off shoe & chalk rental'
+                : ''), 'ok');
           }
           recalcAmount();
         })
@@ -939,32 +938,45 @@ import MainLayout from '../layouts/MainLayout.astro';
     });
 
     // ── Check-in type, add-ons & discount: auto-calculate amount ──
-    function recalcAmount() {
+    function _basePrice() {
       var typeSelect  = document.getElementById('f-checkin-type');
       var selectedOpt = typeSelect.options[typeSelect.selectedIndex];
-      var basePrice   = selectedOpt ? (parseInt(selectedOpt.dataset.price || '0') || 0) : 0;
-      var addonTotal  = 0;
+      return selectedOpt ? (parseInt(selectedOpt.dataset.price || '0') || 0) : 0;
+    }
+
+    /** Add-on subtotals, split so a code can discount gear rental on its own. */
+    function _addonTotals() {
+      var retail = 0, rental = 0;
       document.querySelectorAll('.addon-cb:checked').forEach(function (cb) {
-        addonTotal += parseInt(cb.dataset.price || '0') || 0;
+        var price = parseInt(cb.dataset.price || '0') || 0;
+        if (cb.dataset.rental === '1') rental += price; else retail += price;
       });
+      return { retail: retail, rental: rental };
+    }
+
+    /** What the visit costs under one discount option. */
+    function totalFor(discountVal) {
+      var base   = _basePrice();
+      var addons = _addonTotals();
+      if (discountVal === 'day30')      return Math.round(base * 0.7) + addons.retail + addons.rental;
+      if (discountVal === 'day40')      return Math.round(base * 0.6) + addons.retail + addons.rental;
+      if (discountVal === 'lasthour50') return Math.round(base * 0.5) + addons.retail + addons.rental;
+      if (discountVal === 'birthday')   return Math.max(0, (base + addons.retail + addons.rental) - 20000);
+      if (discountVal === 'referral') {
+        // Only a verified code discounts anything. Retail add-ons are never
+        // discounted; the rental add-ons are, when the code says so.
+        var pct       = _referral ? (_referral.discount_pct || 0) : 0;
+        var rentalPct = _referral ? (_referral.rental_discount_pct || 0) : 0;
+        return Math.round(base * (1 - pct / 100)) + addons.retail +
+               Math.round(addons.rental * (1 - rentalPct / 100));
+      }
+      return base + addons.retail + addons.rental;
+    }
+
+    function recalcAmount() {
       var discountRb  = document.querySelector('.discount-rb:checked');
       var discountVal = discountRb ? discountRb.value : '';
-      var total;
-      if (discountVal === 'day30') {
-        total = Math.round(basePrice * 0.7) + addonTotal;
-      } else if (discountVal === 'day40') {
-        total = Math.round(basePrice * 0.6) + addonTotal;
-      } else if (discountVal === 'lasthour50') {
-        total = Math.round(basePrice * 0.5) + addonTotal;
-      } else if (discountVal === 'birthday') {
-        total = Math.max(0, (basePrice + addonTotal) - 20000);
-      } else if (discountVal === 'referral') {
-        // Only a verified code discounts anything; add-ons are never discounted.
-        var pct = _referral ? (_referral.discount_pct || 0) : 0;
-        total = Math.round(basePrice * (1 - pct / 100)) + addonTotal;
-      } else {
-        total = basePrice + addonTotal;
-      }
+      var total       = totalFor(discountVal);
       document.getElementById('f-amount').value = total > 0 ? total : '';
       if (discountVal === 'referral') checkDiscountOverlap();
       else document.getElementById('referral-overlap').classList.add('hidden');
@@ -1029,6 +1041,11 @@ import MainLayout from '../layouts/MainLayout.astro';
       var discountRbSub  = document.querySelector('.discount-rb:checked');
       var discountValSub = discountRbSub ? discountRbSub.value : '';
       if (discountValSub && DISCOUNT_LABELS[discountValSub]) addonsArr.push('Discount: ' + DISCOUNT_LABELS[discountValSub]);
+      // Record the rental cut too — the referral columns only carry the base-price %.
+      if (discountValSub === 'referral' && _referral && _referral.rental_discount_pct &&
+          document.querySelector('.addon-cb[data-rental="1"]:checked')) {
+        addonsArr.push('Rental discount: ' + _referral.rental_discount_pct + '%');
+      }
       var addonsStr      = addonsArr.join(', ');
 
       // Referral / promo discount requires a code that verified successfully

@@ -6,21 +6,22 @@ import { ok, serverError } from '../../../lib/auth';
 import { fetchAllPages } from '../../../lib/paginate';
 import {
   isValidUUID, escapeLike,
-  normalizeReferralCode, isValidReferralCode, isValidReferralPct,
+  normalizeReferralCode, isValidReferralCode, isValidReferralPct, isValidRentalPct,
   referralCodesMatch, normalizeCodeLabel,
 } from '../../../lib/validate';
 
 /** Shape returned to the client for one code row. */
 function toRow(r: any, ownerNames: Map<string, string>) {
   return {
-    id:           r.id,
-    code:         r.code ?? '',
-    discount_pct: r.discount_pct ?? 0,
-    owner_id:     r.owner_id ?? null,
-    owner_name:   r.owner_id ? (ownerNames.get(r.owner_id) ?? '') : '',
-    label:        r.label ?? '',
-    is_active:    r.is_active !== false,
-    created_at:   r.created_at ?? '',
+    id:                  r.id,
+    code:                r.code ?? '',
+    discount_pct:        r.discount_pct ?? 0,
+    rental_discount_pct: r.rental_discount_pct ?? 0,
+    owner_id:            r.owner_id ?? null,
+    owner_name:          r.owner_id ? (ownerNames.get(r.owner_id) ?? '') : '',
+    label:               r.label ?? '',
+    is_active:           r.is_active !== false,
+    created_at:          r.created_at ?? '',
   };
 }
 
@@ -52,7 +53,7 @@ export const GET: APIRoute = async ({ url }) => {
     const { data, error } = await fetchAllPages((from, to) => {
       let q = db
         .from('referral_codes')
-        .select('id, code, discount_pct, owner_id, label, is_active, created_at')
+        .select('id, code, discount_pct, rental_discount_pct, owner_id, label, is_active, created_at')
         .order('created_at', { ascending: false })
         .range(from, to);
       if (owner)                  q = q.eq('owner_id', owner);
@@ -83,6 +84,7 @@ export const POST: APIRoute = async ({ request }) => {
     let body: {
       code?: string;
       discount_pct?: number;
+      rental_discount_pct?: number;
       owner_id?: string | null;
       label?: string;
       is_active?: boolean;
@@ -101,6 +103,14 @@ export const POST: APIRoute = async ({ request }) => {
     if (!isValidReferralPct(pct)) {
       return new Response(JSON.stringify({
         error: 'Discount must be a whole number between 1 and 100.',
+      }), { status: 400 });
+    }
+
+    // Rentals are charged in full unless the code says otherwise.
+    const rentalPct = 'rental_discount_pct' in body ? Math.round(Number(body.rental_discount_pct)) : 0;
+    if (!isValidRentalPct(rentalPct)) {
+      return new Response(JSON.stringify({
+        error: 'Rental discount must be a whole number between 0 and 100.',
       }), { status: 400 });
     }
 
@@ -129,10 +139,11 @@ export const POST: APIRoute = async ({ request }) => {
       .from('referral_codes')
       .insert({
         code,
-        discount_pct: pct,
-        owner_id:     ownerId,
-        label:        normalizeCodeLabel(body.label ?? ''),
-        is_active:    body.is_active !== false,
+        discount_pct:        pct,
+        rental_discount_pct: rentalPct,
+        owner_id:            ownerId,
+        label:               normalizeCodeLabel(body.label ?? ''),
+        is_active:           body.is_active !== false,
       })
       .select('id, code, discount_pct, owner_id, label, is_active, created_at')
       .single();

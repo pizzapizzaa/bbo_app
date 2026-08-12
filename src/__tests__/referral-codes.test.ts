@@ -80,6 +80,40 @@ describe('POST /api/referral-codes', () => {
     expect(await res.json()).toMatchObject({ row: { code: 'SUMMER26', owner_name: '' } });
   });
 
+  it('stores a rental discount when one is given', async () => {
+    const captured = mockTables({
+      insertedCode: {
+        id: CODE_ID, code: 'HANIE10', discount_pct: 10, rental_discount_pct: 50,
+        owner_id: null, label: '', is_active: true, created_at: '2026-08-12T00:00:00Z',
+      },
+    });
+
+    const res = await POST({ request: makeReq({ code: 'HANIE10', discount_pct: 10, rental_discount_pct: 50 }) } as any);
+
+    expect(res.status).toBe(200);
+    expect(captured.insert).toMatchObject({ code: 'HANIE10', discount_pct: 10, rental_discount_pct: 50 });
+    expect(await res.json()).toMatchObject({ row: { rental_discount_pct: 50 } });
+  });
+
+  it('defaults the rental discount to 0 when omitted', async () => {
+    const captured = mockTables({
+      insertedCode: {
+        id: CODE_ID, code: 'SUMMER26', discount_pct: 20, rental_discount_pct: 0,
+        owner_id: null, label: '', is_active: true, created_at: '2026-06-01T00:00:00Z',
+      },
+    });
+    await POST({ request: makeReq({ code: 'SUMMER26', discount_pct: 20 }) } as any);
+    expect(captured.insert).toMatchObject({ rental_discount_pct: 0 });
+  });
+
+  it('returns 400 for an out-of-range rental discount', async () => {
+    const res = await POST({ request: makeReq({ code: 'SUMMER26', discount_pct: 20, rental_discount_pct: 150 }) } as any);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({
+      error: 'Rental discount must be a whole number between 0 and 100.',
+    });
+  });
+
   it('creates a customer-owned code and reports the owner name', async () => {
     mockTables({
       customer:     { id: OWNER_ID, full_name: 'Bao Tran' },
@@ -203,7 +237,21 @@ describe('GET /api/referral', () => {
     });
     const res = await lookupReq('code=summer26');
     expect(await res.json()).toMatchObject({
-      valid: true, code: 'SUMMER26', kind: 'promo', owner_name: '', label: 'Summer 2026', discount_pct: 20,
+      valid: true, code: 'SUMMER26', kind: 'promo', owner_name: '', label: 'Summer 2026',
+      discount_pct: 20, rental_discount_pct: 0,
+    });
+  });
+
+  it('passes the rental discount through to the check-in form', async () => {
+    mockTables({
+      existingCode: {
+        id: CODE_ID, code: 'HANIE10', discount_pct: 10, rental_discount_pct: 50,
+        owner_id: null, label: '', is_active: true,
+      },
+    });
+    const res = await lookupReq('code=hanie10');
+    expect(await res.json()).toMatchObject({
+      valid: true, code: 'HANIE10', discount_pct: 10, rental_discount_pct: 50,
     });
   });
 

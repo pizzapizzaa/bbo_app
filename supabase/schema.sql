@@ -221,6 +221,18 @@ WHERE c.referral_code <> ''
     SELECT 1 FROM referral_codes rc WHERE upper(rc.code) = upper(c.referral_code)
   );
 
+-- ── Rental Discount On Codes ─────────────────────────────────────────────────
+-- Some codes also cut the gear rental add-ons (Shoes Rental, Liquid Chalk
+-- Rental). 0 = rentals are charged in full, which is the default for every
+-- other code. Only the rental add-ons are affected — retail add-ons (chalk
+-- balls, drinks, socks) are never discounted.
+ALTER TABLE referral_codes
+  ADD COLUMN IF NOT EXISTS rental_discount_pct INTEGER NOT NULL DEFAULT 0;
+
+-- Hanie's and Huy Phan's codes give 50% off shoe and chalk rental.
+UPDATE referral_codes SET rental_discount_pct = 50
+WHERE upper(code) IN ('HANIE10', 'HUYPHAN10');
+
 -- customers.referral_code / referral_discount_pct are no longer read or written
 -- by the app. They are kept as a backup of the pre-migration state; drop them
 -- once the backfill above has been verified in production:

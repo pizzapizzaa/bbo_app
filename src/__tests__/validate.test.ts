@@ -9,6 +9,7 @@ import {
   normalizeReferralCode,
   isValidReferralCode,
   isValidReferralPct,
+  isValidRentalPct,
   referralCodesMatch,
   normalizeCodeLabel,
   MAX_NAME,
@@ -263,6 +264,16 @@ describe('referralCodesMatch', () => {
     expect(referralCodesMatch(null, 'BBO')).toBe(false);
     expect(referralCodesMatch('BBO', undefined)).toBe(false);
   });
+});
+
+describe('isValidRentalPct', () => {
+  it('accepts 0 — rentals charged in full', () => expect(isValidRentalPct(0)).toBe(true));
+  it('accepts 50', ()   => expect(isValidRentalPct(50)).toBe(true));
+  it('accepts 100', ()  => expect(isValidRentalPct(100)).toBe(true));
+  it('rejects 101', ()  => expect(isValidRentalPct(101)).toBe(false));
+  it('rejects negatives', () => expect(isValidRentalPct(-1)).toBe(false));
+  it('rejects fractions', () => expect(isValidRentalPct(12.5)).toBe(false));
+  it('rejects NaN', ()       => expect(isValidRentalPct(NaN)).toBe(false));
 });
 
 describe('normalizeCodeLabel', () => {

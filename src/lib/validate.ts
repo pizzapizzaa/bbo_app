@@ -74,6 +74,14 @@ export function isValidReferralPct(n: number): boolean {
   return Number.isInteger(n) && n >= 1 && n <= 100;
 }
 
+/**
+ * Rental discount percentage — the cut a code gives on the gear rental add-ons.
+ * Unlike the base-price discount this may be 0, meaning "rentals charged in full".
+ */
+export function isValidRentalPct(n: number): boolean {
+  return Number.isInteger(n) && n >= 0 && n <= 100;
+}
+
 /** Max length of the optional label attached to a code (e.g. 'Summer 2026'). */
 export const MAX_CODE_LABEL = 60;
 

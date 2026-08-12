@@ -94,6 +94,17 @@ import MainLayout from '../layouts/MainLayout.astro';
           <input id="code-pct" type="number" min="1" max="100" step="1" value="10"
                  class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
                         focus:outline-none focus:ring-2 focus:ring-purple-300" />
+          <p class="text-xs text-gray-400 mt-1">Off the check-in base price.</p>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Rental discount (%)</label>
+          <input id="code-rental" type="number" min="0" max="100" step="1" value="0"
+                 class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm
+                        focus:outline-none focus:ring-2 focus:ring-purple-300" />
+          <p class="text-xs text-gray-400 mt-1">
+            Off Shoes Rental and Liquid Chalk Rental. 0 = rentals charged in full.
+            Retail add-ons (drinks, chalk balls, socks) are never discounted.
+          </p>
         </div>
         <div>
           <label class="block text-xs font-medium text-gray-600 mb-1">Label <span class="text-gray-300">(optional)</span></label>
@@ -258,6 +269,17 @@ import MainLayout from '../layouts/MainLayout.astro';
             }
           },
           {
+            title: 'Rental',
+            data: 'rental_discount_pct',
+            render: function (val, type) {
+              if (type !== 'display') return val || 0;
+              return val
+                ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">' +
+                    val + '% off rental</span>'
+                : '<span class="text-gray-300">—</span>';
+            }
+          },
+          {
             title: 'Label',
             data: 'label',
             render: function (val, type) {
@@ -319,7 +341,7 @@ import MainLayout from '../layouts/MainLayout.astro';
         dom: "<'flex flex-wrap items-center gap-3 mb-3'<''f>>" +
              "t" +
              "<'flex flex-wrap items-center justify-between mt-3'<'text-sm text-gray-500'i><'flex gap-1'p>>",
-        order: [[3, 'asc']],
+        order: [[4, 'asc']],   // "Belongs to" — promos and each owner grouped together
         pageLength: 25,
         language: { emptyTable: 'No codes found.' }
       });
@@ -334,6 +356,7 @@ import MainLayout from '../layouts/MainLayout.astro';
       document.getElementById('code-modal-title').textContent = row ? 'Edit Code' : 'New Promo Code';
       document.getElementById('code-input').value  = row ? row.code : '';
       document.getElementById('code-pct').value    = row ? row.discount_pct : 10;
+      document.getElementById('code-rental').value = row ? (row.rental_discount_pct || 0) : 0;
       document.getElementById('code-label').value  = row ? (row.label || '') : '';
       document.getElementById('code-active').checked = row ? row.is_active !== false : true;
       document.getElementById('code-error').classList.add('hidden');
@@ -382,12 +405,13 @@ import MainLayout from '../layouts/MainLayout.astro';
     }
 
     function submitCode() {
-      var code  = document.getElementById('code-input').value.trim().toUpperCase();
-      var pct   = parseInt(document.getElementById('code-pct').value, 10) || 0;
-      var label = document.getElementById('code-label').value.trim();
+      var code   = document.getElementById('code-input').value.trim().toUpperCase();
+      var pct    = parseInt(document.getElementById('code-pct').value, 10) || 0;
+      var rental = parseInt(document.getElementById('code-rental').value, 10) || 0;
+      var label  = document.getElementById('code-label').value.trim();
       var active = document.getElementById('code-active').checked;
-      var errEl = document.getElementById('code-error');
-      var btn   = document.getElementById('code-submit');
+      var errEl  = document.getElementById('code-error');
+      var btn    = document.getElementById('code-submit');
 
       if (!/^[A-Z0-9][A-Z0-9-]{2,19}$/.test(code)) {
         errEl.textContent = 'Code must be 3–20 characters: letters, numbers or dashes.';
@@ -397,12 +421,17 @@ import MainLayout from '../layouts/MainLayout.astro';
         errEl.textContent = 'Discount must be between 1 and 100 percent.';
         errEl.classList.remove('hidden'); return;
       }
+      if (rental < 0 || rental > 100) {
+        errEl.textContent = 'Rental discount must be between 0 and 100 percent.';
+        errEl.classList.remove('hidden'); return;
+      }
       errEl.classList.add('hidden');
       btn.disabled = true; btn.textContent = 'Saving…';
 
       var url    = editingId ? '/api/referral-codes/' + editingId : '/api/referral-codes';
       var method = editingId ? 'PATCH' : 'POST';
-      var body   = { code: code, discount_pct: pct, label: label, is_active: active };
+      var body   = { code: code, discount_pct: pct, rental_discount_pct: rental,
+                     label: label, is_active: active };
       if (!editingId) body.owner_id = null;   // gym-wide promo code
 
       apiFetch(url, { method: method, body: JSON.stringify(body) })

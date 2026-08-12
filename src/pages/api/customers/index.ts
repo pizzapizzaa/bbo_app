@@ -39,7 +39,7 @@ export const GET: APIRoute = async () => {
   const codesByOwner = new Map<string, any[]>();
   const codesResult = await fetchAllPages((from, to) =>
     db.from('referral_codes')
-      .select('id, code, discount_pct, owner_id, label, is_active, created_at')
+      .select('id, code, discount_pct, rental_discount_pct, owner_id, label, is_active, created_at')
       .not('owner_id', 'is', null)
       .order('created_at', { ascending: true })
       .range(from, to)
@@ -48,11 +48,12 @@ export const GET: APIRoute = async () => {
     codesResult.data.forEach((c: any) => {
       const list = codesByOwner.get(c.owner_id) ?? [];
       list.push({
-        id:           c.id,
-        code:         c.code ?? '',
-        discount_pct: c.discount_pct ?? 0,
-        label:        c.label ?? '',
-        is_active:    c.is_active !== false,
+        id:                  c.id,
+        code:                c.code ?? '',
+        discount_pct:        c.discount_pct ?? 0,
+        rental_discount_pct: c.rental_discount_pct ?? 0,
+        label:               c.label ?? '',
+        is_active:           c.is_active !== false,
       });
       codesByOwner.set(c.owner_id, list);
     });

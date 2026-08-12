@@ -15,13 +15,14 @@ import { db } from './db';
 import { escapeLike, normalizeReferralCode, isValidReferralCode, referralCodesMatch } from './validate';
 
 export interface ReferralCode {
-  id:           string;
-  code:         string;
-  discount_pct: number;
-  owner_id:     string | null;
-  owner_name:   string;   // '' for universal promo codes
-  label:        string;
-  is_active:    boolean;
+  id:                  string;
+  code:                string;
+  discount_pct:        number;
+  rental_discount_pct: number;  // cut on the gear rental add-ons; 0 = full price
+  owner_id:            string | null;
+  owner_name:          string;  // '' for universal promo codes
+  label:               string;
+  is_active:           boolean;
 }
 
 export type ReferralLookup =
@@ -39,7 +40,7 @@ export async function lookupReferralCode(raw: string): Promise<ReferralLookup> {
 
   const { data: row, error } = await db
     .from('referral_codes')
-    .select('id, code, discount_pct, owner_id, label, is_active')
+    .select('id, code, discount_pct, rental_discount_pct, owner_id, label, is_active')
     .ilike('code', escapeLike(code))
     .limit(1)
     .maybeSingle();
@@ -68,13 +69,14 @@ export async function lookupReferralCode(raw: string): Promise<ReferralLookup> {
   return {
     status: 'ok',
     code: {
-      id:           row.id,
-      code:         normalizeReferralCode(row.code),
-      discount_pct: row.discount_pct ?? 0,
-      owner_id:     row.owner_id ?? null,
-      owner_name:   ownerName,
-      label:        row.label ?? '',
-      is_active:    true,
+      id:                  row.id,
+      code:                normalizeReferralCode(row.code),
+      discount_pct:        row.discount_pct ?? 0,
+      rental_discount_pct: row.rental_discount_pct ?? 0,
+      owner_id:            row.owner_id ?? null,
+      owner_name:          ownerName,
+      label:               row.label ?? '',
+      is_active:           true,
     },
   };
 }

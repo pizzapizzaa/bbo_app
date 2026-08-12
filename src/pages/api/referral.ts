@@ -26,14 +26,15 @@ export const GET: APIRoute = async ({ url }) => {
     }
 
     return ok({
-      valid:        true,
-      code:         code.code,
-      code_id:      code.id,
-      kind:         code.owner_id ? 'referral' : 'promo',
-      owner_id:     code.owner_id,
-      owner_name:   code.owner_name,
-      label:        code.label,
-      discount_pct: code.discount_pct,
+      valid:               true,
+      code:                code.code,
+      code_id:             code.id,
+      kind:                code.owner_id ? 'referral' : 'promo',
+      owner_id:            code.owner_id,
+      owner_name:          code.owner_name,
+      label:               code.label,
+      discount_pct:        code.discount_pct,
+      rental_discount_pct: code.rental_discount_pct,
     });
   } catch (e: any) { return serverError(e?.message ?? String(e)); }
 };
