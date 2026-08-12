@@ -11,7 +11,6 @@
 export const STAFF_NAMES = [
   'Huyen',
   'Duyen Ha',
-  'Thanh Tu',
   'Bao Anh',
   'Danny',
   'Minh Chau',

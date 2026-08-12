@@ -58,7 +58,6 @@ import MainLayout from '../layouts/MainLayout.astro';
                 <option value="">— Select staff —</option>
                 <option value="Huyen">Huyen</option>
                 <option value="Duyen Ha">Duyen Ha</option>
-                <option value="Thanh Tu">Thanh Tu</option>
                 <option value="Bao Anh">Bao Anh</option>
                 <option value="Danny">Danny</option>
                 <option value="Minh Chau">Minh Chau</option>
@@ -440,7 +439,6 @@ import MainLayout from '../layouts/MainLayout.astro';
             <option value="">— Select staff —</option>
             <option value="Huyen">Huyen</option>
             <option value="Duyen Ha">Duyen Ha</option>
-            <option value="Thanh Tu">Thanh Tu</option>
             <option value="Bao Anh">Bao Anh</option>
             <option value="Danny">Danny</option>
             <option value="Minh Chau">Minh Chau</option>
@@ -550,13 +548,6 @@ import MainLayout from '../layouts/MainLayout.astro';
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1.5">Route Setter <span class="text-red-400">*</span></label>
               <div class="border border-gray-200 rounded-lg p-3 space-y-2.5">
-                <label class="flex items-center gap-2 cursor-pointer select-none">
-                  <input type="checkbox" class="rs-setter-cb accent-purple-600 w-3.5 h-3.5" value="Thanh Tu" onchange="toggleSetterInput(this)" />
-                  <span class="text-sm text-gray-700 flex-1">Thanh Tu</span>
-                  <input type="number" class="rs-routes-input hidden w-20 border border-gray-300 rounded-lg px-2 py-1 text-sm text-center
-                         focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    data-setter="Thanh Tu" min="1" max="99" placeholder="# routes" />
-                </label>
                 <label class="flex items-center gap-2 cursor-pointer select-none">
                   <input type="checkbox" class="rs-setter-cb accent-purple-600 w-3.5 h-3.5" value="Shingo" onchange="toggleSetterInput(this)" />
                   <span class="text-sm text-gray-700 flex-1">Shingo</span>
@@ -725,7 +716,7 @@ import MainLayout from '../layouts/MainLayout.astro';
     var scheduleData = [];
     var currentWeekStart;
 
-    var STAFF_NAMES = ['Huyen', 'Duyen Ha', 'Thanh Tu', 'Bao Anh', 'Danny', 'Minh Chau'];
+    var STAFF_NAMES = ['Huyen', 'Duyen Ha', 'Bao Anh', 'Danny', 'Minh Chau'];
     var STAFF_COLORS = [
       { bg: '#FED7AA', text: '#9A3412', border: '#FB923C' },
       { bg: '#BFDBFE', text: '#1E40AF', border: '#60A5FA' },

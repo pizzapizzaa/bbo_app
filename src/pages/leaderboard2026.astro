@@ -921,7 +921,16 @@ import { STAFF_NAMES } from '../lib/staff';
             signature_image: exportSignature(),
           }),
         });
-        const data = await res.json();
+        // A crashed handler returns an HTML error page, not JSON. Parsing that
+        // used to throw into the catch below and get reported as a network
+        // problem, which sent staff chasing the wifi instead of the server.
+        let data = null;
+        try { data = await res.json(); } catch { /* not JSON — handled next */ }
+
+        if (!data) {
+          showAlert(`Server error (${res.status}). The send was not logged — please tell staff.`);
+          return;
+        }
         if (!res.ok) { showAlert(data.error ?? 'Something went wrong. Please try again.'); return; }
 
         // Show success
