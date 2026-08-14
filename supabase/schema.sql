@@ -38,7 +38,8 @@ CREATE TABLE IF NOT EXISTS schedule_entries (
   start_time  TEXT        NOT NULL,  -- stored as HH:MM
   end_time    TEXT        NOT NULL,  -- stored as HH:MM
   notes       TEXT        NOT NULL DEFAULT '',
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_by  TEXT                               -- username that added it; NULL = admin-only to modify
 );
 
 CREATE INDEX IF NOT EXISTS idx_schedule_date       ON schedule_entries (date);
@@ -62,7 +63,8 @@ CREATE TABLE IF NOT EXISTS checkins (
   referral_code          TEXT        NOT NULL DEFAULT '',   -- code redeemed on this visit (uppercase)
   referred_by_id         UUID        REFERENCES customers(id) ON DELETE SET NULL,
   referred_by_name       TEXT        NOT NULL DEFAULT '',
-  referral_discount_pct  INTEGER     NOT NULL DEFAULT 0     -- % applied at redemption time
+  referral_discount_pct  INTEGER     NOT NULL DEFAULT 0,    -- % applied at redemption time
+  created_by             TEXT                               -- username that logged it; NULL = admin-only to modify
 );
 
 CREATE INDEX IF NOT EXISTS idx_checkins_date ON checkins (date);

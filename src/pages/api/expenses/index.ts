@@ -2,7 +2,7 @@ export const prerender = false;
 
 import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
-import { ok, serverError } from '../../../lib/auth';
+import { adminOnly, ok, serverError } from '../../../lib/auth';
 import { fetchAllPages } from '../../../lib/paginate';
 import { isValidDate, isValidAmount, MAX_TEXT } from '../../../lib/validate';
 
@@ -17,7 +17,10 @@ const VALID_TYPES = [
  * Returns all expense records plus all checkin {date, amount} rows so the
  * client can compute balance stats without a second round-trip.
  */
-export const GET: APIRoute = async () => {
+export const GET: APIRoute = async ({ request }) => {
+  const denied = await adminOnly(request);
+  if (denied) return denied;
+
   const [expRes, revRes] = await Promise.all([
     fetchAllPages((from, to) => db.from('expenses').select('*').order('date', { ascending: false }).range(from, to)),
     fetchAllPages((from, to) => db.from('checkins').select('date, amount').range(from, to)),
@@ -31,6 +34,9 @@ export const GET: APIRoute = async () => {
 
 /** POST /api/expenses — log a new expense */
 export const POST: APIRoute = async ({ request }) => {
+  const denied = await adminOnly(request);
+  if (denied) return denied;
+
   let body: {
     description: string;
     type: string;

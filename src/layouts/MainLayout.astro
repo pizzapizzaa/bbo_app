@@ -2,8 +2,17 @@
 export interface Props {
   title: string;
   activePage?: string;
+  /**
+   * Admin-only page (Customers, Promo Codes, Expenses). A part-timer opening
+   * one is sent to /unlock to enter the admin password; the elevated token it
+   * returns is then used for this page's API calls. Admins are unaffected.
+   */
+  adminOnly?: boolean;
 }
-const { title, activePage = '' } = Astro.props;
+const { title, activePage = '', adminOnly = false } = Astro.props;
+
+/** Nav entries a part-timer sees padlocked. Kept in sync with `adminOnly` pages. */
+const GATED_PAGES = ['customers', 'promo-codes', 'expenses'];
 ---
 
 <!DOCTYPE html>
@@ -132,6 +141,32 @@ const { title, activePage = '' } = Astro.props;
     .dt-button:hover { background: #ea580c !important; }
   </style>
 
+  <script is:inline set:html={`window.__BBO_ADMIN_PAGE__ = ${adminOnly};`}></script>
+
+  <!-- Elevation helpers — defined before the auth guard below, which uses them. -->
+  <script is:inline>
+    /**
+     * The unexpired admin token from a /unlock prompt, or '' if there is none.
+     * Stored in sessionStorage so it dies with the tab, and stamped with an
+     * expiry so an unattended tablet re-locks itself.
+     */
+    window.bboElevatedToken = function () {
+      var token = sessionStorage.getItem('bbo_elev_token');
+      var until = parseInt(sessionStorage.getItem('bbo_elev_until') || '0', 10);
+      if (!token || !until || Date.now() >= until) {
+        sessionStorage.removeItem('bbo_elev_token');
+        sessionStorage.removeItem('bbo_elev_until');
+        return '';
+      }
+      return token;
+    };
+
+    /** Current role. Missing key = a pre-roles session, i.e. the admin. */
+    window.bboRole = function () {
+      return localStorage.getItem('bbo_role') || 'admin';
+    };
+  </script>
+
   <script is:inline>
     (function () {
       // One-time migration: copy auth keys from sessionStorage (old) to localStorage (new)
@@ -149,9 +184,22 @@ const { title, activePage = '' } = Astro.props;
         localStorage.removeItem('bbo_auth');
         localStorage.removeItem('bbo_token');
         localStorage.removeItem('bbo_admin');
+        localStorage.removeItem('bbo_role');
         window.location.replace('/');
         return;
       }
+
+      // ── Admin-page gate ──
+      // Sessions created before roles existed have no bbo_role; those are the
+      // owner's own admin sessions, so a missing value means 'admin'.
+      var role = localStorage.getItem('bbo_role') || 'admin';
+      if (role === 'staff' && window.__BBO_ADMIN_PAGE__ === true && !window.bboElevatedToken()) {
+        // Redirect from <head>, before the page's own scripts run, so a
+        // part-timer never briefly loads customer or financial data.
+        window.location.replace('/unlock?next=' + encodeURIComponent(location.pathname));
+        return;
+      }
+
       document.addEventListener('DOMContentLoaded', function () {
         document.body.style.display = '';
       });
@@ -254,6 +302,10 @@ const { title, activePage = '' } = Astro.props;
             d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
         </svg>
         Customers
+        <svg class="gate-lock w-3.5 h-3.5 shrink-0 ml-auto hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+        </svg>
       </a>
 
       <a href="/promo-codes"
@@ -266,6 +318,10 @@ const { title, activePage = '' } = Astro.props;
             d="M7 7h.01M7 3h5a1.99 1.99 0 011.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.99 1.99 0 013 12V7a4 4 0 014-4z"/>
         </svg>
         Promo Codes
+        <svg class="gate-lock w-3.5 h-3.5 shrink-0 ml-auto hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+        </svg>
       </a>
 
       <a href="/schedule"
@@ -304,6 +360,10 @@ const { title, activePage = '' } = Astro.props;
             d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
         </svg>
         Expenses
+        <svg class="gate-lock w-3.5 h-3.5 shrink-0 ml-auto hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+        </svg>
       </a>
     </nav>
 
@@ -317,7 +377,7 @@ const { title, activePage = '' } = Astro.props;
         </div>
         <div class="flex-1 min-w-0">
           <p id="user-name" class="text-white text-sm font-medium truncate">Admin</p>
-          <p class="text-gray-400 text-xs">Administrator</p>
+          <p id="user-role" class="text-gray-400 text-xs">Administrator</p>
         </div>
         <button onclick="doLogout()" title="Logout"
                 class="text-gray-400 hover:text-white transition-colors">
@@ -385,6 +445,14 @@ const { title, activePage = '' } = Astro.props;
     if (_nameEl) _nameEl.textContent = _user;
     if (_avatarEl) _avatarEl.textContent = _user.charAt(0).toUpperCase();
 
+    // Part-timer chrome: role label, and padlocks on the admin-only nav links.
+    if (window.bboRole() === 'staff') {
+      var _roleEl = document.getElementById('user-role');
+      if (_roleEl) _roleEl.textContent = 'Part-timer';
+      var _locks = document.querySelectorAll('.gate-lock');
+      for (var i = 0; i < _locks.length; i++) _locks[i].classList.remove('hidden');
+    }
+
     // Logout — revoke token server-side before clearing local state.
     async function doLogout() {
       if (confirm('Log out?')) {
@@ -400,6 +468,9 @@ const { title, activePage = '' } = Astro.props;
         localStorage.removeItem('bbo_auth');
         localStorage.removeItem('bbo_token');
         localStorage.removeItem('bbo_admin');
+        localStorage.removeItem('bbo_role');
+        sessionStorage.removeItem('bbo_elev_token');
+        sessionStorage.removeItem('bbo_elev_until');
         window.location.replace('/');
       }
     }
@@ -407,7 +478,12 @@ const { title, activePage = '' } = Astro.props;
     // Global apiFetch — shared by all page scripts loaded after this layout.
     // Automatically attaches the Bearer token and redirects to login on 401.
     function apiFetch(url, options) {
-      var token = localStorage.getItem('bbo_token') || '';
+      // On an admin-only page a part-timer is running on a borrowed admin
+      // token from /unlock; everywhere else, and for admins always, this is
+      // just the session token.
+      var token = (window.__BBO_ADMIN_PAGE__ === true && window.bboElevatedToken())
+        || localStorage.getItem('bbo_token')
+        || '';
       var headers = { 'Authorization': 'Bearer ' + token };
       if (options && options.body) headers['Content-Type'] = 'application/json';
       return fetch(url, Object.assign({}, options, { headers: headers }))
@@ -416,8 +492,19 @@ const { title, activePage = '' } = Astro.props;
             localStorage.removeItem('bbo_auth');
             localStorage.removeItem('bbo_token');
             localStorage.removeItem('bbo_admin');
+            localStorage.removeItem('bbo_role');
             setTimeout(function () { window.location.replace('/'); }, 1500);
             return Promise.reject(new Error('Session expired. Redirecting to login…'));
+          }
+          // 403 means the session is fine but lacks admin rights — usually an
+          // elevation that expired mid-page. Re-prompt instead of logging out.
+          if (res.status === 403 && window.bboRole() === 'staff') {
+            sessionStorage.removeItem('bbo_elev_token');
+            sessionStorage.removeItem('bbo_elev_until');
+            if (window.__BBO_ADMIN_PAGE__ === true) {
+              window.location.replace('/unlock?next=' + encodeURIComponent(location.pathname));
+              return Promise.reject(new Error('Admin access required.'));
+            }
           }
           return res;
         });

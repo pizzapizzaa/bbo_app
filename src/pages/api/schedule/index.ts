@@ -2,7 +2,8 @@ export const prerender = false;
 
 import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
-import { ok, serverError } from '../../../lib/auth';
+import { authFromRequest, ok, serverError } from '../../../lib/auth';
+import { insertOwned } from '../../../lib/ownership';
 import { fetchAllPages } from '../../../lib/paginate';
 import { isValidDate, isValidTime, MAX_NAME, MAX_TEXT } from '../../../lib/validate';
 
@@ -39,11 +40,11 @@ export const POST: APIRoute = async ({ request }) => {
     return new Response(JSON.stringify({ error: 'notes exceeds maximum length' }), { status: 400 });
   }
 
-  const { data, error } = await db
-    .from('schedule_entries')
-    .insert({ staff_name, date, start_time, end_time, notes: notes ?? '' })
-    .select()
-    .single();
+  const { data, error } = await insertOwned(
+    'schedule_entries',
+    { staff_name, date, start_time, end_time, notes: notes ?? '' },
+    await authFromRequest(request),
+  );
 
   if (error) return serverError(error.message);
   return ok({ entry: data });

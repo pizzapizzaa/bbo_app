@@ -2,7 +2,8 @@ export const prerender = false;
 
 import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
-import { ok, serverError } from '../../../lib/auth';
+import { authFromRequest, ok, serverError } from '../../../lib/auth';
+import { insertOwned } from '../../../lib/ownership';
 import { fetchAllPages } from '../../../lib/paginate';
 import {
   isValidDate, isValidTime, MAX_NAME, MAX_TEXT, escapeLike,
@@ -127,28 +128,24 @@ export const POST: APIRoute = async ({ request }) => {
     referralPct    = owner.discount_pct;
   }
 
-  const { data, error } = await db
-    .from('checkins')
-    .insert({
-      customer_name,
-      date,
-      time,
-      payment_method,
-      amount: amount ?? 0,
-      notes: notes ?? '',
-      punch_card_holder_id:   punch_card_holder_id   || null,
-      punch_card_holder_name: punch_card_holder_name || '',
-      pt_punch_holder_id:     pt_punch_holder_id     || null,
-      pt_punch_holder_name:   pt_punch_holder_name   || '',
-      checkin_type: checkin_type ?? '',
-      addons:       addons       ?? '',
-      referral_code:         referralCode,
-      referred_by_id:        referredById,
-      referred_by_name:      referredByName,
-      referral_discount_pct: referralPct,
-    })
-    .select()
-    .single();
+  const { data, error } = await insertOwned('checkins', {
+    customer_name,
+    date,
+    time,
+    payment_method,
+    amount: amount ?? 0,
+    notes: notes ?? '',
+    punch_card_holder_id:   punch_card_holder_id   || null,
+    punch_card_holder_name: punch_card_holder_name || '',
+    pt_punch_holder_id:     pt_punch_holder_id     || null,
+    pt_punch_holder_name:   pt_punch_holder_name   || '',
+    checkin_type: checkin_type ?? '',
+    addons:       addons       ?? '',
+    referral_code:         referralCode,
+    referred_by_id:        referredById,
+    referred_by_name:      referredByName,
+    referral_discount_pct: referralPct,
+  }, await authFromRequest(request));
 
   if (error) return serverError(error.message);
 

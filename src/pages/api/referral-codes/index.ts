@@ -2,7 +2,7 @@ export const prerender = false;
 
 import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
-import { ok, serverError } from '../../../lib/auth';
+import { adminOnly, ok, serverError } from '../../../lib/auth';
 import { fetchAllPages } from '../../../lib/paginate';
 import {
   isValidUUID, escapeLike,
@@ -42,7 +42,10 @@ async function loadOwnerNames(rows: any[]): Promise<Map<string, string>> {
 
 /** GET /api/referral-codes[?owner=<uuid>|?scope=promo|customer]
  *  Lists referral / promo codes, newest first. */
-export const GET: APIRoute = async ({ url }) => {
+export const GET: APIRoute = async ({ url, request }) => {
+  const denied = await adminOnly(request);
+  if (denied) return denied;
+
   try {
     const owner = url.searchParams.get('owner');
     const scope = url.searchParams.get('scope') ?? 'all';
@@ -80,6 +83,9 @@ export const GET: APIRoute = async ({ url }) => {
 /** POST /api/referral-codes — create a code.
  *  owner_id omitted / null → universal promo code. */
 export const POST: APIRoute = async ({ request }) => {
+  const denied = await adminOnly(request);
+  if (denied) return denied;
+
   try {
     let body: {
       code?: string;

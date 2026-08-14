@@ -2,7 +2,7 @@ export const prerender = false;
 
 import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
-import { ok, serverError } from '../../../lib/auth';
+import { adminOnly, ok, serverError } from '../../../lib/auth';
 import { fetchAllPages } from '../../../lib/paginate';
 
 /**
@@ -12,7 +12,10 @@ import { fetchAllPages } from '../../../lib/paginate';
  *   stats_from, stats_to   YYYY-MM-DD  → new_customers count + returned_pct
  *   hm_from,    hm_to      YYYY-MM-DD  → heatmap daily check-in counts
  */
-export const GET: APIRoute = async ({ url }) => {
+export const GET: APIRoute = async ({ url, request }) => {
+  const denied = await adminOnly(request);
+  if (denied) return denied;
+
   const statsFrom = url.searchParams.get('stats_from');
   const statsTo   = url.searchParams.get('stats_to');
   const hmFrom    = url.searchParams.get('hm_from');

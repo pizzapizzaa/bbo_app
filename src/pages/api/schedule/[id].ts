@@ -2,13 +2,21 @@ export const prerender = false;
 
 import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
-import { ok, serverError } from '../../../lib/auth';
+import { authFromRequest, forbidden, ok, serverError, unauthorized } from '../../../lib/auth';
+import { canModifyRow } from '../../../lib/ownership';
 import { isValidUUID, isValidDate, isValidTime, MAX_NAME } from '../../../lib/validate';
 
 /** PATCH /api/schedule/:id — update an existing entry */
 export const PATCH: APIRoute = async ({ params, request }) => {
   const { id } = params;
   if (!id || !isValidUUID(id)) return new Response(JSON.stringify({ error: 'Invalid id' }), { status: 400 });
+
+  // Admins may edit any shift; part-timers only the ones they added.
+  const auth = await authFromRequest(request);
+  if (!auth) return unauthorized();
+  if (!await canModifyRow('schedule_entries', id, auth)) {
+    return forbidden('You can only edit shifts you added yourself.');
+  }
 
   let body: { staff_name?: string; date?: string; start_time?: string; end_time?: string; notes?: string };
   try { body = await request.json(); }
@@ -40,9 +48,15 @@ export const PATCH: APIRoute = async ({ params, request }) => {
 };
 
 /** DELETE /api/schedule/:id */
-export const DELETE: APIRoute = async ({ params }) => {
+export const DELETE: APIRoute = async ({ params, request }) => {
   const { id } = params;
   if (!id || !isValidUUID(id)) return new Response(JSON.stringify({ error: 'Invalid id' }), { status: 400 });
+
+  const auth = await authFromRequest(request);
+  if (!auth) return unauthorized();
+  if (!await canModifyRow('schedule_entries', id, auth)) {
+    return forbidden('You can only delete shifts you added yourself.');
+  }
 
   const { error } = await db
     .from('schedule_entries')
