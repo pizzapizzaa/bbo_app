@@ -14,6 +14,9 @@ export const STAFF_NAMES = [
   'Bao Anh',
   'Danny',
   'Minh Chau',
+  'Le Nghia',
+  'Kim An',
+  'Bich Van',
 ] as const;
 
 /** True if `name` is on the roster (exact match after trimming). */
