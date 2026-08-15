@@ -346,39 +346,16 @@ import MainLayout from '../layouts/MainLayout.astro';
     </div><!-- end Import CSV card -->
   </div><!-- end Row 1 grid -->
 
-  <!-- ── Open Part-time Shifts board ── -->
-  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
-    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-      <div>
-        <h2 class="font-semibold text-gray-800">
-          Open Part-time Shifts
-          <span id="open-count-badge"
-                class="ml-1.5 align-middle inline-flex items-center justify-center min-w-[1.5rem] h-6 px-2
-                       rounded-full bg-amber-100 text-amber-700 text-xs font-bold">0</span>
-        </h2>
-        <p id="open-shifts-sub" class="text-xs text-gray-400 mt-0.5">Shifts still waiting to be filled.</p>
-      </div>
-      <div class="flex items-center gap-2">
-        <button type="button" id="open-scope-upcoming" onclick="setOpenScope('upcoming')"
-          class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition">
-          Upcoming
-        </button>
-        <button type="button" id="open-scope-week" onclick="setOpenScope('week')"
-          class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition">
-          Viewed Week
-        </button>
-      </div>
-    </div>
-    <div id="open-shifts-body"></div>
-  </div>
-
   <!-- ── Row 2: Full-width Weekly Calendar ── -->
   <div>
       <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
 
         <!-- Header: title + week nav + export -->
         <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
-          <h2 class="font-semibold text-gray-800">Weekly Schedule</h2>
+          <div>
+            <h2 class="font-semibold text-gray-800">Weekly Schedule</h2>
+            <p id="cal-subtitle" class="text-xs text-gray-400 mt-0.5"></p>
+          </div>
           <div class="flex items-center gap-2 flex-wrap">
             <button id="btn-prev-week"
                     class="px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition">
@@ -538,16 +515,18 @@ import MainLayout from '../layouts/MainLayout.astro';
   <div id="claim-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40"
        onclick="if(event.target===this)closeClaimModal()">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-6">
-      <h3 class="font-semibold text-gray-800 text-base mb-1">Take This Shift</h3>
+      <h3 id="claim-title" class="font-semibold text-gray-800 text-base mb-1">Take This Shift</h3>
       <p id="claim-shift-label" class="text-sm text-gray-500 mb-4"></p>
 
-      <label class="block text-sm font-medium text-gray-700 mb-1.5">Who are you? <span class="text-red-400">*</span></label>
+      <label id="claim-name-label" class="block text-sm font-medium text-gray-700 mb-1.5">
+        Who are you? <span class="text-red-400">*</span>
+      </label>
       <select id="claim-name"
         class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
                focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent">
         <!-- populated by JS from PART_TIMER_NAMES -->
       </select>
-      <p class="mt-1.5 text-xs text-gray-400">Your hours are tracked under the name you pick.</p>
+      <p id="claim-name-hint" class="mt-1.5 text-xs text-gray-400">Your hours are tracked under the name you pick.</p>
 
       <div id="claim-error" class="hidden mt-3 text-sm text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2"></div>
 
@@ -813,9 +792,9 @@ import MainLayout from '../layouts/MainLayout.astro';
         var el = document.getElementById(id);
         if (el) el.classList.toggle('hidden', !isAdmin);
       });
-      document.getElementById('open-shifts-sub').textContent = isAdmin
-        ? 'Shifts still waiting to be filled.'
-        : 'Pick a shift to add it to your schedule.';
+      document.getElementById('cal-subtitle').textContent = isAdmin
+        ? 'Open part-time shifts appear in the Open row until someone takes them.'
+        : 'Tap an open shift to put your name on it.';
     }
 
     /** Full-timers and part-timers combined, each name once, canonical order. */
@@ -849,7 +828,6 @@ import MainLayout from '../layouts/MainLayout.astro';
 
       setSingleShiftType('assigned');
       setBulkShiftType('assigned');
-      setOpenScope('upcoming');
 
       document.getElementById('btn-prev-week').addEventListener('click', function () {
         currentWeekStart = addDays(currentWeekStart, -7);
@@ -945,91 +923,10 @@ import MainLayout from '../layouts/MainLayout.astro';
         '<option value="">— Select your name —</option>' + optionsHtml(PART_TIMER_NAMES);
     }
 
-    // ── Open Shifts board ─────────────────────────────────────────────────────
-    var openScope = 'upcoming'; // 'upcoming' = today onward | 'week' = viewed week
-
-    function setOpenScope(scope) {
-      openScope = scope;
-      var on  = 'px-3 py-1.5 rounded-lg text-xs font-semibold border transition ' +
-                'bg-amber-500 border-amber-500 text-white';
-      var off = 'px-3 py-1.5 rounded-lg text-xs font-semibold border transition ' +
-                'bg-white border-gray-300 text-gray-500 hover:bg-gray-50';
-      document.getElementById('open-scope-upcoming').className = scope === 'upcoming' ? on : off;
-      document.getElementById('open-scope-week').className     = scope === 'week'     ? on : off;
-      renderOpenShifts();
-    }
-
-    function openShiftsInScope() {
-      var open = scheduleData.filter(isOpenShift);
-      if (openScope === 'week') {
-        var from = fmtDate(currentWeekStart);
-        var to   = fmtDate(addDays(currentWeekStart, 6));
-        return open.filter(function (s) { return s.date >= from && s.date <= to; });
-      }
-      var today = fmtDate(new Date());
-      return open.filter(function (s) { return s.date >= today; });
-    }
-
     function fmtDayLabel(iso) {
       var DAY_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
       var d = new Date(iso + 'T00:00:00');
       return DAY_FULL[d.getDay()] + ', ' + MONTHS_SHORT[d.getMonth()] + ' ' + d.getDate();
-    }
-
-    function renderOpenShifts() {
-      var shifts = openShiftsInScope().slice().sort(function (a, b) {
-        return a.date === b.date
-          ? String(a.start_time).localeCompare(String(b.start_time))
-          : a.date.localeCompare(b.date);
-      });
-
-      document.getElementById('open-count-badge').textContent = shifts.length;
-
-      var body = document.getElementById('open-shifts-body');
-      if (!shifts.length) {
-        body.innerHTML = '<p class="py-8 text-center text-gray-400 text-sm">' +
-          (openScope === 'week' ? 'No open shifts in the viewed week.' : 'No open shifts — everything is covered.') +
-          '</p>';
-        return;
-      }
-
-      // Group by day so several slots on the same date read as one block.
-      var byDate = {};
-      var dates  = [];
-      shifts.forEach(function (s) {
-        if (!byDate[s.date]) { byDate[s.date] = []; dates.push(s.date); }
-        byDate[s.date].push(s);
-      });
-
-      body.innerHTML = dates.map(function (date) {
-        var chips = byDate[date].map(function (s) {
-          var safeId = escHtml(String(s.id));
-          var action = isAdmin
-            ? '<button type="button" onclick="deleteEntry(\'' + safeId + '\')" ' +
-              'class="px-2 py-1 rounded-md text-xs font-semibold text-amber-700 hover:bg-amber-200/70 transition">' +
-              'Remove</button>'
-            : '<button type="button" onclick="openClaimModal(\'' + safeId + '\')" ' +
-              'class="px-3 py-1 rounded-md bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold transition ' +
-              'active:scale-[0.98]">Take it</button>';
-          return '<div class="flex items-center gap-3 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200">' +
-            '<div class="min-w-0">' +
-            '<div class="text-sm font-semibold text-amber-900 whitespace-nowrap">' +
-              escHtml(s.start_time) + '–' + escHtml(s.end_time) + '</div>' +
-            (s.notes
-              ? '<div class="text-xs text-amber-700/70 truncate">' + escHtml(s.notes) + '</div>'
-              : '') +
-            '</div>' + action + '</div>';
-        }).join('');
-
-        return '<div class="mb-4 last:mb-0">' +
-          '<p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">' +
-            escHtml(fmtDayLabel(date)) +
-            ' <span class="text-gray-300">·</span> ' +
-            '<span class="text-gray-400 normal-case font-medium">' + byDate[date].length + ' open</span>' +
-          '</p>' +
-          '<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">' + chips + '</div>' +
-          '</div>';
-      }).join('');
     }
 
     // ── Claim / release ───────────────────────────────────────────────────────
@@ -1039,6 +936,17 @@ import MainLayout from '../layouts/MainLayout.astro';
       var entry = scheduleData.filter(function (s) { return String(s.id) === String(id); })[0];
       if (!entry) return;
       claimingId = id;
+
+      // Same dialog, two readings: a part-timer is naming themselves, an admin
+      // is naming someone else.
+      document.getElementById('claim-title').textContent =
+        isAdmin ? 'Fill This Shift' : 'Take This Shift';
+      document.getElementById('claim-name-label').innerHTML =
+        (isAdmin ? 'Who is working it?' : 'Who are you?') + ' <span class="text-red-400">*</span>';
+      document.getElementById('claim-name-hint').textContent = isAdmin
+        ? 'Their hours are tracked under this name.'
+        : 'Your hours are tracked under the name you pick.';
+
       document.getElementById('claim-shift-label').textContent =
         fmtDayLabel(entry.date) + ' · ' + entry.start_time + '–' + entry.end_time +
         (entry.notes ? ' · ' + entry.notes : '');
@@ -1085,7 +993,8 @@ import MainLayout from '../layouts/MainLayout.astro';
           closeClaimModal();
           currentWeekStart = getWeekStart(new Date(data.entry.date + 'T00:00:00'));
           renderCalendar();
-          showToast('Shift taken — ' + name + ' is on ' + fmtDayLabel(data.entry.date) + '.');
+          showToast((isAdmin ? 'Shift filled — ' : 'Shift taken — ') +
+            name + ' is on ' + fmtDayLabel(data.entry.date) + '.');
         })
         .catch(function (err) {
           btn.disabled = false; btn.textContent = 'Confirm';
@@ -1185,7 +1094,10 @@ import MainLayout from '../layouts/MainLayout.astro';
     var ICON_RELEASE = '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h11a4 4 0 010 8h-3m-8-8l4-4m-4 4l4 4"/></svg>';
 
     function iconBtn(fn, id, title, icon) {
-      return '<button onclick="' + fn + '(\'' + id + '\')" title="' + title + '" type="button" ' +
+      // stopPropagation because an open-shift chip is itself clickable — without
+      // it, hitting Delete would also open the claim dialog behind the confirm.
+      return '<button onclick="event.stopPropagation();' + fn + '(\'' + id + '\')" ' +
+        'title="' + title + '" type="button" ' +
         'class="p-0.5 rounded hover:bg-black/10 transition-colors">' + icon + '</button>';
     }
 
@@ -1237,24 +1149,21 @@ import MainLayout from '../layouts/MainLayout.astro';
           var safeId = escHtml(String(entry.id));
           var label  = escHtml(entry.start_time) + '–' + escHtml(entry.end_time);
           var note   = entry.notes ? '&#10;Note: ' + escHtml(entry.notes) : '';
-          if (isAdmin) {
-            html += '<div class="mb-1 px-2 py-1 rounded-md text-xs leading-snug border border-dashed ' +
-              'border-amber-400 bg-amber-100/60 text-amber-800 group" ' +
-              'title="Open part-time shift' + note + '">' +
-              '<div class="flex items-start justify-between gap-0.5">' +
-              '<div><div class="font-semibold whitespace-nowrap">' + label + '</div>' +
-              '<div class="opacity-70 truncate">unfilled' + (entry.notes ? ' · ' + escHtml(entry.notes) : '') + '</div></div>' +
-              entryActionsHtml(entry) +
-              '</div></div>';
-          } else {
-            html += '<button type="button" onclick="openClaimModal(\'' + safeId + '\')" ' +
-              'title="Tap to take this shift' + note + '" ' +
-              'class="w-full text-left mb-1 px-2 py-1 rounded-md text-xs leading-snug border border-dashed ' +
-              'border-amber-400 bg-amber-100/60 text-amber-800 hover:bg-amber-200 transition cursor-pointer">' +
-              '<div class="font-semibold whitespace-nowrap">' + label + '</div>' +
-              '<div class="opacity-70 truncate">Take it</div>' +
-              '</button>';
-          }
+          // One interaction for both roles: click the shift, put a name on it.
+          // The admin's edit/delete icons sit inside and stop the click there.
+          html += '<div role="button" tabindex="0" onclick="openClaimModal(\'' + safeId + '\')" ' +
+            'title="' + (isAdmin ? 'Click to fill this shift' : 'Tap to take this shift') + note + '" ' +
+            'class="mb-1 px-2 py-1 rounded-md text-xs leading-snug border border-dashed ' +
+            'border-amber-400 bg-amber-100/60 text-amber-800 hover:bg-amber-200 transition cursor-pointer group">' +
+            '<div class="flex items-start justify-between gap-0.5">' +
+            '<div class="min-w-0">' +
+            '<div class="font-semibold whitespace-nowrap">' + label + '</div>' +
+            '<div class="opacity-70 truncate">' +
+              (isAdmin ? 'unfilled' + (entry.notes ? ' · ' + escHtml(entry.notes) : '') : 'Take it') +
+            '</div>' +
+            '</div>' +
+            entryActionsHtml(entry) +
+            '</div></div>';
         });
         html += '</td>';
       });
@@ -1337,8 +1246,10 @@ import MainLayout from '../layouts/MainLayout.astro';
               'style="background:' + color.bg + ';color:' + color.text + ';border-color:' + color.border + '">' +
               '<div class="flex items-start justify-between gap-0.5">' +
               '<div>' +
-              '<div class="font-semibold whitespace-nowrap">' + start + '–' + end +
-                (isPartTime(entry) ? ' <span class="opacity-60 font-normal">PT</span>' : '') + '</div>' +
+              // A claimed shift is deliberately indistinguishable from an assigned
+              // one — once someone is on it, how it got filled is bookkeeping. The
+              // tooltip still says, for anyone who needs to know.
+              '<div class="font-semibold whitespace-nowrap">' + start + '–' + end + '</div>' +
               '<div class="opacity-70 truncate">' + dur + (entry.notes ? ' · ' + escHtml(entry.notes) : '') + '</div>' +
               '</div>' +
               entryActionsHtml(entry) +
@@ -1362,7 +1273,6 @@ import MainLayout from '../layouts/MainLayout.astro';
       }
       document.getElementById('cal-body').innerHTML = bodyHtml;
 
-      renderOpenShifts();
       updatePartTimerStats();
     }
 
