@@ -23,8 +23,8 @@ import MainLayout from '../layouts/MainLayout.astro';
   <!-- ══ Tab 1: Staff Schedule ══ -->
   <div id="page-panel-staff">
 
-  <!-- ── Row 1: Form + Import CSV ── -->
-  <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
+  <!-- ── Row 1: Form + Import CSV (admin only) ── -->
+  <div id="admin-entry-row" class="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
 
     <!-- ── Add / Bulk Entry ── -->
     <div class="xl:col-span-1">
@@ -46,8 +46,26 @@ import MainLayout from '../layouts/MainLayout.astro';
         <div id="panel-single">
           <form id="schedule-form" class="space-y-4" novalidate>
 
-            <!-- Staff Name -->
+            <!-- Shift type -->
             <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Shift Type</label>
+              <div class="grid grid-cols-2 gap-2">
+                <button type="button" id="f-type-assigned" onclick="setSingleShiftType('assigned')"
+                  class="px-3 py-2 rounded-lg text-sm font-semibold border transition">
+                  Assign to staff
+                </button>
+                <button type="button" id="f-type-part_time" onclick="setSingleShiftType('part_time')"
+                  class="px-3 py-2 rounded-lg text-sm font-semibold border transition">
+                  Open part-time shift
+                </button>
+              </div>
+              <p id="f-type-hint" class="hidden mt-1.5 text-xs text-gray-400">
+                Posted unfilled — a part-timer picks it up and puts their own name on it.
+              </p>
+            </div>
+
+            <!-- Staff Name -->
+            <div id="f-staff-wrap">
               <label class="block text-sm font-medium text-gray-700 mb-1.5">Staff Name <span class="text-red-400">*</span></label>
               <select
                 id="f-staff"
@@ -55,13 +73,7 @@ import MainLayout from '../layouts/MainLayout.astro';
                        focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
                 onchange="toggleTempInput('f-staff-temp', this.value)"
               >
-                <option value="">— Select staff —</option>
-                <option value="Huyen">Huyen</option>
-                <option value="Duyen Ha">Duyen Ha</option>
-                <option value="Bao Anh">Bao Anh</option>
-                <option value="Danny">Danny</option>
-                <option value="Minh Chau">Minh Chau</option>
-                <option value="Temp">Temp</option>
+                <!-- populated by JS from STAFF_NAMES + PART_TIMER_NAMES -->
               </select>
               <input
                 id="f-staff-temp"
@@ -70,6 +82,15 @@ import MainLayout from '../layouts/MainLayout.astro';
                 class="hidden mt-2 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
                        focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
               />
+            </div>
+
+            <!-- How many identical open slots to post -->
+            <div id="f-count-wrap" class="hidden">
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Part-timers Needed <span class="text-red-400">*</span></label>
+              <input id="f-count" type="number" min="1" max="20" value="1"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                       focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent" />
+              <p class="mt-1 text-xs text-gray-400">Posts this many separate slots in the same time range.</p>
             </div>
 
             <!-- Date -->
@@ -143,8 +164,23 @@ import MainLayout from '../layouts/MainLayout.astro';
         <div id="panel-bulk" class="hidden">
           <form id="bulk-form" class="space-y-4" novalidate>
 
-            <!-- Staff checkboxes -->
+            <!-- Shift type -->
             <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Shift Type</label>
+              <div class="grid grid-cols-2 gap-2">
+                <button type="button" id="b-type-assigned" onclick="setBulkShiftType('assigned')"
+                  class="px-3 py-2 rounded-lg text-sm font-semibold border transition">
+                  Assign to staff
+                </button>
+                <button type="button" id="b-type-part_time" onclick="setBulkShiftType('part_time')"
+                  class="px-3 py-2 rounded-lg text-sm font-semibold border transition">
+                  Open part-time shifts
+                </button>
+              </div>
+            </div>
+
+            <!-- Staff checkboxes -->
+            <div id="b-staff-wrap">
               <div class="flex items-center justify-between mb-1.5">
                 <label class="block text-sm font-medium text-gray-700">Staff Members <span class="text-red-400">*</span></label>
                 <button type="button" id="btn-select-all-staff" onclick="toggleSelectAllStaff()"
@@ -156,6 +192,14 @@ import MainLayout from '../layouts/MainLayout.astro';
                    class="border border-gray-200 rounded-lg p-3 space-y-2 max-h-44 overflow-y-auto">
                 <!-- populated by JS -->
               </div>
+            </div>
+
+            <!-- How many identical open slots per day -->
+            <div id="b-count-wrap" class="hidden">
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Part-timers Needed Per Day <span class="text-red-400">*</span></label>
+              <input id="b-count" type="number" min="1" max="20" value="1"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                       focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent" />
             </div>
 
             <!-- Date range -->
@@ -302,6 +346,32 @@ import MainLayout from '../layouts/MainLayout.astro';
     </div><!-- end Import CSV card -->
   </div><!-- end Row 1 grid -->
 
+  <!-- ── Open Part-time Shifts board ── -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+      <div>
+        <h2 class="font-semibold text-gray-800">
+          Open Part-time Shifts
+          <span id="open-count-badge"
+                class="ml-1.5 align-middle inline-flex items-center justify-center min-w-[1.5rem] h-6 px-2
+                       rounded-full bg-amber-100 text-amber-700 text-xs font-bold">0</span>
+        </h2>
+        <p id="open-shifts-sub" class="text-xs text-gray-400 mt-0.5">Shifts still waiting to be filled.</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button type="button" id="open-scope-upcoming" onclick="setOpenScope('upcoming')"
+          class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition">
+          Upcoming
+        </button>
+        <button type="button" id="open-scope-week" onclick="setOpenScope('week')"
+          class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition">
+          Viewed Week
+        </button>
+      </div>
+    </div>
+    <div id="open-shifts-body"></div>
+  </div>
+
   <!-- ── Row 2: Full-width Weekly Calendar ── -->
   <div>
       <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
@@ -323,7 +393,7 @@ import MainLayout from '../layouts/MainLayout.astro';
                     class="px-2.5 py-1.5 text-sm bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-lg transition">
               Today
             </button>
-            <button onclick="duplicateToNextWeek()"
+            <button id="btn-duplicate-week" onclick="duplicateToNextWeek()"
                     class="inline-flex items-center gap-1.5 text-sm text-indigo-600 hover:text-indigo-800
                            bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-3 py-1.5 rounded-lg transition">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -359,7 +429,7 @@ import MainLayout from '../layouts/MainLayout.astro';
     <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
       <div>
         <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest">Part-timer Hours</p>
-        <p class="text-[11px] text-gray-500 mt-0.5">Bao Anh · Danny · Minh Chau</p>
+        <p id="pt-roster-label" class="text-[11px] text-gray-500 mt-0.5"></p>
       </div>
       <div class="flex items-center gap-2">
         <p id="pt-finance-period" class="text-[11px] text-gray-400 italic"></p>
@@ -380,70 +450,40 @@ import MainLayout from '../layouts/MainLayout.astro';
       </div>
     </div>
 
-    <!-- grid: 4 columns (3 staff + 1 combined) × 2 rows (weekly / monthly) -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-2">
-      <!-- Weekly -->
-      <div class="bg-gray-800 rounded-xl border border-gray-700 p-4">
-        <p class="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Bao Anh · This Week</p>
-        <p id="pt-week-baoAnh"  class="text-xl font-bold text-amber-300 tabular-nums mt-1">—</p>
-      </div>
-      <div class="bg-gray-800 rounded-xl border border-gray-700 p-4">
-        <p class="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Danny · This Week</p>
-        <p id="pt-week-danny"   class="text-xl font-bold text-amber-300 tabular-nums mt-1">—</p>
-      </div>
-      <div class="bg-gray-800 rounded-xl border border-gray-700 p-4">
-        <p class="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Minh Chau · This Week</p>
-        <p id="pt-week-minhChau" class="text-xl font-bold text-amber-300 tabular-nums mt-1">—</p>
-      </div>
-      <div class="bg-gray-800 rounded-xl border border-orange-800/60 p-4">
-        <p class="text-[10px] text-orange-400 uppercase tracking-wide mb-0.5">Combined · This Week</p>
-        <p id="pt-week-total"   class="text-xl font-bold text-orange-400 tabular-nums mt-1">—</p>
-      </div>
-    </div>
+    <!-- One tile per part-timer + a combined tile, for the viewed week… -->
+    <div id="pt-week-grid" class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-2"></div>
 
     <div class="border-t border-gray-700/60 my-3"></div>
 
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-      <!-- Monthly (finance period) -->
-      <div class="bg-gray-800 rounded-xl border border-gray-700 p-4">
-        <p class="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Bao Anh · This Month</p>
-        <p id="pt-mon-baoAnh"  class="text-xl font-bold text-emerald-400 tabular-nums mt-1">—</p>
-      </div>
-      <div class="bg-gray-800 rounded-xl border border-gray-700 p-4">
-        <p class="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Danny · This Month</p>
-        <p id="pt-mon-danny"   class="text-xl font-bold text-emerald-400 tabular-nums mt-1">—</p>
-      </div>
-      <div class="bg-gray-800 rounded-xl border border-gray-700 p-4">
-        <p class="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Minh Chau · This Month</p>
-        <p id="pt-mon-minhChau" class="text-xl font-bold text-emerald-400 tabular-nums mt-1">—</p>
-      </div>
-      <div class="bg-gray-800 rounded-xl border border-emerald-800/60 p-4">
-        <p class="text-[10px] text-emerald-400 uppercase tracking-wide mb-0.5">Combined · This Month</p>
-        <p id="pt-mon-total"   class="text-xl font-bold text-emerald-400 tabular-nums mt-1">—</p>
-      </div>
-    </div>
+    <!-- …and again for the finance month. Both rendered from PART_TIMER_NAMES. -->
+    <div id="pt-mon-grid" class="grid grid-cols-2 sm:grid-cols-4 gap-3"></div>
   </div>
 
   <!-- ── Edit Schedule Entry Modal ── -->
   <div id="edit-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40"
        onclick="if(event.target===this)closeEditModal()">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-6">
-      <h3 class="font-semibold text-gray-800 text-base mb-4">Edit Schedule Entry</h3>
+      <h3 class="font-semibold text-gray-800 text-base mb-4">
+        Edit Schedule Entry
+        <span id="e-type-badge"
+              class="hidden ml-1.5 align-middle px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[11px] font-bold">
+          Part-time
+        </span>
+      </h3>
       <div class="space-y-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1.5">Staff Name <span class="text-red-400">*</span></label>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">
+            Staff Name <span id="e-staff-required" class="text-red-400">*</span>
+          </label>
           <select id="e-staff"
             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
                    focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
             onchange="toggleTempInput('e-staff-temp', this.value)">
-            <option value="">— Select staff —</option>
-            <option value="Huyen">Huyen</option>
-            <option value="Duyen Ha">Duyen Ha</option>
-            <option value="Bao Anh">Bao Anh</option>
-            <option value="Danny">Danny</option>
-            <option value="Minh Chau">Minh Chau</option>
-            <option value="Temp">Temp</option>
+            <!-- populated by JS from STAFF_NAMES + PART_TIMER_NAMES -->
           </select>
+          <p id="e-open-hint" class="hidden mt-1.5 text-xs text-gray-400">
+            Leave blank to put this slot back in the open pool.
+          </p>
           <input
             id="e-staff-temp"
             type="text"
@@ -488,6 +528,37 @@ import MainLayout from '../layouts/MainLayout.astro';
         <button id="edit-save-btn" onclick="submitEdit()" type="button"
           class="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 rounded-lg text-sm transition active:scale-[0.98]">
           Save Changes
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Claim Shift Modal ── -->
+  <!-- All part-timers share one login, so the claimer names themselves here. -->
+  <div id="claim-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+       onclick="if(event.target===this)closeClaimModal()">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-6">
+      <h3 class="font-semibold text-gray-800 text-base mb-1">Take This Shift</h3>
+      <p id="claim-shift-label" class="text-sm text-gray-500 mb-4"></p>
+
+      <label class="block text-sm font-medium text-gray-700 mb-1.5">Who are you? <span class="text-red-400">*</span></label>
+      <select id="claim-name"
+        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+               focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent">
+        <!-- populated by JS from PART_TIMER_NAMES -->
+      </select>
+      <p class="mt-1.5 text-xs text-gray-400">Your hours are tracked under the name you pick.</p>
+
+      <div id="claim-error" class="hidden mt-3 text-sm text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2"></div>
+
+      <div class="flex gap-3 mt-5">
+        <button onclick="closeClaimModal()" type="button"
+          class="flex-1 border border-gray-300 text-gray-700 font-medium py-2 rounded-lg text-sm hover:bg-gray-50 transition">
+          Cancel
+        </button>
+        <button id="claim-confirm-btn" onclick="submitClaim()" type="button"
+          class="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-semibold py-2 rounded-lg text-sm transition active:scale-[0.98]">
+          Confirm
         </button>
       </div>
     </div>
@@ -716,7 +787,50 @@ import MainLayout from '../layouts/MainLayout.astro';
     var scheduleData = [];
     var currentWeekStart;
 
-    var STAFF_NAMES = ['Huyen', 'Duyen Ha', 'Bao Anh', 'Danny', 'Minh Chau'];
+    // Mirrors STAFF_NAMES / PART_TIMER_NAMES in src/lib/staff.ts — this script is
+    // is:inline and cannot import, so both lists have to be kept in step by hand.
+    var STAFF_NAMES      = ['Huyen', 'Duyen Ha', 'Bao Anh', 'Danny', 'Minh Chau',
+                            'Le Nghia', 'Kim An', 'Bich Van'];
+    var PART_TIMER_NAMES = ['Bao Anh', 'Danny', 'Minh Chau', 'Le Nghia', 'Kim An', 'Bich Van'];
+
+    // ── Who is looking at this page ───────────────────────────────────────────
+    // All part-timers share one login, so the session *role* — not the username —
+    // decides what the page offers: an admin posts and edits shifts, the shared
+    // part-time account only claims open ones and releases what it claimed.
+    // The server enforces the same split; this just hides what wouldn't work.
+    var isAdmin = false;
+
+    function readSessionRole() {
+      var token = localStorage.getItem('bbo_token') || '';
+      var dot   = token.lastIndexOf('.');
+      if (dot < 0) return 'staff';
+      try {
+        var b64 = token.slice(0, dot).replace(/-/g, '+').replace(/_/g, '/');
+        while (b64.length % 4) b64 += '=';
+        return JSON.parse(atob(b64)).r === 'admin' ? 'admin' : 'staff';
+      } catch (_) {
+        return 'staff'; // unreadable token → fall back to the read-only role
+      }
+    }
+
+    /** Hide the controls the current role has no permission to use. */
+    function applyRoleVisibility() {
+      ['admin-entry-row', 'btn-duplicate-week'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.classList.toggle('hidden', !isAdmin);
+      });
+      document.getElementById('open-shifts-sub').textContent = isAdmin
+        ? 'Shifts still waiting to be filled.'
+        : 'Pick a shift to add it to your schedule.';
+    }
+
+    /** Full-timers and part-timers combined, each name once, canonical order. */
+    function allAssignableNames() {
+      var list = STAFF_NAMES.slice();
+      PART_TIMER_NAMES.forEach(function (n) { if (list.indexOf(n) === -1) list.push(n); });
+      return list;
+    }
+
     var STAFF_COLORS = [
       { bg: '#FED7AA', text: '#9A3412', border: '#FB923C' },
       { bg: '#BFDBFE', text: '#1E40AF', border: '#60A5FA' },
@@ -729,10 +843,19 @@ import MainLayout from '../layouts/MainLayout.astro';
     ];
 
     $(document).ready(function () {
+      isAdmin = readSessionRole() === 'admin';
+      applyRoleVisibility();
+      initNameSelects();
+      buildPartTimerPanel();
+
       document.getElementById('f-date').value = new Date().toISOString().slice(0, 10);
       currentWeekStart = getWeekStart(new Date());
       hoursMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
       ptMonth    = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+
+      setSingleShiftType('assigned');
+      setBulkShiftType('assigned');
+      setOpenScope('upcoming');
 
       document.getElementById('btn-prev-week').addEventListener('click', function () {
         currentWeekStart = addDays(currentWeekStart, -7);
@@ -754,10 +877,252 @@ import MainLayout from '../layouts/MainLayout.astro';
       initStaffCheckboxes();
       document.getElementById('b-date-from').addEventListener('change', updateBulkPreview);
       document.getElementById('b-date-to').addEventListener('change', updateBulkPreview);
+      document.getElementById('b-count').addEventListener('input', updateBulkPreview);
       document.querySelectorAll('.bulk-dow').forEach(function (cb) {
         cb.addEventListener('change', updateBulkPreview);
       });
     });
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // ── Part-time shifts ──────────────────────────────────────────────────────
+    // An open shift is a part_time row nobody has taken yet, so its staff_name is
+    // still ''. Claiming writes the part-timer's name there — which is why the
+    // weekly totals, the part-timer panel and Monthly Hours need no special case.
+    // ══════════════════════════════════════════════════════════════════════════
+    function isPartTime(entry) { return entry.shift_type === 'part_time'; }
+    function isOpenShift(entry) { return isPartTime(entry) && !entry.staff_name; }
+
+    /** A shift you may still hand back: yours, part-time, and not yet in the past. */
+    function canRelease(entry) {
+      if (!isPartTime(entry) || !entry.staff_name) return false;
+      if (isAdmin) return true;
+      return entry.date >= fmtDate(new Date());
+    }
+
+    // ── Segmented shift-type controls ─────────────────────────────────────────
+    var SEG_ON  = 'px-3 py-2 rounded-lg text-sm font-semibold border transition ' +
+                  'bg-orange-500 border-orange-500 text-white';
+    var SEG_OFF = 'px-3 py-2 rounded-lg text-sm font-semibold border transition ' +
+                  'bg-white border-gray-300 text-gray-500 hover:bg-gray-50';
+
+    var singleShiftType = 'assigned';
+    var bulkShiftType   = 'assigned';
+
+    function setSingleShiftType(type) {
+      singleShiftType = type;
+      var open = type === 'part_time';
+      document.getElementById('f-type-assigned').className  = open ? SEG_OFF : SEG_ON;
+      document.getElementById('f-type-part_time').className = open ? SEG_ON  : SEG_OFF;
+      document.getElementById('f-staff-wrap').classList.toggle('hidden', open);
+      document.getElementById('f-count-wrap').classList.toggle('hidden', !open);
+      document.getElementById('f-type-hint').classList.toggle('hidden', !open);
+    }
+
+    function setBulkShiftType(type) {
+      bulkShiftType = type;
+      var open = type === 'part_time';
+      document.getElementById('b-type-assigned').className  = open ? SEG_OFF : SEG_ON;
+      document.getElementById('b-type-part_time').className = open ? SEG_ON  : SEG_OFF;
+      document.getElementById('b-staff-wrap').classList.toggle('hidden', open);
+      document.getElementById('b-count-wrap').classList.toggle('hidden', !open);
+      updateBulkPreview();
+    }
+
+    // ── Name dropdowns ────────────────────────────────────────────────────────
+    function optionsHtml(names) {
+      return names.map(function (n) {
+        return '<option value="' + escHtml(n) + '">' + escHtml(n) + '</option>';
+      }).join('');
+    }
+
+    function initNameSelects() {
+      // Bao Anh / Danny / Minh Chau are part-timers who also get assigned shifts;
+      // list them once, under Part-timers.
+      var fullTimers = STAFF_NAMES.filter(function (n) { return PART_TIMER_NAMES.indexOf(n) === -1; });
+      var staffOptions =
+        '<option value="">— Select staff —</option>' +
+        '<optgroup label="Staff">'        + optionsHtml(fullTimers)       + '</optgroup>' +
+        '<optgroup label="Part-timers">'  + optionsHtml(PART_TIMER_NAMES) + '</optgroup>' +
+        '<option value="Temp">Temp</option>';
+
+      document.getElementById('f-staff').innerHTML = staffOptions;
+      document.getElementById('e-staff').innerHTML = staffOptions;
+      document.getElementById('claim-name').innerHTML =
+        '<option value="">— Select your name —</option>' + optionsHtml(PART_TIMER_NAMES);
+    }
+
+    // ── Open Shifts board ─────────────────────────────────────────────────────
+    var openScope = 'upcoming'; // 'upcoming' = today onward | 'week' = viewed week
+
+    function setOpenScope(scope) {
+      openScope = scope;
+      var on  = 'px-3 py-1.5 rounded-lg text-xs font-semibold border transition ' +
+                'bg-amber-500 border-amber-500 text-white';
+      var off = 'px-3 py-1.5 rounded-lg text-xs font-semibold border transition ' +
+                'bg-white border-gray-300 text-gray-500 hover:bg-gray-50';
+      document.getElementById('open-scope-upcoming').className = scope === 'upcoming' ? on : off;
+      document.getElementById('open-scope-week').className     = scope === 'week'     ? on : off;
+      renderOpenShifts();
+    }
+
+    function openShiftsInScope() {
+      var open = scheduleData.filter(isOpenShift);
+      if (openScope === 'week') {
+        var from = fmtDate(currentWeekStart);
+        var to   = fmtDate(addDays(currentWeekStart, 6));
+        return open.filter(function (s) { return s.date >= from && s.date <= to; });
+      }
+      var today = fmtDate(new Date());
+      return open.filter(function (s) { return s.date >= today; });
+    }
+
+    function fmtDayLabel(iso) {
+      var DAY_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+      var d = new Date(iso + 'T00:00:00');
+      return DAY_FULL[d.getDay()] + ', ' + MONTHS_SHORT[d.getMonth()] + ' ' + d.getDate();
+    }
+
+    function renderOpenShifts() {
+      var shifts = openShiftsInScope().slice().sort(function (a, b) {
+        return a.date === b.date
+          ? String(a.start_time).localeCompare(String(b.start_time))
+          : a.date.localeCompare(b.date);
+      });
+
+      document.getElementById('open-count-badge').textContent = shifts.length;
+
+      var body = document.getElementById('open-shifts-body');
+      if (!shifts.length) {
+        body.innerHTML = '<p class="py-8 text-center text-gray-400 text-sm">' +
+          (openScope === 'week' ? 'No open shifts in the viewed week.' : 'No open shifts — everything is covered.') +
+          '</p>';
+        return;
+      }
+
+      // Group by day so several slots on the same date read as one block.
+      var byDate = {};
+      var dates  = [];
+      shifts.forEach(function (s) {
+        if (!byDate[s.date]) { byDate[s.date] = []; dates.push(s.date); }
+        byDate[s.date].push(s);
+      });
+
+      body.innerHTML = dates.map(function (date) {
+        var chips = byDate[date].map(function (s) {
+          var safeId = escHtml(String(s.id));
+          var action = isAdmin
+            ? '<button type="button" onclick="deleteEntry(\'' + safeId + '\')" ' +
+              'class="px-2 py-1 rounded-md text-xs font-semibold text-amber-700 hover:bg-amber-200/70 transition">' +
+              'Remove</button>'
+            : '<button type="button" onclick="openClaimModal(\'' + safeId + '\')" ' +
+              'class="px-3 py-1 rounded-md bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold transition ' +
+              'active:scale-[0.98]">Take it</button>';
+          return '<div class="flex items-center gap-3 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200">' +
+            '<div class="min-w-0">' +
+            '<div class="text-sm font-semibold text-amber-900 whitespace-nowrap">' +
+              escHtml(s.start_time) + '–' + escHtml(s.end_time) + '</div>' +
+            (s.notes
+              ? '<div class="text-xs text-amber-700/70 truncate">' + escHtml(s.notes) + '</div>'
+              : '') +
+            '</div>' + action + '</div>';
+        }).join('');
+
+        return '<div class="mb-4 last:mb-0">' +
+          '<p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">' +
+            escHtml(fmtDayLabel(date)) +
+            ' <span class="text-gray-300">·</span> ' +
+            '<span class="text-gray-400 normal-case font-medium">' + byDate[date].length + ' open</span>' +
+          '</p>' +
+          '<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">' + chips + '</div>' +
+          '</div>';
+      }).join('');
+    }
+
+    // ── Claim / release ───────────────────────────────────────────────────────
+    var claimingId = null;
+
+    function openClaimModal(id) {
+      var entry = scheduleData.filter(function (s) { return String(s.id) === String(id); })[0];
+      if (!entry) return;
+      claimingId = id;
+      document.getElementById('claim-shift-label').textContent =
+        fmtDayLabel(entry.date) + ' · ' + entry.start_time + '–' + entry.end_time +
+        (entry.notes ? ' · ' + entry.notes : '');
+      document.getElementById('claim-name').value = '';
+      document.getElementById('claim-error').classList.add('hidden');
+      var btn = document.getElementById('claim-confirm-btn');
+      btn.disabled = false; btn.textContent = 'Confirm';
+      document.getElementById('claim-modal').classList.remove('hidden');
+    }
+
+    function closeClaimModal() {
+      document.getElementById('claim-modal').classList.add('hidden');
+      claimingId = null;
+    }
+
+    function submitClaim() {
+      var errEl = document.getElementById('claim-error');
+      errEl.classList.add('hidden');
+      var name = document.getElementById('claim-name').value;
+      if (!name) {
+        errEl.textContent = 'Please select your name.';
+        errEl.classList.remove('hidden');
+        return;
+      }
+
+      var btn = document.getElementById('claim-confirm-btn');
+      btn.disabled = true; btn.textContent = 'Saving…';
+
+      apiFetch('/api/schedule/' + claimingId + '/claim', {
+        method: 'POST',
+        body: JSON.stringify({ part_timer_name: name })
+      })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          btn.disabled = false; btn.textContent = 'Confirm';
+          if (data.error) {
+            errEl.textContent = data.error;
+            errEl.classList.remove('hidden');
+            // A 409 means someone beat us to it — refresh so the board is honest.
+            if (/no longer open/i.test(data.error)) loadSchedule();
+            return;
+          }
+          replaceEntry(data.entry);
+          closeClaimModal();
+          currentWeekStart = getWeekStart(new Date(data.entry.date + 'T00:00:00'));
+          renderCalendar();
+          showToast('Shift taken — ' + name + ' is on ' + fmtDayLabel(data.entry.date) + '.');
+        })
+        .catch(function (err) {
+          btn.disabled = false; btn.textContent = 'Confirm';
+          errEl.textContent = 'Could not take the shift: ' + err.message;
+          errEl.classList.remove('hidden');
+        });
+    }
+
+    function releaseShift(id) {
+      var entry = scheduleData.filter(function (s) { return String(s.id) === String(id); })[0];
+      if (!entry) return;
+      if (!confirm('Give this shift back to the open pool?')) return;
+
+      apiFetch('/api/schedule/' + id + '/claim', { method: 'DELETE' })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if (data.error) { showToast(data.error, 'error'); return; }
+          replaceEntry(data.entry);
+          renderCalendar();
+          showToast('Shift released — it is open again.', 'warning');
+        })
+        .catch(function (err) { showToast('Release failed: ' + err.message, 'error'); });
+    }
+
+    /** Swap an updated row into scheduleData in place. */
+    function replaceEntry(entry) {
+      for (var i = 0; i < scheduleData.length; i++) {
+        if (String(scheduleData[i].id) === String(entry.id)) { scheduleData[i] = entry; return; }
+      }
+      scheduleData.unshift(entry);
+    }
 
     // ── Week helpers ──
     function getWeekStart(date) {
@@ -790,10 +1155,12 @@ import MainLayout from '../layouts/MainLayout.astro';
     }
 
     function getStaffList() {
-      var list = STAFF_NAMES.slice();
-      // Include any staff from DB not in the canonical list (e.g. temp staff names)
+      var list = allAssignableNames();
+      // Include any staff from DB not in the canonical list (e.g. temp staff names).
+      // Unclaimed part-time slots carry an empty staff_name — they belong in the
+      // OPEN row, not a row of their own, so skip them here.
       scheduleData.forEach(function (s) {
-        if (list.indexOf(s.staff_name) === -1) list.push(s.staff_name);
+        if (s.staff_name && list.indexOf(s.staff_name) === -1) list.push(s.staff_name);
       });
       return list;
     }
@@ -816,6 +1183,92 @@ import MainLayout from '../layouts/MainLayout.astro';
         return document.getElementById(tempId).value.trim();
       }
       return sel;
+    }
+
+    // ── Calendar cell actions ──
+    var ICON_EDIT    = '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>';
+    var ICON_DELETE  = '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>';
+    var ICON_RELEASE = '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h11a4 4 0 010 8h-3m-8-8l4-4m-4 4l4 4"/></svg>';
+
+    function iconBtn(fn, id, title, icon) {
+      return '<button onclick="' + fn + '(\'' + id + '\')" title="' + title + '" type="button" ' +
+        'class="p-0.5 rounded hover:bg-black/10 transition-colors">' + icon + '</button>';
+    }
+
+    /** Hover actions on a shift chip, limited to what this role may actually do. */
+    function entryActionsHtml(entry) {
+      var safeId = escHtml(String(entry.id));
+      var btns = '';
+      if (isAdmin) {
+        btns += iconBtn('openEditModal', safeId, 'Edit entry',   ICON_EDIT);
+        btns += iconBtn('deleteEntry',   safeId, 'Delete entry', ICON_DELETE);
+      }
+      if (canRelease(entry)) {
+        btns += iconBtn('releaseShift', safeId, 'Give this shift back', ICON_RELEASE);
+      }
+      if (!btns) return '';
+      // Admins are at a desk, so their controls stay out of the way until hover.
+      // Part-timers are on a phone, where there is no hover — theirs stay visible.
+      var wrap = isAdmin
+        ? 'flex gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity'
+        : 'flex gap-0.5 shrink-0';
+      return '<div class="' + wrap + '">' + btns + '</div>';
+    }
+
+    /**
+     * The pinned OPEN row at the top of the weekly grid.
+     *
+     * Unfilled part-time slots have no name to file them under, and there can be
+     * any number of them on one day — including several in the same time range —
+     * so they stack in one shared row until someone claims them.
+     */
+    function renderOpenRow(weekDates, todayIso) {
+      var weekOpen = weekDates.map(function (d) {
+        var iso = fmtDate(d);
+        return scheduleData.filter(function (s) { return isOpenShift(s) && s.date === iso; });
+      });
+      var total = weekOpen.reduce(function (n, list) { return n + list.length; }, 0);
+      if (!total) return '';
+
+      var html = '<tr class="border-b border-amber-200 bg-amber-50/40">';
+      html += '<td class="py-2.5 pr-3 align-top w-24">' +
+        '<span class="text-xs font-bold text-amber-700 uppercase tracking-wide leading-tight">Open</span>' +
+        '<span class="block text-[10px] text-amber-600/70 leading-tight">part-time</span>' +
+        '</td>';
+
+      weekDates.forEach(function (d, i) {
+        var isToday = fmtDate(d) === todayIso;
+        html += '<td class="py-2 px-1 align-top' + (isToday ? ' bg-orange-100/40' : '') + '" style="min-width:80px">';
+        weekOpen[i].forEach(function (entry) {
+          var safeId = escHtml(String(entry.id));
+          var label  = escHtml(entry.start_time) + '–' + escHtml(entry.end_time);
+          var note   = entry.notes ? '&#10;Note: ' + escHtml(entry.notes) : '';
+          if (isAdmin) {
+            html += '<div class="mb-1 px-2 py-1 rounded-md text-xs leading-snug border border-dashed ' +
+              'border-amber-400 bg-amber-100/60 text-amber-800 group" ' +
+              'title="Open part-time shift' + note + '">' +
+              '<div class="flex items-start justify-between gap-0.5">' +
+              '<div><div class="font-semibold whitespace-nowrap">' + label + '</div>' +
+              '<div class="opacity-70 truncate">unfilled' + (entry.notes ? ' · ' + escHtml(entry.notes) : '') + '</div></div>' +
+              entryActionsHtml(entry) +
+              '</div></div>';
+          } else {
+            html += '<button type="button" onclick="openClaimModal(\'' + safeId + '\')" ' +
+              'title="Tap to take this shift' + note + '" ' +
+              'class="w-full text-left mb-1 px-2 py-1 rounded-md text-xs leading-snug border border-dashed ' +
+              'border-amber-400 bg-amber-100/60 text-amber-800 hover:bg-amber-200 transition cursor-pointer">' +
+              '<div class="font-semibold whitespace-nowrap">' + label + '</div>' +
+              '<div class="opacity-70 truncate">Take it</div>' +
+              '</button>';
+          }
+        });
+        html += '</td>';
+      });
+
+      html += '<td class="py-2.5 pl-3 align-middle text-right">' +
+        '<span class="text-xs font-semibold text-amber-700 whitespace-nowrap">' + total + ' open</span>' +
+        '</td>';
+      return html + '</tr>';
     }
 
     // ── Render calendar ──
@@ -857,7 +1310,7 @@ import MainLayout from '../layouts/MainLayout.astro';
           return s.staff_name === name && weekDateSet.indexOf(s.date) !== -1;
         });
       });
-      var bodyHtml  = '';
+      var bodyHtml  = renderOpenRow(weekDates, todayIso);
       staffList.forEach(function (staffName, rowIdx) {
         var color  = STAFF_COLORS[rowIdx % STAFF_COLORS.length];
         var isLast = rowIdx === staffList.length - 1;
@@ -881,28 +1334,20 @@ import MainLayout from '../layouts/MainLayout.astro';
             weekTotalMin += diff;
             var h = Math.floor(diff / 60), m = diff % 60;
             var dur = h + 'h' + (m ? ' ' + m + 'm' : '');
-            var safeId = escHtml(String(entry.id));
             bodyHtml +=
               '<div ' +
               'title="' + escHtml(staffName) + ': ' + start + '–' + end +
+                (isPartTime(entry) ? '&#10;Part-time shift (claimed)' : '') +
                 (entry.notes ? '&#10;Note: ' + escHtml(entry.notes) : '') + '" ' +
               'class="mb-1 px-2 py-1 rounded-md text-xs leading-snug border group" ' +
               'style="background:' + color.bg + ';color:' + color.text + ';border-color:' + color.border + '">' +
               '<div class="flex items-start justify-between gap-0.5">' +
               '<div>' +
-              '<div class="font-semibold whitespace-nowrap">' + start + '–' + end + '</div>' +
+              '<div class="font-semibold whitespace-nowrap">' + start + '–' + end +
+                (isPartTime(entry) ? ' <span class="opacity-60 font-normal">PT</span>' : '') + '</div>' +
               '<div class="opacity-70 truncate">' + dur + (entry.notes ? ' · ' + escHtml(entry.notes) : '') + '</div>' +
               '</div>' +
-              '<div class="flex gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">' +
-              '<button onclick="openEditModal(\'' + safeId + '\')" title="Edit entry" type="button" ' +
-              'class="p-0.5 rounded hover:bg-black/10 transition-colors">' +
-              '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>' +
-              '</button>' +
-              '<button onclick="deleteEntry(\'' + safeId + '\')" title="Delete entry" type="button" ' +
-              'class="p-0.5 rounded hover:bg-black/10 transition-colors">' +
-              '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>' +
-              '</button>' +
-              '</div>' +
+              entryActionsHtml(entry) +
               '</div>' +
               '</div>';
           });
@@ -923,6 +1368,7 @@ import MainLayout from '../layouts/MainLayout.astro';
       }
       document.getElementById('cal-body').innerHTML = bodyHtml;
 
+      renderOpenShifts();
       updatePartTimerStats();
     }
 
@@ -951,9 +1397,38 @@ import MainLayout from '../layouts/MainLayout.astro';
     }
 
     // ── Part-timer hours summary ──
-    var PART_TIMERS = ['Bao Anh', 'Danny', 'Minh Chau'];
-    var PT_IDS      = ['baoAnh',  'danny', 'minhChau'];
-    var ptMonth     = null; // Date set to 1st of the selected finance month
+    // Driven by PART_TIMER_NAMES so a new part-timer only has to be added once.
+    var ptMonth = null; // Date set to 1st of the selected finance month
+
+    function ptSlug(name) { return name.toLowerCase().replace(/[^a-z0-9]+/g, '-'); }
+
+    function ptTileHtml(prefix, name, suffix, valueClass) {
+      return '<div class="bg-gray-800 rounded-xl border border-gray-700 p-4">' +
+        '<p class="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">' +
+          escHtml(name) + ' · ' + suffix + '</p>' +
+        '<p id="pt-' + prefix + '-' + ptSlug(name) + '" ' +
+          'class="text-xl font-bold ' + valueClass + ' tabular-nums mt-1">—</p>' +
+        '</div>';
+    }
+
+    // Class names are passed whole, never assembled from fragments — Tailwind
+    // scans this file as plain text and would not emit a class it can't see.
+    function ptTotalTileHtml(prefix, suffix, borderClass, textClass) {
+      return '<div class="bg-gray-800 rounded-xl p-4 border ' + borderClass + '">' +
+        '<p class="text-[10px] uppercase tracking-wide mb-0.5 ' + textClass + '">Combined · ' + suffix + '</p>' +
+        '<p id="pt-' + prefix + '-total" class="text-xl font-bold tabular-nums mt-1 ' + textClass + '">—</p>' +
+        '</div>';
+    }
+
+    function buildPartTimerPanel() {
+      document.getElementById('pt-roster-label').textContent = PART_TIMER_NAMES.join(' · ');
+      document.getElementById('pt-week-grid').innerHTML =
+        PART_TIMER_NAMES.map(function (n) { return ptTileHtml('week', n, 'This Week', 'text-amber-300'); }).join('') +
+        ptTotalTileHtml('week', 'This Week', 'border-orange-800/60', 'text-orange-400');
+      document.getElementById('pt-mon-grid').innerHTML =
+        PART_TIMER_NAMES.map(function (n) { return ptTileHtml('mon', n, 'This Month', 'text-emerald-400'); }).join('') +
+        ptTotalTileHtml('mon', 'This Month', 'border-emerald-800/60', 'text-emerald-400');
+    }
 
     function fmtHours(totalMin) {
       if (totalMin <= 0) return '0h';
@@ -1017,13 +1492,13 @@ import MainLayout from '../layouts/MainLayout.astro';
       document.getElementById('pt-finance-period').textContent = 'Finance period: ' + startLabel + ' – ' + endLabel;
 
       var weekTotal = 0, monTotal = 0;
-      PART_TIMERS.forEach(function (name, i) {
+      PART_TIMER_NAMES.forEach(function (name) {
         var wMin = sumStaffMinutes(name, weekDates);
         var mMin = sumStaffMinutesInRange(name, fin.start, fin.end);
         weekTotal += wMin;
         monTotal  += mMin;
-        document.getElementById('pt-week-' + PT_IDS[i]).textContent = fmtHours(wMin);
-        document.getElementById('pt-mon-'  + PT_IDS[i]).textContent = fmtHours(mMin);
+        document.getElementById('pt-week-' + ptSlug(name)).textContent = fmtHours(wMin);
+        document.getElementById('pt-mon-'  + ptSlug(name)).textContent = fmtHours(mMin);
       });
       document.getElementById('pt-week-total').textContent = fmtHours(weekTotal);
       document.getElementById('pt-mon-total').textContent  = fmtHours(monTotal);
@@ -1046,13 +1521,16 @@ import MainLayout from '../layouts/MainLayout.astro';
       var errEl = document.getElementById('form-error');
       errEl.classList.add('hidden');
 
-      var staff = resolveStaffName('f-staff', 'f-staff-temp');
+      var isOpen = singleShiftType === 'part_time';
+      var staff = isOpen ? '' : resolveStaffName('f-staff', 'f-staff-temp');
       var date  = document.getElementById('f-date').value;
       var start = document.getElementById('f-start').value;
       var end   = document.getElementById('f-end').value;
       var notes = document.getElementById('f-notes').value.trim();
+      // Several part-timers can work the same slot, so one post may create N slots.
+      var count = isOpen ? Math.max(1, Math.min(20, parseInt(document.getElementById('f-count').value, 10) || 1)) : 1;
 
-      if (!staff || !date || !start || !end) {
+      if ((!staff && !isOpen) || !date || !start || !end) {
         errEl.textContent = document.getElementById('f-staff').value === 'Temp' && !staff
           ? 'Please enter the temp staff name.'
           : 'Please fill in all required fields.';
@@ -1063,15 +1541,24 @@ import MainLayout from '../layouts/MainLayout.astro';
       var btn = e.target.querySelector('[type="submit"]');
       btn.disabled = true; btn.textContent = 'Saving…';
 
-      apiFetch('/api/schedule', {
-        method: 'POST',
-        body: JSON.stringify({ staff_name: staff, date: date, start_time: start, end_time: end, notes: notes })
-      })
-        .then(function (res) { return res.json(); })
-        .then(function (data) {
+      var payload = {
+        staff_name: staff, date: date, start_time: start, end_time: end,
+        notes: notes, shift_type: singleShiftType
+      };
+      var posts = [];
+      for (var ci = 0; ci < count; ci++) {
+        posts.push(apiFetch('/api/schedule', { method: 'POST', body: JSON.stringify(payload) })
+          .then(function (res) { return res.json(); }));
+      }
+
+      Promise.all(posts)
+        .then(function (results) {
           btn.disabled = false; btn.textContent = 'Add to Schedule';
-          if (data.error) { errEl.textContent = data.error; errEl.classList.remove('hidden'); return; }
-          scheduleData.unshift(data.entry);
+          var failed = results.filter(function (r) { return r.error; })[0];
+          if (failed) { errEl.textContent = failed.error; errEl.classList.remove('hidden'); }
+          var added = results.filter(function (r) { return r.entry; });
+          if (!added.length) return;
+          added.forEach(function (r) { scheduleData.unshift(r.entry); });
           // Jump to the week of the newly added entry
           currentWeekStart = getWeekStart(new Date(date + 'T00:00:00'));
           renderCalendar();
@@ -1084,7 +1571,9 @@ import MainLayout from '../layouts/MainLayout.astro';
           document.getElementById('duration-display').textContent = '— (auto-calculated)';
           document.getElementById('duration-display').className =
             'w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-500';
-          showToast('Schedule entry added!');
+          showToast(isOpen
+            ? 'Posted ' + added.length + ' open part-time shift' + (added.length !== 1 ? 's' : '') + '.'
+            : 'Schedule entry added!');
         })
         .catch(function (err) {
           btn.disabled = false; btn.textContent = 'Add to Schedule';
@@ -1107,16 +1596,26 @@ import MainLayout from '../layouts/MainLayout.astro';
     }
 
     // ── Edit entry ──
-    var editingId = null;
+    var editingId        = null;
+    var editingShiftType = 'assigned';
 
     function openEditModal(id) {
       var entry = scheduleData.filter(function (s) { return String(s.id) === String(id); })[0];
       if (!entry) return;
-      editingId = id;
+      editingId        = id;
+      editingShiftType = isPartTime(entry) ? 'part_time' : 'assigned';
+
+      // A part-time slot may legitimately have nobody on it, so the name stops
+      // being required and clearing it becomes the way to reopen the slot.
+      var open = editingShiftType === 'part_time';
+      document.getElementById('e-type-badge').classList.toggle('hidden', !open);
+      document.getElementById('e-open-hint').classList.toggle('hidden', !open);
+      document.getElementById('e-staff-required').classList.toggle('hidden', open);
+
       var staffName = entry.staff_name || '';
       var eStaffSel = document.getElementById('e-staff');
       var eStaffTemp = document.getElementById('e-staff-temp');
-      if (STAFF_NAMES.indexOf(staffName) !== -1) {
+      if (allAssignableNames().indexOf(staffName) !== -1) {
         eStaffSel.value = staffName;
         eStaffTemp.classList.add('hidden');
         eStaffTemp.value = '';
@@ -1153,7 +1652,8 @@ import MainLayout from '../layouts/MainLayout.astro';
       var end   = document.getElementById('e-end').value;
       var notes = document.getElementById('e-notes').value.trim();
 
-      if (!staff || !date || !start || !end) {
+      var open = editingShiftType === 'part_time';
+      if ((!staff && !open) || !date || !start || !end) {
         errEl.textContent = document.getElementById('e-staff').value === 'Temp' && !staff
           ? 'Please enter the temp staff name.'
           : 'Please fill in all required fields.';
@@ -1167,16 +1667,17 @@ import MainLayout from '../layouts/MainLayout.astro';
 
       apiFetch('/api/schedule/' + editingId, {
         method: 'PATCH',
-        body: JSON.stringify({ staff_name: staff, date: date, start_time: start, end_time: end, notes: notes })
+        body: JSON.stringify({
+          staff_name: staff, date: date, start_time: start, end_time: end,
+          notes: notes, shift_type: editingShiftType
+        })
       })
         .then(function (res) { return res.json(); })
         .then(function (data) {
           saveBtn.disabled = false;
           saveBtn.textContent = 'Save Changes';
           if (data.error) { errEl.textContent = data.error; errEl.classList.remove('hidden'); return; }
-          for (var i = 0; i < scheduleData.length; i++) {
-            if (String(scheduleData[i].id) === String(editingId)) { scheduleData[i] = data.entry; break; }
-          }
+          replaceEntry(data.entry);
           closeEditModal();
           renderCalendar();
           showToast('Entry updated!');
@@ -1190,9 +1691,13 @@ import MainLayout from '../layouts/MainLayout.astro';
     }
 
     function exportCSV() {
-      var rows = [['Staff Name', 'Date', 'Start', 'End', 'Notes']];
+      var rows = [['Staff Name', 'Date', 'Start', 'End', 'Notes', 'Shift Type', 'Status']];
       scheduleData.forEach(function (s) {
-        rows.push([s.staff_name, s.date, s.start_time, s.end_time, s.notes || '']);
+        rows.push([
+          s.staff_name, s.date, s.start_time, s.end_time, s.notes || '',
+          isPartTime(s) ? 'part-time' : 'assigned',
+          isOpenShift(s) ? 'open' : (isPartTime(s) ? 'claimed' : 'assigned')
+        ]);
       });
       var csv = rows.map(function (r) {
         return r.map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(',');
@@ -1348,7 +1853,7 @@ import MainLayout from '../layouts/MainLayout.astro';
     // ── Staff checkboxes ──
     function initStaffCheckboxes() {
       var container = document.getElementById('staff-checkboxes');
-      container.innerHTML = STAFF_NAMES.map(function (name) {
+      container.innerHTML = allAssignableNames().map(function (name) {
         return '<label class="flex items-center gap-2 cursor-pointer select-none">' +
           '<input type="checkbox" class="bulk-staff accent-orange-500 w-3.5 h-3.5" value="' + escHtml(name) + '" />' +
           '<span class="text-sm text-gray-700">' + escHtml(name) + '</span>' +
@@ -1388,15 +1893,24 @@ import MainLayout from '../layouts/MainLayout.astro';
       return dates;
     }
 
+    /** Slots posted per day in bulk part-time mode. */
+    function getBulkCount() {
+      return Math.max(1, Math.min(20, parseInt(document.getElementById('b-count').value, 10) || 1));
+    }
+
     function updateBulkPreview() {
       var el      = document.getElementById('bulk-preview');
+      var isOpen  = bulkShiftType === 'part_time';
       var staff   = getSelectedStaff();
+      var perDay  = isOpen ? getBulkCount() : staff.length;
       var fromISO = document.getElementById('b-date-from').value;
       var toISO   = document.getElementById('b-date-to').value;
       var days    = getSelectedDays();
 
-      if (!staff.length || !fromISO || !toISO || !days.length) {
-        el.textContent = 'Select staff, a date range and at least one day to preview entry count.';
+      if (!perDay || !fromISO || !toISO || !days.length) {
+        el.textContent = isOpen
+          ? 'Set how many part-timers you need, a date range and at least one day to preview.'
+          : 'Select staff, a date range and at least one day to preview entry count.';
         el.className = 'text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-500';
         return;
       }
@@ -1406,13 +1920,14 @@ import MainLayout from '../layouts/MainLayout.astro';
         return;
       }
       var dates = getDatesInRange(fromISO, toISO, days);
-      var total = staff.length * dates.length;
+      var total = perDay * dates.length;
       if (!total) {
         el.textContent = 'No matching dates in the selected range for the chosen days.';
         el.className = 'text-xs bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2 text-yellow-700';
         return;
       }
-      el.textContent = staff.length + ' staff × ' + dates.length + ' day' + (dates.length !== 1 ? 's' : '') +
+      el.textContent = (isOpen ? perDay + ' open slot' + (perDay !== 1 ? 's' : '') : perDay + ' staff') +
+                       ' × ' + dates.length + ' day' + (dates.length !== 1 ? 's' : '') +
                        ' = ' + total + ' entr' + (total !== 1 ? 'ies' : 'y') + ' will be created.';
       el.className = 'text-xs bg-orange-50 border border-orange-200 rounded-lg px-3 py-2 text-orange-700 font-medium';
     }
@@ -1423,6 +1938,7 @@ import MainLayout from '../layouts/MainLayout.astro';
       var errEl = document.getElementById('bulk-error');
       errEl.classList.add('hidden');
 
+      var isOpen  = bulkShiftType === 'part_time';
       var staff   = getSelectedStaff();
       var fromISO = document.getElementById('b-date-from').value;
       var toISO   = document.getElementById('b-date-to').value;
@@ -1431,7 +1947,7 @@ import MainLayout from '../layouts/MainLayout.astro';
       var end     = document.getElementById('b-end').value;
       var notes   = document.getElementById('b-notes').value.trim();
 
-      if (!staff.length)  { errEl.textContent = 'Select at least one staff member.'; errEl.classList.remove('hidden'); return; }
+      if (!isOpen && !staff.length) { errEl.textContent = 'Select at least one staff member.'; errEl.classList.remove('hidden'); return; }
       if (!fromISO || !toISO) { errEl.textContent = 'Please choose a date range.'; errEl.classList.remove('hidden'); return; }
       if (fromISO > toISO) { errEl.textContent = '"To" date must be on or after "From" date.'; errEl.classList.remove('hidden'); return; }
       if (!days.length)   { errEl.textContent = 'Select at least one day of the week.'; errEl.classList.remove('hidden'); return; }
@@ -1440,10 +1956,19 @@ import MainLayout from '../layouts/MainLayout.astro';
       var dates = getDatesInRange(fromISO, toISO, days);
       if (!dates.length)  { errEl.textContent = 'No matching dates in the selected range for the chosen days.'; errEl.classList.remove('hidden'); return; }
 
+      // In open mode there is no staff list to iterate — post N nameless slots per day.
+      var perDay = staff;
+      if (isOpen) {
+        perDay = [];
+        for (var pi = 0; pi < getBulkCount(); pi++) perDay.push('');
+      }
       var entries = [];
-      staff.forEach(function (s) {
+      perDay.forEach(function (s) {
         dates.forEach(function (d) {
-          entries.push({ staff_name: s, date: d, start_time: start, end_time: end, notes: notes });
+          entries.push({
+            staff_name: isOpen ? '' : s, date: d, start_time: start, end_time: end,
+            notes: notes, shift_type: bulkShiftType
+          });
         });
       });
 
@@ -1485,9 +2010,15 @@ import MainLayout from '../layouts/MainLayout.astro';
       }
       if (!confirm('Duplicate ' + thisWeekEntries.length + ' entr' + (thisWeekEntries.length !== 1 ? 'ies' : 'y') + ' to next week?')) return;
 
+      // Part-time slots come across as slots, not as whoever happened to take
+      // them last week — next week's shifts have to be claimed afresh.
       var entries = thisWeekEntries.map(function (s) {
         var nextDate = fmtDate(addDays(new Date(s.date + 'T00:00:00'), 7));
-        return { staff_name: s.staff_name, date: nextDate, start_time: s.start_time, end_time: s.end_time, notes: s.notes || '' };
+        return {
+          staff_name: isPartTime(s) ? '' : s.staff_name,
+          date: nextDate, start_time: s.start_time, end_time: s.end_time,
+          notes: s.notes || '', shift_type: s.shift_type || 'assigned'
+        };
       });
 
       Promise.all(entries.map(function (row) {
@@ -1567,10 +2098,12 @@ import MainLayout from '../layouts/MainLayout.astro';
         return (s.date || '').slice(0, 7) === prefix;
       });
 
-      // Aggregate by staff
+      // Aggregate by staff. Unclaimed part-time slots have nobody to bill them
+      // to, so they stay out of the hours table until someone takes them.
       var staffMap = {};
       entries.forEach(function (s) {
-        var name = s.staff_name || '?';
+        var name = s.staff_name;
+        if (!name) return;
         if (!staffMap[name]) staffMap[name] = { shifts: 0, totalMin: 0 };
         staffMap[name].shifts++;
         var diff = timeToMin(s.end_time) - timeToMin(s.start_time);
@@ -1580,8 +2113,9 @@ import MainLayout from '../layouts/MainLayout.astro';
 
       var staffList = Object.keys(staffMap);
       // Sort by canonical order first, then alphabetical
+      var roster = allAssignableNames();
       staffList.sort(function (a, b) {
-        var ia = STAFF_NAMES.indexOf(a), ib = STAFF_NAMES.indexOf(b);
+        var ia = roster.indexOf(a), ib = roster.indexOf(b);
         if (ia !== -1 && ib !== -1) return ia - ib;
         if (ia !== -1) return -1;
         if (ib !== -1) return 1;

@@ -30,19 +30,33 @@ CREATE INDEX IF NOT EXISTS idx_customers_full_name ON customers (full_name);
 CREATE INDEX IF NOT EXISTS idx_customers_email     ON customers (email);
 
 -- ── Staff Schedule ───────────────────────────────────────────────────────────
--- One row per shift assigned to a staff member.
+-- One row per shift. Either the admin named the person up front (shift_type
+-- 'assigned') or the admin posted an open part-time slot ('part_time') that a
+-- part-timer later claims. Claiming writes the claimer's name into staff_name,
+-- so every hours calculation in the app keys off that one column either way.
+-- See supabase/migration-part-time-shifts.sql.
 CREATE TABLE IF NOT EXISTS schedule_entries (
-  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  staff_name  TEXT        NOT NULL,
-  date        DATE        NOT NULL,
-  start_time  TEXT        NOT NULL,  -- stored as HH:MM
-  end_time    TEXT        NOT NULL,  -- stored as HH:MM
-  notes       TEXT        NOT NULL DEFAULT '',
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+  id                 UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  staff_name         TEXT        NOT NULL,  -- '' while a part-time slot is unclaimed
+  date               DATE        NOT NULL,
+  start_time         TEXT        NOT NULL,  -- stored as HH:MM
+  end_time           TEXT        NOT NULL,  -- stored as HH:MM
+  notes              TEXT        NOT NULL DEFAULT '',
+  shift_type         TEXT        NOT NULL DEFAULT 'assigned',  -- 'assigned' | 'part_time'
+  claimed_by         TEXT        NOT NULL DEFAULT '',          -- part-timer who claimed it
+  claimed_by_account TEXT        NOT NULL DEFAULT '',          -- login the claim came from
+  claimed_at         TIMESTAMPTZ,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT schedule_entries_shift_type_chk
+    CHECK (shift_type IN ('assigned', 'part_time')),
+  CONSTRAINT schedule_entries_assigned_has_name_chk
+    CHECK (shift_type <> 'assigned' OR staff_name <> '')
 );
 
 CREATE INDEX IF NOT EXISTS idx_schedule_date       ON schedule_entries (date);
 CREATE INDEX IF NOT EXISTS idx_schedule_staff_date ON schedule_entries (staff_name, date);
+CREATE INDEX IF NOT EXISTS idx_schedule_open_shifts ON schedule_entries (date)
+  WHERE shift_type = 'part_time' AND staff_name = '';
 
 -- ── Daily Check-ins ──────────────────────────────────────────────────────────
 -- One row per customer visit.
