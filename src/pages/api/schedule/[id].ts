@@ -2,24 +2,31 @@ export const prerender = false;
 
 import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
-import { authFromRequest, forbidden, ok, serverError, unauthorized } from '../../../lib/auth';
-import { canModifyRow } from '../../../lib/ownership';
+import { authFromRequest, forbidden, ok, serverError, unauthorized, requireAdmin } from '../../../lib/auth';
 import { isValidUUID, isValidDate, isValidTime, MAX_NAME } from '../../../lib/validate';
 import { toShiftType } from '../../../lib/staff';
 
-/** PATCH /api/schedule/:id — update an existing entry */
+/**
+ * Reject a non-admin without destroying their session.
+ *
+ * Editing the schedule is the admin's job; a part-timer changes their own
+ * standing on it by claiming and releasing slots (POST/DELETE :id/claim), which
+ * is guarded separately.
+ */
+async function adminOrRefusal(request: Request, action: string): Promise<Response | null> {
+  if (await requireAdmin(request)) return null;
+  return await authFromRequest(request)
+    ? forbidden(`Only an admin can ${action} shifts. Take or hand back a shift instead.`)
+    : unauthorized();
+}
+
+/** PATCH /api/schedule/:id — update an existing entry (admin only) */
 export const PATCH: APIRoute = async ({ params, request }) => {
   const { id } = params;
   if (!id || !isValidUUID(id)) return new Response(JSON.stringify({ error: 'Invalid id' }), { status: 400 });
 
-  // Admins may edit any shift; part-timers only the ones they added. Taking a
-  // shift is not editing it — that goes through POST :id/claim, which has its
-  // own rules.
-  const auth = await authFromRequest(request);
-  if (!auth) return unauthorized();
-  if (!await canModifyRow('schedule_entries', id, auth)) {
-    return forbidden('You can only edit shifts you added yourself.');
-  }
+  const refusal = await adminOrRefusal(request, 'edit');
+  if (refusal) return refusal;
 
   let body: {
     staff_name?: string; date?: string; start_time?: string; end_time?: string;
@@ -67,16 +74,13 @@ export const PATCH: APIRoute = async ({ params, request }) => {
   return ok({ entry: data });
 };
 
-/** DELETE /api/schedule/:id */
+/** DELETE /api/schedule/:id (admin only) */
 export const DELETE: APIRoute = async ({ params, request }) => {
   const { id } = params;
   if (!id || !isValidUUID(id)) return new Response(JSON.stringify({ error: 'Invalid id' }), { status: 400 });
 
-  const auth = await authFromRequest(request);
-  if (!auth) return unauthorized();
-  if (!await canModifyRow('schedule_entries', id, auth)) {
-    return forbidden('You can only delete shifts you added yourself.');
-  }
+  const refusal = await adminOrRefusal(request, 'delete');
+  if (refusal) return refusal;
 
   const { error } = await db
     .from('schedule_entries')

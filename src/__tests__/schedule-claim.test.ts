@@ -10,6 +10,8 @@ vi.mock('../lib/db', () => ({
 
 import { signToken } from '../lib/auth';
 import { POST, DELETE } from '../pages/api/schedule/[id]/claim';
+import { POST as schedulePost } from '../pages/api/schedule/index';
+import { PATCH as schedulePatch, DELETE as scheduleDelete } from '../pages/api/schedule/[id]';
 
 const SHIFT_ID = 'bbbb0000-0000-0000-0000-000000000001';
 
@@ -46,6 +48,67 @@ function stubDb(result: { data: any; error: any }) {
 beforeEach(() => {
   mockFromFn.mockReset();
   stubDb({ data: [], error: null });
+});
+
+// ── Who may author a shift ────────────────────────────────────────────────────
+// The admin owns the roster; a part-timer's only way onto it is claiming a slot
+// the admin posted. Without this, a part-timer could invent their own work.
+describe('schedule writes are admin-only', () => {
+  const shift = {
+    staff_name: 'Kim An', date: '2099-06-15', start_time: '09:00', end_time: '14:00',
+  };
+
+  function writeReq(token: string, body: unknown = shift): Request {
+    return new Request(`http://localhost/api/schedule/${SHIFT_ID}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    });
+  }
+
+  it('refuses a part-timer posting an assigned shift', async () => {
+    const res = await schedulePost({ request: writeReq(partTimerToken()) } as any);
+    expect(res.status).toBe(403);
+    expect(mockFromFn).not.toHaveBeenCalledWith('schedule_entries');
+  });
+
+  it('refuses a part-timer posting an open part-time slot', async () => {
+    const body = { ...shift, staff_name: '', shift_type: 'part_time' };
+    const res = await schedulePost({ request: writeReq(partTimerToken(), body) } as any);
+    expect(res.status).toBe(403);
+  });
+
+  it('refuses a part-timer editing a shift', async () => {
+    const res = await schedulePatch({ params: { id: SHIFT_ID }, request: writeReq(partTimerToken()) } as any);
+    expect(res.status).toBe(403);
+  });
+
+  it('refuses a part-timer deleting a shift', async () => {
+    const res = await scheduleDelete({ params: { id: SHIFT_ID }, request: writeReq(partTimerToken()) } as any);
+    expect(res.status).toBe(403);
+    expect(mockFromFn).not.toHaveBeenCalledWith('schedule_entries');
+  });
+
+  it('refuses without a session at all, and says so as 401 not 403', async () => {
+    const req = new Request('http://localhost/api/schedule', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(shift),
+    });
+    const res = await schedulePost({ request: req } as any);
+    expect(res.status).toBe(401);
+  });
+
+  it('lets an admin post an open part-time slot with no name on it', async () => {
+    const builder = makeBuilder({ data: { id: SHIFT_ID, ...shift, staff_name: '' }, error: null });
+    mockFromFn.mockImplementation(() => builder);
+
+    const body = { ...shift, staff_name: '', shift_type: 'part_time' };
+    const res = await schedulePost({ request: writeReq(adminToken(), body) } as any);
+
+    expect(res.status).toBe(200);
+    expect(builder.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ staff_name: '', shift_type: 'part_time', claimed_by: '' }),
+    );
+  });
 });
 
 // ── Claiming ──────────────────────────────────────────────────────────────────

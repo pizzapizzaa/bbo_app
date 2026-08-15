@@ -2,7 +2,7 @@ export const prerender = false;
 
 import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
-import { authFromRequest, forbidden, ok, serverError, unauthorized } from '../../../lib/auth';
+import { authFromRequest, forbidden, ok, serverError, unauthorized, requireAdmin } from '../../../lib/auth';
 import { insertOwned } from '../../../lib/ownership';
 import { fetchAllPages } from '../../../lib/paginate';
 import { isValidDate, isValidTime, MAX_NAME, MAX_TEXT } from '../../../lib/validate';
@@ -23,16 +23,25 @@ export const GET: APIRoute = async ({ request }) => {
 };
 
 /**
- * POST /api/schedule — add a new entry.
+ * POST /api/schedule — add a new entry (admin only).
  *
- * Part-timers may add ordinary shifts, which are stamped with their username so
- * they can edit their own afterwards. Posting an *open* part-time slot is an
- * admin act, though — it is the gym deciding a shift needs covering, not a
- * part-timer manufacturing work to claim.
+ * The admin owns the roster: they either name someone for a shift or post an
+ * open part-time slot. A part-timer's only way onto the schedule is claiming
+ * one of those slots, via POST :id/claim — they never author a shift, so there
+ * is no way to invent work for themselves.
+ *
+ * The row is still stamped with created_by, which keeps the audit trail
+ * consistent with checkins even though it grants no edit rights here.
  */
 export const POST: APIRoute = async ({ request }) => {
-  const auth = await authFromRequest(request);
-  if (!auth) return unauthorized();
+  const auth = await requireAdmin(request);
+  if (!auth) {
+    // 403, not 401: a part-timer's session is valid, it just isn't allowed to
+    // post shifts. A 401 would tear down their login instead of telling them so.
+    return await authFromRequest(request)
+      ? forbidden('Only an admin can add shifts to the schedule.')
+      : unauthorized();
+  }
 
   let body: {
     staff_name?: string; date: string; start_time: string; end_time: string;
@@ -45,9 +54,6 @@ export const POST: APIRoute = async ({ request }) => {
   const shift_type = toShiftType(body.shift_type);
   const staff_name = String(body.staff_name ?? '').trim();
 
-  if (shift_type === 'part_time' && auth.role !== 'admin') {
-    return forbidden('Only an admin can post part-time shifts.');
-  }
   if (!date || !start_time || !end_time) {
     return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400 });
   }
