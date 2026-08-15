@@ -801,16 +801,10 @@ import MainLayout from '../layouts/MainLayout.astro';
     var isAdmin = false;
 
     function readSessionRole() {
-      var token = localStorage.getItem('bbo_token') || '';
-      var dot   = token.lastIndexOf('.');
-      if (dot < 0) return 'staff';
-      try {
-        var b64 = token.slice(0, dot).replace(/-/g, '+').replace(/_/g, '/');
-        while (b64.length % 4) b64 += '=';
-        return JSON.parse(atob(b64)).r === 'admin' ? 'admin' : 'staff';
-      } catch (_) {
-        return 'staff'; // unreadable token → fall back to the read-only role
-      }
+      // MainLayout owns the role: it is stored at login and treats a session
+      // predating roles as the owner's own admin session. Don't re-derive it
+      // from the token here — two sources of truth would eventually disagree.
+      return window.bboRole && window.bboRole() === 'staff' ? 'staff' : 'admin';
     }
 
     /** Hide the controls the current role has no permission to use. */

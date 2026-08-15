@@ -2,16 +2,24 @@ export const prerender = false;
 
 import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
-import { ok, serverError, unauthorized, requireAdmin } from '../../../lib/auth';
+import { authFromRequest, forbidden, ok, serverError, unauthorized } from '../../../lib/auth';
+import { canModifyRow } from '../../../lib/ownership';
 import { isValidUUID, isValidDate, isValidTime, MAX_NAME } from '../../../lib/validate';
 import { toShiftType } from '../../../lib/staff';
 
-/** PATCH /api/schedule/:id — update an existing entry (admin only) */
+/** PATCH /api/schedule/:id — update an existing entry */
 export const PATCH: APIRoute = async ({ params, request }) => {
-  if (!await requireAdmin(request)) return unauthorized();
-
   const { id } = params;
   if (!id || !isValidUUID(id)) return new Response(JSON.stringify({ error: 'Invalid id' }), { status: 400 });
+
+  // Admins may edit any shift; part-timers only the ones they added. Taking a
+  // shift is not editing it — that goes through POST :id/claim, which has its
+  // own rules.
+  const auth = await authFromRequest(request);
+  if (!auth) return unauthorized();
+  if (!await canModifyRow('schedule_entries', id, auth)) {
+    return forbidden('You can only edit shifts you added yourself.');
+  }
 
   let body: {
     staff_name?: string; date?: string; start_time?: string; end_time?: string;
@@ -41,9 +49,9 @@ export const PATCH: APIRoute = async ({ params, request }) => {
     return new Response(JSON.stringify({ error: 'Invalid time format (expected HH:MM)' }), { status: 400 });
   }
 
-  // Keep the claim columns in step with the name the admin just set. Clearing the
-  // name on a part-time slot returns it to the open pool, so the stale claim
-  // trail has to go with it; typing a name in counts as the admin filling it.
+  // Keep the claim columns in step with the name just set. Clearing the name on
+  // a part-time slot returns it to the open pool, so the stale claim trail has
+  // to go with it; typing a name in counts as the admin filling it.
   const claimPatch = shift_type === 'part_time' && !staff_name
     ? { claimed_by: '', claimed_by_account: '', claimed_at: null }
     : { claimed_by: shift_type === 'part_time' ? staff_name : '' };
@@ -59,12 +67,16 @@ export const PATCH: APIRoute = async ({ params, request }) => {
   return ok({ entry: data });
 };
 
-/** DELETE /api/schedule/:id (admin only) */
+/** DELETE /api/schedule/:id */
 export const DELETE: APIRoute = async ({ params, request }) => {
-  if (!await requireAdmin(request)) return unauthorized();
-
   const { id } = params;
   if (!id || !isValidUUID(id)) return new Response(JSON.stringify({ error: 'Invalid id' }), { status: 400 });
+
+  const auth = await authFromRequest(request);
+  if (!auth) return unauthorized();
+  if (!await canModifyRow('schedule_entries', id, auth)) {
+    return forbidden('You can only delete shifts you added yourself.');
+  }
 
   const { error } = await db
     .from('schedule_entries')

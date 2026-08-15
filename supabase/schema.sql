@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS schedule_entries (
   claimed_by_account TEXT        NOT NULL DEFAULT '',          -- login the claim came from
   claimed_at         TIMESTAMPTZ,
   created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_by         TEXT,                              -- username that added it; NULL = admin-only to modify
   CONSTRAINT schedule_entries_shift_type_chk
     CHECK (shift_type IN ('assigned', 'part_time')),
   CONSTRAINT schedule_entries_assigned_has_name_chk
@@ -76,7 +77,8 @@ CREATE TABLE IF NOT EXISTS checkins (
   referral_code          TEXT        NOT NULL DEFAULT '',   -- code redeemed on this visit (uppercase)
   referred_by_id         UUID        REFERENCES customers(id) ON DELETE SET NULL,
   referred_by_name       TEXT        NOT NULL DEFAULT '',
-  referral_discount_pct  INTEGER     NOT NULL DEFAULT 0     -- % applied at redemption time
+  referral_discount_pct  INTEGER     NOT NULL DEFAULT 0,    -- % applied at redemption time
+  created_by             TEXT                               -- username that logged it; NULL = admin-only to modify
 );
 
 CREATE INDEX IF NOT EXISTS idx_checkins_date ON checkins (date);

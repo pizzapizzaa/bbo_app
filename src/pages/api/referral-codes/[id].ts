@@ -2,7 +2,7 @@ export const prerender = false;
 
 import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
-import { ok, serverError } from '../../../lib/auth';
+import { adminOnly, ok, serverError } from '../../../lib/auth';
 import {
   isValidUUID, escapeLike,
   normalizeReferralCode, isValidReferralCode, isValidReferralPct, isValidRentalPct,
@@ -11,6 +11,9 @@ import {
 
 /** PATCH /api/referral-codes/:id — edit code, discount, label or active flag. */
 export const PATCH: APIRoute = async ({ params, request }) => {
+  const denied = await adminOnly(request);
+  if (denied) return denied;
+
   try {
     const { id } = params;
     if (!id || !isValidUUID(id)) return new Response(JSON.stringify({ error: 'Invalid id' }), { status: 400 });
@@ -102,7 +105,10 @@ export const PATCH: APIRoute = async ({ params, request }) => {
 
 /** DELETE /api/referral-codes/:id — remove a code permanently.
  *  Past check-ins keep their recorded code, owner and percentage. */
-export const DELETE: APIRoute = async ({ params }) => {
+export const DELETE: APIRoute = async ({ params, request }) => {
+  const denied = await adminOnly(request);
+  if (denied) return denied;
+
   try {
     const { id } = params;
     if (!id || !isValidUUID(id)) return new Response(JSON.stringify({ error: 'Invalid id' }), { status: 400 });

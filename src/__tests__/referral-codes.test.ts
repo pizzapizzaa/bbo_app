@@ -11,16 +11,25 @@ vi.mock('../lib/db', () => ({
 import { POST } from '../pages/api/referral-codes/index';
 import { PATCH, DELETE } from '../pages/api/referral-codes/[id]';
 import { GET as REFERRAL_GET } from '../pages/api/referral';
+import { signToken } from '../lib/auth';
 
 const OWNER_ID = 'cccc0000-0000-0000-0000-000000000003';
 const CODE_ID  = 'dddd0000-0000-0000-0000-000000000004';
 
+/** Promo codes are admin-only, so every request here carries an admin token. */
+const ADMIN_AUTH = { Authorization: `Bearer ${signToken('test-admin', 'admin')}` };
+
 function makeReq(body: unknown): Request {
   return new Request('http://localhost/api/referral-codes', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...ADMIN_AUTH },
     body: JSON.stringify(body),
   });
+}
+
+/** A bodyless authenticated request, for DELETE. */
+function makeAuthedReq(): Request {
+  return new Request('http://localhost/api/referral-codes', { headers: ADMIN_AUTH });
 }
 
 /** Wires each table to its own canned result and captures the insert payload. */
@@ -216,7 +225,7 @@ describe('PATCH /api/referral-codes/:id', () => {
 
   it('deletes a code by id', async () => {
     mockTables({});
-    const res = await DELETE({ params: { id: CODE_ID } } as any);
+    const res = await DELETE({ params: { id: CODE_ID }, request: makeAuthedReq() } as any);
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ success: true });
   });

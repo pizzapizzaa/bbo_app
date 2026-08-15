@@ -1,9 +1,10 @@
 export const prerender = false;
 
 import type { APIRoute } from 'astro';
-import { createHash, timingSafeEqual, scrypt, randomBytes as _randomBytes } from 'crypto';
+import { scrypt, randomBytes as _randomBytes } from 'crypto';
 import { promisify } from 'util';
 import { signToken, ok } from '../../../lib/auth';
+import { isEnvAccountName, matchEnvAccount } from '../../../lib/env-accounts';
 import { db } from '../../../lib/db';
 
 const scryptAsync = promisify(scrypt);
@@ -60,8 +61,8 @@ export const POST: APIRoute = async ({ request }) => {
   const { username = '', password = '' } = body;
 
   // ── 1. DB staff users (primary path) ────────────────────────────────────────
-  // If the staff_users table has any active accounts, only those accounts can log in.
-  // The env-var bootstrap is only used when the table is empty (initial deployment).
+  // If the staff_users table has any active accounts, only those accounts — plus
+  // the env-configured accounts (step 2) — can log in.
   try {
     const { data: users, error: queryErr } = await db
       .from('staff_users')
@@ -77,43 +78,37 @@ export const POST: APIRoute = async ({ request }) => {
         if (!await verifyScryptPassword(user.password_hash, password)) {
           return invalidCreds();
         }
+        const role = user.role as 'admin' | 'staff';
         loginAttempts.delete(ip);
-        return ok({ token: signToken(user.username, user.role as 'admin' | 'staff') });
+        return ok({ token: signToken(user.username, role), role });
       }
 
-      // Username not in DB — check whether the table has ANY active users.
-      // If it does, the unknown username is simply invalid; don't fall through.
-      const { count } = await db
-        .from('staff_users')
-        .select('id', { count: 'exact', head: true })
-        .eq('is_active', true);
-      if (count && count > 0) {
-        return invalidCreds();
+      // Username not in DB. Unless it names an env-configured account, the
+      // login is simply invalid whenever the table holds active users.
+      if (!isEnvAccountName(username.trim())) {
+        const { count } = await db
+          .from('staff_users')
+          .select('id', { count: 'exact', head: true })
+          .eq('is_active', true);
+        if (count && count > 0) {
+          return invalidCreds();
+        }
       }
-      // Table is empty → fall through to env-var bootstrap below
+      // Env account name, or empty table → fall through to step 2
     }
-    // queryErr (e.g. table doesn't exist yet) → fall through to env-var bootstrap
+    // queryErr (e.g. table doesn't exist yet) → fall through to step 2
   } catch {
-    // DB unavailable → fall through to env-var bootstrap
+    // DB unavailable → fall through to step 2
   }
 
-  // ── 2. Env-var bootstrap (fallback when staff_users table is empty) ──────────
-  const expectedUser = import.meta.env.ADMIN_USERNAME ?? '';
-  const expectedPass = import.meta.env.ADMIN_PASSWORD ?? '';
-
-  const usernameOk = timingSafeEqual(
-    createHash('sha256').update(username).digest(),
-    createHash('sha256').update(expectedUser).digest(),
-  );
-  const passwordOk = timingSafeEqual(
-    createHash('sha256').update(password).digest(),
-    createHash('sha256').update(expectedPass).digest(),
-  );
-
-  if (!usernameOk || !passwordOk) {
+  // ── 2. Env-var accounts (admin bootstrap + shared part-timer) ───────────────
+  // Checked regardless of whether staff_users holds rows, so adding staff to
+  // that table can never lock the owner out of their own admin credentials.
+  const account = matchEnvAccount(username.trim(), password);
+  if (!account) {
     return invalidCreds();
   }
 
   loginAttempts.delete(ip);
-  return ok({ token: signToken(username, 'admin') });
+  return ok({ token: signToken(account.username, account.role), role: account.role });
 };

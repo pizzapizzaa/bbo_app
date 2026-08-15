@@ -1,7 +1,7 @@
 export const prerender = false;
 
 import type { APIRoute } from 'astro';
-import { authFromRequest, signToken, ok } from '../../../lib/auth';
+import { authFromRequest, signToken, ok, forbidden } from '../../../lib/auth';
 
 /**
  * POST /api/auth/refresh
@@ -15,6 +15,13 @@ export const POST: APIRoute = async ({ request }) => {
       status: 401,
       headers: { 'Content-Type': 'application/json' },
     });
+  }
+
+  // An elevation is a 30-minute loan of admin rights, granted by an admin
+  // typing their password on someone else's session. Refreshing it would turn
+  // that loan into a full 8-hour admin session, so it has to be re-earned.
+  if (auth.elevated) {
+    return forbidden('Elevated access cannot be extended — re-enter the admin password.');
   }
 
   const token = signToken(auth.username, auth.role);

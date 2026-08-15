@@ -1,0 +1,182 @@
+---
+// Admin-password prompt — standalone, deliberately NOT wrapped in MainLayout
+// (that layout redirects part-timers here, which would loop).
+//
+// Reached when a part-timer opens Customers, Promo Codes or Expenses. Trades
+// the admin password for a short-lived admin token via POST /api/auth/elevate,
+// then bounces back to the page that was asked for.
+---
+
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Access — BBO Gym POS</title>
+  <link rel="icon" href="/assets/favicon.ico" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <script is:inline>
+    // Only the three gated pages are valid destinations — an allowlist rather
+    // than trusting ?next=, so this page can never be used as an open redirect.
+    var ALLOWED_NEXT = ['/customers', '/promo-codes', '/expenses'];
+
+    function unlockTarget() {
+      var next = new URLSearchParams(location.search).get('next') || '';
+      return ALLOWED_NEXT.indexOf(next) !== -1 ? next : '/dashboard';
+    }
+
+    (function () {
+      // Not signed in at all → the login page, not this one.
+      if (!localStorage.getItem('bbo_auth') || !localStorage.getItem('bbo_token')) {
+        window.location.replace('/');
+        return;
+      }
+      // Admins never need to unlock anything.
+      if ((localStorage.getItem('bbo_role') || 'admin') !== 'staff') {
+        window.location.replace(unlockTarget());
+        return;
+      }
+      // Already unlocked and still valid → straight through.
+      var token = sessionStorage.getItem('bbo_elev_token');
+      var until = parseInt(sessionStorage.getItem('bbo_elev_until') || '0', 10);
+      if (token && until && Date.now() < until) {
+        window.location.replace(unlockTarget());
+      }
+    })();
+  </script>
+</head>
+
+<body class="h-full bg-gray-900 font-sans flex items-center justify-center p-4"
+      style="font-family:'Inter',system-ui,sans-serif">
+
+  <div class="absolute inset-0 overflow-hidden pointer-events-none">
+    <div class="absolute -top-40 -right-32 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl"></div>
+    <div class="absolute -bottom-40 -left-32 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl"></div>
+  </div>
+
+  <div class="relative w-full max-w-md bg-gray-800 rounded-2xl shadow-2xl shadow-black/40 p-8 border border-gray-700/60">
+
+    <div class="flex flex-col items-center mb-7">
+      <div class="w-14 h-14 rounded-full bg-orange-500/15 border border-orange-500/30
+                  flex items-center justify-center mb-4">
+        <svg class="w-7 h-7 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+        </svg>
+      </div>
+      <h1 class="text-white text-lg font-semibold">Admin Access Required</h1>
+      <p class="text-gray-400 text-sm mt-1.5 text-center">
+        <span id="page-label" class="text-gray-300 font-medium">This page</span>
+        is admin-only. Ask an admin to enter their password.
+      </p>
+    </div>
+
+    <div id="unlock-error"
+         class="hidden mb-4 px-4 py-3 bg-red-500/10 border border-red-500/30 rounded-lg
+                text-red-400 text-sm text-center"></div>
+
+    <form id="unlock-form" class="space-y-5">
+      <div>
+        <label for="admin-password" class="block text-sm font-medium text-gray-300 mb-1.5">
+          Admin Password
+        </label>
+        <input
+          id="admin-password"
+          name="admin-password"
+          type="password"
+          required
+          autocomplete="off"
+          placeholder="••••••••"
+          class="w-full bg-gray-700/60 border border-gray-600 rounded-xl px-4 py-2.5
+                 text-white placeholder-gray-500 text-sm
+                 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent
+                 transition"
+        />
+      </div>
+
+      <button
+        type="submit"
+        id="unlock-btn"
+        class="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold
+               py-2.5 rounded-xl text-sm transition active:scale-[0.98]"
+      >
+        Unlock
+      </button>
+
+      <button
+        type="button"
+        onclick="window.location.replace('/dashboard')"
+        class="w-full bg-transparent hover:bg-gray-700/50 text-gray-400 hover:text-gray-200
+               font-medium py-2 rounded-xl text-sm transition"
+      >
+        Back to Dashboard
+      </button>
+    </form>
+
+    <p class="mt-6 text-center text-xs text-gray-500">
+      Access stays unlocked for 30 minutes on this device.
+    </p>
+  </div>
+
+  <script is:inline>
+    var PAGE_LABELS = {
+      '/customers':   'Customers',
+      '/promo-codes': 'Promo Codes',
+      '/expenses':    'Expenses',
+    };
+
+    (function () {
+      var label = PAGE_LABELS[unlockTarget()];
+      if (label) document.getElementById('page-label').textContent = label;
+      document.getElementById('admin-password').focus();
+    })();
+
+    document.getElementById('unlock-form').addEventListener('submit', async function (e) {
+      e.preventDefault();
+
+      var pwdEl = document.getElementById('admin-password');
+      var errEl = document.getElementById('unlock-error');
+      var btn   = document.getElementById('unlock-btn');
+
+      btn.disabled = true;
+      btn.textContent = 'Checking…';
+      errEl.classList.add('hidden');
+
+      var res, data;
+      try {
+        res = await fetch('/api/auth/elevate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + (localStorage.getItem('bbo_token') || ''),
+          },
+          body: JSON.stringify({ password: pwdEl.value }),
+        });
+        data = await res.json();
+      } catch (err) {
+        errEl.textContent = 'Network error. Please check your connection.';
+        errEl.classList.remove('hidden');
+        btn.disabled = false;
+        btn.textContent = 'Unlock';
+        return;
+      }
+
+      if (res.ok && data.token) {
+        sessionStorage.setItem('bbo_elev_token', data.token);
+        sessionStorage.setItem('bbo_elev_until', String(data.expires_at));
+        window.location.replace(unlockTarget());
+        return;
+      }
+
+      pwdEl.value = '';
+      pwdEl.focus();
+      errEl.textContent = data && data.error ? data.error : 'Incorrect admin password.';
+      errEl.classList.remove('hidden');
+      btn.disabled = false;
+      btn.textContent = 'Unlock';
+    });
+  </script>
+</body>
+</html>

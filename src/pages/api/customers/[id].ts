@@ -2,11 +2,14 @@ export const prerender = false;
 
 import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
-import { ok, serverError } from '../../../lib/auth';
+import { adminOnly, ok, serverError } from '../../../lib/auth';
 import { isValidUUID } from '../../../lib/validate';
 
 /** PATCH /api/customers/:id — update punch card and/or membership info */
 export const PATCH: APIRoute = async ({ params, request }) => {
+  const denied = await adminOnly(request);
+  if (denied) return denied;
+
   try {
     const { id } = params;
     if (!id || !isValidUUID(id)) return new Response(JSON.stringify({ error: 'Invalid id' }), { status: 400 });
@@ -92,7 +95,10 @@ export const PATCH: APIRoute = async ({ params, request }) => {
 };
 
 /** DELETE /api/customers/:id */
-export const DELETE: APIRoute = async ({ params }) => {
+export const DELETE: APIRoute = async ({ params, request }) => {
+  const denied = await adminOnly(request);
+  if (denied) return denied;
+
   try {
     const { id } = params;
     if (!id || !isValidUUID(id)) return new Response(JSON.stringify({ error: 'Invalid id' }), { status: 400 });

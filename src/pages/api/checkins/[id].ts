@@ -2,13 +2,21 @@ export const prerender = false;
 
 import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
-import { ok, serverError } from '../../../lib/auth';
+import { authFromRequest, forbidden, ok, serverError, unauthorized } from '../../../lib/auth';
+import { canModifyRow } from '../../../lib/ownership';
 import { isValidUUID } from '../../../lib/validate';
 
 /** DELETE /api/checkins/:id */
-export const DELETE: APIRoute = async ({ params }) => {
+export const DELETE: APIRoute = async ({ params, request }) => {
   const { id } = params;
   if (!id || !isValidUUID(id)) return new Response(JSON.stringify({ error: 'Invalid id' }), { status: 400 });
+
+  // Admins may delete any check-in; part-timers only the ones they logged.
+  const auth = await authFromRequest(request);
+  if (!auth) return unauthorized();
+  if (!await canModifyRow('checkins', id, auth)) {
+    return forbidden('You can only delete check-ins you logged yourself.');
+  }
 
   // Fetch the check-in first so we can revert any punch deduction
   const { data: checkin, error: fetchError } = await db

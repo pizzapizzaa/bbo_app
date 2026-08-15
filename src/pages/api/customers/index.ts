@@ -2,7 +2,7 @@ export const prerender = false;
 
 import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
-import { ok, serverError } from '../../../lib/auth';
+import { adminOnly, ok, serverError } from '../../../lib/auth';
 import { fetchAllPages } from '../../../lib/paginate';
 
 // Column map: CSV header → DB column name
@@ -91,6 +91,9 @@ export const GET: APIRoute = async () => {
 
 /** POST /api/customers — merge CSV into existing records (additive, no deletes) */
 export const POST: APIRoute = async ({ request }) => {
+  const denied = await adminOnly(request);
+  if (denied) return denied;
+
   try {
   let body: { rows: Record<string, string>[] };
   try { body = await request.json(); }
@@ -149,6 +152,9 @@ export const POST: APIRoute = async ({ request }) => {
 /** DELETE /api/customers — wipe all customer records.
  *  Requires body: { "confirm": "DELETE ALL CUSTOMERS" } to prevent accidental wipes. */
 export const DELETE: APIRoute = async ({ request }) => {
+  const denied = await adminOnly(request);
+  if (denied) return denied;
+
   try {
   let body: { confirm?: string } = {};
   try { body = await request.json(); } catch { /* body is optional */ }
@@ -169,6 +175,9 @@ export const DELETE: APIRoute = async ({ request }) => {
 
 /** PUT /api/customers — insert a single new customer */
 export const PUT: APIRoute = async ({ request }) => {
+  const denied = await adminOnly(request);
+  if (denied) return denied;
+
   try {
   let body: { row: Record<string, string> };
   try { body = await request.json(); }
