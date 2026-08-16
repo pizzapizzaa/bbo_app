@@ -211,6 +211,22 @@ describe('envValue', () => {
     delete process.env.BBO_TEST_CRED;
     expect(envValue(undefined, 'BBO_TEST_CRED')).toBe('');
   });
+
+  it('falls back when the build value is an empty string, not just undefined', () => {
+    // ?? would stop here and hand back "", defeating the runtime lookup.
+    process.env.BBO_TEST_CRED = 'from-runtime';
+    expect(envValue('', 'BBO_TEST_CRED')).toBe('from-runtime');
+    delete process.env.BBO_TEST_CRED;
+  });
+
+  it('trims a pasted trailing newline or space', () => {
+    // The credential compare is exact, so an invisible character is
+    // indistinguishable from a wrong password.
+    expect(envValue('  parttimer\n', 'BBO_TEST_CRED')).toBe('parttimer');
+    process.env.BBO_TEST_CRED = 'secret \n';
+    expect(envValue(undefined, 'BBO_TEST_CRED')).toBe('secret');
+    delete process.env.BBO_TEST_CRED;
+  });
 });
 
 // ── adminOnly guard ───────────────────────────────────────────────────────────

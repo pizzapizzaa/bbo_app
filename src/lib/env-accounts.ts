@@ -47,7 +47,13 @@ export function secretEquals(a: string, b: string): boolean {
  * Same pattern as getSigningSecret() in leaderboard-sig.ts.
  */
 export function envValue(buildTime: string | undefined, name: string): string {
-  return buildTime ?? process.env[name] ?? '';
+  // Truthiness, not ??. A variable that exists but is empty at build time
+  // compiles to "", which ?? treats as a real value and would stop the runtime
+  // lookup dead — the same silent failure this fallback exists to prevent.
+  const raw = buildTime || process.env[name] || '';
+  // Dashboard paste routinely carries a trailing newline or space. The compare
+  // is exact, so an invisible character rejects an otherwise correct password.
+  return raw.trim();
 }
 
 /** The env-var admin, or null when ADMIN_USERNAME/ADMIN_PASSWORD are unset. */
