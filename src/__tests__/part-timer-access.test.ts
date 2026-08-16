@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { makeBuilder } from './_utils';
+import { scrypt } from 'crypto';
+import { promisify } from 'util';
 
 // ── Mock src/lib/db before importing anything that depends on it ───────────────
 const mockFromFn = vi.hoisted(() => vi.fn());
@@ -9,7 +11,7 @@ vi.mock('../lib/db', () => ({
 }));
 
 import { signToken, adminOnly, forbidden, ELEVATED_TTL_MS } from '../lib/auth';
-import { matchEnvAccount, isEnvAccountName, secretEquals } from '../lib/env-accounts';
+import { matchEnvAccount, isEnvAccountName, secretEquals, envValue } from '../lib/env-accounts';
 import { insertOwned, canModifyRow } from '../lib/ownership';
 import { verifyToken } from '../lib/auth';
 import { POST as loginPost } from '../pages/api/auth/token';
@@ -140,6 +142,74 @@ describe('POST /api/auth/token', () => {
       ),
     );
     expect(res.status).toBe(401);
+  });
+
+  it('logs in a staff_users row against its stored scrypt hash', async () => {
+    // Regression guard: verifyScryptPassword calls timingSafeEqual, and the
+    // function swallows its own errors. A missing import therefore surfaced as
+    // "Invalid credentials" for every DB account rather than as a crash.
+    const salt = 'a1b2c3d4';
+    const hash = (await promisify(scrypt)('db-user-password', salt, 64) as Buffer).toString('hex');
+
+    mockFromFn.mockImplementation(() => makeBuilder({
+      data: [{
+        id: 'u1', username: 'huyen', password_hash: `${salt}:${hash}`,
+        role: 'admin', is_active: true,
+      }],
+      error: null,
+    }));
+
+    const res = await call(
+      loginPost,
+      jsonRequest('http://localhost/api/auth/token',
+        { username: 'huyen', password: 'db-user-password' }, '10.0.0.7'),
+    );
+    expect(res.status).toBe(200);
+    expect((await res.json()).role).toBe('admin');
+  });
+
+  it('rejects a staff_users row when the password is wrong', async () => {
+    const salt = 'a1b2c3d4';
+    const hash = (await promisify(scrypt)('db-user-password', salt, 64) as Buffer).toString('hex');
+
+    mockFromFn.mockImplementation(() => makeBuilder({
+      data: [{
+        id: 'u1', username: 'huyen', password_hash: `${salt}:${hash}`,
+        role: 'admin', is_active: true,
+      }],
+      error: null,
+    }));
+
+    const res = await call(
+      loginPost,
+      jsonRequest('http://localhost/api/auth/token',
+        { username: 'huyen', password: 'not-it' }, '10.0.0.8'),
+    );
+    expect(res.status).toBe(401);
+  });
+});
+
+// ── Env vars added after the build ────────────────────────────────────────────
+// Vite inlines import.meta.env at build time, so a variable set in the hosting
+// dashboard after the last deploy is `undefined` in the bundle — which folded
+// the whole account away and rejected every login. The process.env fallback is
+// what makes setting a credential take effect without a rebuild.
+describe('envValue', () => {
+  it('prefers the value baked in at build time', () => {
+    process.env.BBO_TEST_CRED = 'from-runtime';
+    expect(envValue('from-build', 'BBO_TEST_CRED')).toBe('from-build');
+    delete process.env.BBO_TEST_CRED;
+  });
+
+  it('falls back to process.env when the build had no value', () => {
+    process.env.BBO_TEST_CRED = 'from-runtime';
+    expect(envValue(undefined, 'BBO_TEST_CRED')).toBe('from-runtime');
+    delete process.env.BBO_TEST_CRED;
+  });
+
+  it('is empty when the variable is set in neither place', () => {
+    delete process.env.BBO_TEST_CRED;
+    expect(envValue(undefined, 'BBO_TEST_CRED')).toBe('');
   });
 });
 

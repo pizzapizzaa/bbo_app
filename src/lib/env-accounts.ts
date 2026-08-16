@@ -31,17 +31,36 @@ export function secretEquals(a: string, b: string): boolean {
   );
 }
 
+/**
+ * Read a credential from the environment.
+ *
+ * The `process.env` half is not redundant. Vite replaces `import.meta.env.X`
+ * with a literal at BUILD time, so a variable that was unset when the bundle
+ * was built compiles to `undefined` — and the optimiser then folds the whole
+ * account away to `return null`. The account does not merely have blank
+ * credentials, it ceases to exist, and every login attempt is rejected however
+ * correctly it is typed.
+ *
+ * That is exactly what happens when an env var is added in the hosting
+ * dashboard after the last deploy. Falling back to `process.env` reads the
+ * value at request time instead, so setting it takes effect without a rebuild.
+ * Same pattern as getSigningSecret() in leaderboard-sig.ts.
+ */
+export function envValue(buildTime: string | undefined, name: string): string {
+  return buildTime ?? process.env[name] ?? '';
+}
+
 /** The env-var admin, or null when ADMIN_USERNAME/ADMIN_PASSWORD are unset. */
 export function envAdmin(): EnvAccount | null {
-  const username = import.meta.env.ADMIN_USERNAME ?? '';
-  const password = import.meta.env.ADMIN_PASSWORD ?? '';
+  const username = envValue(import.meta.env.ADMIN_USERNAME, 'ADMIN_USERNAME');
+  const password = envValue(import.meta.env.ADMIN_PASSWORD, 'ADMIN_PASSWORD');
   return username && password ? { username, password, role: 'admin' } : null;
 }
 
 /** The shared part-timer account, or null when its env vars are unset. */
 export function envPartTimer(): EnvAccount | null {
-  const username = import.meta.env.PARTTIMER_USERNAME ?? '';
-  const password = import.meta.env.PARTTIMER_PASSWORD ?? '';
+  const username = envValue(import.meta.env.PARTTIMER_USERNAME, 'PARTTIMER_USERNAME');
+  const password = envValue(import.meta.env.PARTTIMER_PASSWORD, 'PARTTIMER_PASSWORD');
   return username && password ? { username, password, role: 'staff' } : null;
 }
 

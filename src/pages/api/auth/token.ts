@@ -1,7 +1,7 @@
 export const prerender = false;
 
 import type { APIRoute } from 'astro';
-import { scrypt, randomBytes as _randomBytes } from 'crypto';
+import { scrypt, timingSafeEqual, randomBytes as _randomBytes } from 'crypto';
 import { promisify } from 'util';
 import { signToken, ok } from '../../../lib/auth';
 import { isEnvAccountName, matchEnvAccount } from '../../../lib/env-accounts';
