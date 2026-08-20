@@ -21,7 +21,7 @@ const GATED_PAGES = ['customers', 'promo-codes', 'expenses'];
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{title} — BBO Gym POS</title>
-  <link rel="icon" href="/assets/favicon.ico" />
+  <link rel="icon" type="image/png" href="/assets/Favicon.png" />
 
   <!-- Inter font -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -185,7 +185,7 @@ const GATED_PAGES = ['customers', 'promo-codes', 'expenses'];
         localStorage.removeItem('bbo_token');
         localStorage.removeItem('bbo_admin');
         localStorage.removeItem('bbo_role');
-        window.location.replace('/');
+        window.location.replace('/pos');
         return;
       }
 
@@ -196,7 +196,7 @@ const GATED_PAGES = ['customers', 'promo-codes', 'expenses'];
       if (role === 'staff' && window.__BBO_ADMIN_PAGE__ === true && !window.bboElevatedToken()) {
         // Redirect from <head>, before the page's own scripts run, so a
         // part-timer never briefly loads customer or financial data.
-        window.location.replace('/unlock?next=' + encodeURIComponent(location.pathname));
+        window.location.replace('/pos/unlock?next=' + encodeURIComponent(location.pathname));
         return;
       }
 
@@ -225,7 +225,7 @@ const GATED_PAGES = ['customers', 'promo-codes', 'expenses'];
           localStorage.removeItem('bbo_auth');
           localStorage.removeItem('bbo_token');
           localStorage.removeItem('bbo_admin');
-          window.location.replace('/');
+          window.location.replace('/pos');
           return;
         }
         // Within 7 days of expiry — refresh silently
@@ -268,7 +268,7 @@ const GATED_PAGES = ['customers', 'promo-codes', 'expenses'];
     <!-- Nav -->
     <nav class="flex-1 px-3 py-5 space-y-0.5 overflow-y-auto">
 
-      <a href="/dashboard"
+      <a href="/pos/dashboard"
          class={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
            ${activePage === 'dashboard'
              ? 'bg-orange-500 text-white'
@@ -280,7 +280,7 @@ const GATED_PAGES = ['customers', 'promo-codes', 'expenses'];
         Dashboard
       </a>
 
-      <a href="/checkin"
+      <a href="/pos/checkin"
          class={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
            ${activePage === 'checkin'
              ? 'bg-orange-500 text-white'
@@ -292,7 +292,7 @@ const GATED_PAGES = ['customers', 'promo-codes', 'expenses'];
         Daily Check-in
       </a>
 
-      <a href="/customers"
+      <a href="/pos/customers"
          class={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
            ${activePage === 'customers'
              ? 'bg-orange-500 text-white'
@@ -308,7 +308,7 @@ const GATED_PAGES = ['customers', 'promo-codes', 'expenses'];
         </svg>
       </a>
 
-      <a href="/promo-codes"
+      <a href="/pos/promo-codes"
          class={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
            ${activePage === 'promo-codes'
              ? 'bg-orange-500 text-white'
@@ -324,7 +324,7 @@ const GATED_PAGES = ['customers', 'promo-codes', 'expenses'];
         </svg>
       </a>
 
-      <a href="/schedule"
+      <a href="/pos/schedule"
          class={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
            ${activePage === 'schedule'
              ? 'bg-orange-500 text-white'
@@ -350,7 +350,7 @@ const GATED_PAGES = ['customers', 'promo-codes', 'expenses'];
         </svg>
       </a>
 
-      <a href="/expenses"
+      <a href="/pos/expenses"
          class={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
            ${activePage === 'expenses'
              ? 'bg-orange-500 text-white'
@@ -471,7 +471,7 @@ const GATED_PAGES = ['customers', 'promo-codes', 'expenses'];
         localStorage.removeItem('bbo_role');
         sessionStorage.removeItem('bbo_elev_token');
         sessionStorage.removeItem('bbo_elev_until');
-        window.location.replace('/');
+        window.location.replace('/pos');
       }
     }
 
@@ -493,7 +493,7 @@ const GATED_PAGES = ['customers', 'promo-codes', 'expenses'];
             localStorage.removeItem('bbo_token');
             localStorage.removeItem('bbo_admin');
             localStorage.removeItem('bbo_role');
-            setTimeout(function () { window.location.replace('/'); }, 1500);
+            setTimeout(function () { window.location.replace('/pos'); }, 1500);
             return Promise.reject(new Error('Session expired. Redirecting to login…'));
           }
           // 403 means the session is fine but lacks admin rights — usually an
@@ -502,7 +502,7 @@ const GATED_PAGES = ['customers', 'promo-codes', 'expenses'];
             sessionStorage.removeItem('bbo_elev_token');
             sessionStorage.removeItem('bbo_elev_until');
             if (window.__BBO_ADMIN_PAGE__ === true) {
-              window.location.replace('/unlock?next=' + encodeURIComponent(location.pathname));
+              window.location.replace('/pos/unlock?next=' + encodeURIComponent(location.pathname));
               return Promise.reject(new Error('Admin access required.'));
             }
           }

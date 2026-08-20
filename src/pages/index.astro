@@ -1,237 +1,1078 @@
 ---
-// Login page — standalone, no shared layout
-// Authentication is handled server-side via POST /api/auth/token
+import Layout from '../layouts/Layout-landing-page.astro';
+
+// Contact details shown in the Contact section.
+const CONTACT_EMAIL = 'contact@bbo.fitness';
+const CONTACT_PHONE = '+84 906 916 216';
+const CONTACT_PHONE_HREF = 'tel:+84906916216';
+
+// Resolved at build time, so the footer year advances on each deploy.
+const currentYear = new Date().getFullYear();
 ---
 
-<!DOCTYPE html>
-<html lang="en" class="h-full">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Login — BBO Gym POS</title>
-  <link rel="icon" href="/assets/favicon.ico" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-
-  <!-- If already logged in, go straight to dashboard -->
-  <script is:inline>
-    if (localStorage.getItem('bbo_auth')) {
-      window.location.replace('/dashboard');
-    }
-  </script>
-</head>
-
-<body class="h-full bg-gray-900 font-sans flex items-center justify-center p-4"
-      style="font-family:'Inter',system-ui,sans-serif">
-
-  <!-- Background decoration -->
-  <div class="absolute inset-0 overflow-hidden pointer-events-none">
-    <div class="absolute -top-40 -right-32 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl"></div>
-    <div class="absolute -bottom-40 -left-32 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl"></div>
-  </div>
-
-  <!-- Login card -->
-  <div class="relative w-full max-w-md bg-gray-800 rounded-2xl shadow-2xl shadow-black/40 p-8 border border-gray-700/60">
-
-    <!-- Logo / branding -->
-    <div class="flex flex-col items-center mb-8">
-      <img
-        src="/assets/bobo_logo_rectangle.png"
-        alt="BBO Gym"
-        class="h-20 w-auto object-contain mb-4"
-        onerror="this.style.display='none'; document.getElementById('logo-fallback').style.display='block'"
-      />
-      <span id="logo-fallback" class="text-orange-500 text-4xl font-black mb-4" style="display:none">BB</span>
-      <p class="text-gray-400 text-sm mt-1">Point of Sales System</p>
-      <p class="text-gray-500 text-xs mt-1">Support Hotline: 096916216</p>
+<Layout title="Boulder Box Vietnam | Boutique Bouldering Gym in Saigon">
+  <!-- Hero Section -->
+  <section id="home" class="hero-section">
+    <div class="hero-content">
+      <div class="hero-text">
+        <h1 class="hero-title">
+          Our Gym.<br />Your Home Gym.
+        </h1>
+        <h2 class="hero-subtitle">
+          <span>We pride ourselves on being a Boutique Bouldering Gym meticulously designed to offer the <strong>coziest, airconditioned and most unique climbing experience possible</strong>.</span>
+          <br /><br />
+          <span>Our space is thoughtfully maintained, guaranteeing cleanliness, creating a welcoming atmosphere where you can relax, recharge, and connect with fellow climbers after an intense session.</span>
+        </h2>
+        <div class="hero-buttons">
+          <a
+            href="https://maps.app.goo.gl/ExoLejDiePDpqMsx6"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="hero-button hero-button-primary"
+          >
+            Open Google Maps
+          </a>
+          <a
+            href="https://www.instagram.com/boulderbox.saigon/"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="hero-button hero-button-secondary"
+          >
+            Our Instagram
+          </a>
+        </div>
+      </div>
+      <div class="hero-video">
+        <video
+          src="/assets/gym_video.mp4"
+          autoplay
+          preload="auto"
+          muted
+          playsinline
+        ></video>
+      </div>
     </div>
+  </section>
 
-    <!-- Error message (text set dynamically by JS) -->
-    <div id="login-error"
-         class="hidden mb-4 px-4 py-3 bg-red-500/10 border border-red-500/30 rounded-lg
-                text-red-400 text-sm text-center"></div>
-
-    <!-- Form -->
-    <form id="login-form" class="space-y-5" autocomplete="on">
-      <div>
-        <label for="username" class="block text-sm font-medium text-gray-300 mb-1.5">
-          Username
-        </label>
-        <input
-          id="username"
-          name="username"
-          type="text"
-          required
-          autocomplete="username"
-          placeholder="admin"
-          class="w-full bg-gray-700/60 border border-gray-600 rounded-xl px-4 py-2.5
-                 text-white placeholder-gray-500 text-sm
-                 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent
-                 transition"
-        />
+  <!-- Pricing Section -->
+  <section id="pricing" class="pricing-section">
+    <div class="section-container">
+      <h1 class="pricing-title">Pricing</h1>
+      <div class="pricing-description-wrapper">
+        <h2 class="pricing-subtitle">
+          We believe climbing should be accessible. That's why we offer affordable pricing options designed to fit your budget.
+        </h2>
+        <h2 class="pricing-subtitle">
+          Special Student Discount! We are proud to support the next generation of climbers! Vietnamese and international students (age 21 and below) are eligible for special discounts on our passes and memberships. Just bring your valid student ID!
+        </h2>
       </div>
 
-      <div>
-        <label for="password" class="block text-sm font-medium text-gray-300 mb-1.5">
-          Password
-        </label>
-        <div class="relative">
-          <input
-            id="password"
-            name="password"
-            type="password"
-            required
-            autocomplete="current-password"
-            placeholder="••••••••"
-            class="w-full bg-gray-700/60 border border-gray-600 rounded-xl px-4 py-2.5
-                   text-white placeholder-gray-500 text-sm pr-11
-                   focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent
-                   transition"
-          />
-          <!-- Toggle password visibility -->
-          <button type="button" id="pwd-toggle"
-                  class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200">
-            <svg id="pwd-eye" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7
-                   -1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+      <!-- Pricing Carousel -->
+      <div class="pricing-carousel">
+        <div class="pricing-carousel-container">
+          <a href="/assets/pricing-01.avif" target="_blank" rel="noopener" class="pricing-item">
+            <img
+              src="/assets/pricing-01.avif"
+              alt="Boulder Box Pricing 1"
+              class="pricing-image"
+            />
+          </a>
+          <a href="/assets/pricing-02.avif" target="_blank" rel="noopener" class="pricing-item">
+            <img
+              src="/assets/pricing-02.avif"
+              alt="Boulder Box Pricing 2"
+              class="pricing-image"
+            />
+          </a>
+        </div>
+        <div class="pricing-nav">
+          <button class="pricing-nav-btn pricing-nav-prev" aria-label="Previous pricing">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+          </button>
+          <button class="pricing-nav-btn pricing-nav-next" aria-label="Next pricing">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9 18 15 12 9 6"></polyline>
             </svg>
           </button>
         </div>
       </div>
+    </div>
+  </section>
 
-      <button
-        type="submit"
-        id="submit-btn"
-        class="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold
-               py-2.5 rounded-xl text-sm transition active:scale-[0.98]"
-      >
-        Sign In
-      </button>
-    </form>
+  <!-- About Section -->
+  <section id="about" class="about-section">
+    <div class="section-container">
+      <h1 class="about-title">About</h1>
+      <p class="about-description">
+        Meet the Boulder Box Crew - fellow climbers committed to ensuring you have the best experience possible.<span class="about-description-secondary"><br /></span>
+        <br />
+        From offering beta advice to cheering you on as you tackle new challenges, we're here to support you 
+        every step of the way. At Boulder Box, our passion for bouldering extends beyond the walls – it's in 
+        everything we do.
+      </p>
 
-    <p class="mt-6 text-center text-xs text-gray-500">
-      BBO Gym &mdash; Authorized Personnel Only
-    </p>
-  </div>
+      <!-- Team Cards -->
+      <div class="team-grid">
+        <!-- Huyen Card -->
+        <div class="team-card">
+          <div class="team-card-image-wrapper">
+            <img
+              src="/assets/huyen-profile-photo.avif"
+              alt="Huyen Alyvia"
+              class="team-card-image"
+            />
+          </div>
+          <div class="team-card-content">
+            <h3 class="team-name">Huyen Alyvia</h3>
+            <p class="team-role">Founder</p>
+            <p class="team-description">
+              Driven by a desire to create a space where she and her friends could practice their beloved 
+              sport, she set out to establish a gym unlike any other in the city.
+            </p>
+          </div>
+        </div>
 
-  <script is:inline>
-    // ── Rate-limit config ──
-    var MAX_ATTEMPTS = 5;
-    var LOCKOUT_MS   = 30 * 1000; // 30 seconds
-    var lockoutTimer = null;
+        <!-- Shingo Card -->
+        <div class="team-card">
+          <div class="team-card-image-wrapper">
+            <!-- TODO: replace with Shingo's photo -->
+            <div class="team-card-image-placeholder" role="img" aria-label="Shingo">
+              <span class="team-card-image-initial">S</span>
+            </div>
+          </div>
+          <div class="team-card-content">
+            <h3 class="team-name">Shingo</h3>
+            <p class="team-role">Head Route-setter</p>
+            <p class="team-description">
+              Our Japanese head-setter brings over 20 years of climbing and more than 11 years of route
+              setting to the walls, shaping problems that read beautifully and push every grade to move better.
+            </p>
+          </div>
+        </div>
 
-    function getRemainingLockout() {
-      return Math.max(0, parseInt(sessionStorage.getItem('bbo_lock_until') || '0', 10) - Date.now());
+        <!-- Ha Card -->
+        <div class="team-card">
+          <div class="team-card-image-wrapper">
+            <img
+              src="/assets/ha-profile-photo.avif"
+              alt="Duyen Ha"
+              class="team-card-image"
+            />
+          </div>
+          <div class="team-card-content">
+            <h3 class="team-name">Duyen Ha</h3>
+            <p class="team-role">General Manager</p>
+            <p class="team-description">
+              Beyond cleanliness, she goes the extra mile, preparing delightful snacks and refreshing 
+              drinks for our guests. Ha makes everyone feel welcome and valued.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Gallery Section -->
+  <section id="gallery" class="gallery-section">
+    <div class="section-container">
+      <h2 class="section-title">Gallery</h2>
+      <div class="gallery-grid">
+        <a href="/assets/media/gym/bbo-image-01.avif" target="_blank" rel="noopener" class="gallery-item">
+          <img
+            src="/assets/media/gym/bbo-image-01.avif"
+            alt="Boulder Box Gym"
+            class="gallery-image"
+          />
+        </a>
+        <a href="/assets/media/gym/bbo-image-02.webp" target="_blank" rel="noopener" class="gallery-item">
+          <img
+            src="/assets/media/gym/bbo-image-02.webp"
+            alt="Boulder Box Gym"
+            class="gallery-image"
+          />
+        </a>
+        <a href="/assets/media/gym/bbo-image-10.webp" target="_blank" rel="noopener" class="gallery-item">
+          <img
+            src="/assets/media/gym/bbo-image-10.webp"
+            alt="Boulder Box Gym"
+            class="gallery-image"
+          />
+        </a>
+        <a href="/assets/media/gym/bbo-image-11.avif" target="_blank" rel="noopener" class="gallery-item">
+          <img
+            src="/assets/media/gym/bbo-image-11.avif"
+            alt="Boulder Box Gym"
+            class="gallery-image"
+          />
+        </a>
+        <a href="/assets/media/gym/bbo-image-12.webp" target="_blank" rel="noopener" class="gallery-item">
+          <img
+            src="/assets/media/gym/bbo-image-12.webp"
+            alt="Boulder Box Gym"
+            class="gallery-image"
+          />
+        </a>
+        <a href="/assets/media/gym/bbo-image-13.avif" target="_blank" rel="noopener" class="gallery-item">
+          <img
+            src="/assets/media/gym/bbo-image-13.avif"
+            alt="Boulder Box Gym"
+            class="gallery-image"
+          />
+        </a>
+        <a href="/assets/media/gym/gym-photo-01.avif" target="_blank" rel="noopener" class="gallery-item">
+          <img
+            src="/assets/media/gym/gym-photo-01.avif"
+            alt="Boulder Box Gym"
+            class="gallery-image"
+          />
+        </a>
+        <a href="/assets/media/gym/gym-photo-02.avif" target="_blank" rel="noopener" class="gallery-item">
+          <img
+            src="/assets/media/gym/gym-photo-02.avif"
+            alt="Boulder Box Gym"
+            class="gallery-image"
+          />
+        </a>
+        <a href="/assets/media/gym/gym-photo-03.avif" target="_blank" rel="noopener" class="gallery-item">
+          <img
+            src="/assets/media/gym/gym-photo-03.avif"
+            alt="Boulder Box Gym"
+            class="gallery-image"
+          />
+        </a>
+        <a href="/assets/media/gym/gym-photo-04.avif" target="_blank" rel="noopener" class="gallery-item">
+          <img
+            src="/assets/media/gym/gym-photo-04.avif"
+            alt="Boulder Box Gym"
+            class="gallery-image"
+          />
+        </a>
+        <a href="/assets/media/gym/gym-photo-05.avif" target="_blank" rel="noopener" class="gallery-item">
+          <img
+            src="/assets/media/gym/gym-photo-05.avif"
+            alt="Boulder Box Gym"
+            class="gallery-image"
+          />
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Blog Section -->
+  <section id="blog" class="blog-section">
+    <div class="section-container">
+      <h2 class="blog-title">Blog</h2>
+      <p class="blog-subtitle">Latest insights and stories from the Boulder Box community</p>
+      
+      <div class="blog-grid">
+        <!-- Featured: UNBOX 2026 Sponsors -->
+        <div class="blog-post">
+          <div class="blog-post-image">
+            <img src="/assets/media/unbox-thumbnail-2026.png" alt="UNBOX 2026" class="blog-image" />
+          </div>
+          <div class="blog-post-content">
+            <span class="blog-date">May 26, 2026</span>
+            <h3 class="blog-post-title">Building the Future of Vietnamese Bouldering: Partner with Us for UNBOX 2026</h3>
+            <p class="blog-post-excerpt">
+              Learn about sponsorship packages and how to partner with us for UNBOX 2026.
+            </p>
+            <a href="/unbox-2026-sponsors" class="blog-read-more">Read More →</a>
+          </div>
+        </div>
+        <!-- Blog Post 1 -->
+        <div class="blog-post">
+          <div class="blog-post-image">
+            <img src="/assets/IG_thumbnail_tet_holiday.jpg" alt="V-Day & Tet" class="blog-image" />
+          </div>
+          <div class="blog-post-content">
+            <span class="blog-date">Feb 2, 2026</span>
+            <h3 class="blog-post-title">Happy V-Day and Lunar New Year!</h3>
+            <p class="blog-post-excerpt">
+              Updated Tet hours and Couple Climbing Minigame — join us for special dates and prizes!
+            </p>
+            <a href="/happy-vday-lunar-new-year-2026" class="blog-read-more">Read More →</a>
+          </div>
+        </div>
+
+        <!-- Blog Post 2 -->
+        <div class="blog-post">
+          <div class="blog-post-image">
+            <img src="/assets/boulder-box-update-2026.avif" alt="Updates 2026" class="blog-image" />
+          </div>
+          <div class="blog-post-content">
+            <span class="blog-date">Dec 30, 2025</span>
+            <h3 class="blog-post-title">2026 AT BOULDER BOX: NEW UPDATES & PERKS! 🧗‍♂️✨</h3>
+            <p class="blog-post-excerpt">
+              New year, same great vibes — price freeze, updated gear policy, and new discounts for 2026.
+            </p>
+            <a href="/updates-2026" class="blog-read-more">Read More →</a>
+          </div>
+        </div>
+
+        <!-- Blog Post 3 -->
+        <div class="blog-post">
+          <div class="blog-post-image">
+            <img src="/assets/boulder-box-rocktober-2025.avif" alt="Rocktober 2025" class="blog-image" />
+          </div>
+          <div class="blog-post-content">
+            <span class="blog-date">Nov 4, 2025</span>
+            <h3 class="blog-post-title">What an incredible finish to Rocktober 2025!</h3>
+            <p class="blog-post-excerpt">
+              A thrilling competition finish — congratulations to our climbers and thanks to sponsors and organisers!
+            </p>
+            <a href="/rocktober-2025" class="blog-read-more">Read More →</a>
+          </div>
+        </div>
+      </div>
+      <div style="text-align:center; margin-top:32px;">
+        <a href="/blog" class="blog-list-read-more" style="font-size:1.1rem; font-weight:600; color:#fe5c13; text-decoration:none; padding:12px 32px; border-radius:8px; border:1px solid #fe5c13; display:inline-block; transition:background 0.2s;">View all blogs</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Contact Section -->
+  <section id="contact" class="contact-section">
+    <div class="section-container contact-container">
+      <div class="contact-details-wrapper">
+        <h2 class="contact-title">Chat to us.</h2>
+        
+        <p class="contact-intro">
+          Questions about pricing, classes, or booking? Give us a call or drop us an email —
+          we're happy to help.
+        </p>
+
+        <!-- Contact Details -->
+        <div class="contact-methods">
+          <a href={CONTACT_PHONE_HREF} class="contact-method">
+            <span class="contact-method-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"></path>
+              </svg>
+            </span>
+            <span class="contact-method-text">
+              <span class="contact-method-label">Call us</span>
+              <span class="contact-method-value">{CONTACT_PHONE}</span>
+            </span>
+          </a>
+
+          <a href={`mailto:${CONTACT_EMAIL}`} class="contact-method">
+            <span class="contact-method-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+                <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path>
+              </svg>
+            </span>
+            <span class="contact-method-text">
+              <span class="contact-method-label">Email us</span>
+              <span class="contact-method-value">{CONTACT_EMAIL}</span>
+            </span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Contact Info -->
+      <div class="contact-info-wrapper">
+        <h3 class="contact-info-title">Find us</h3>
+        
+        <div class="map-preview" aria-hidden="false">
+          <div class="map-preview-inner">
+            <div class="place-name">Boulder Box Saigon</div>
+            <div class="place-address">96/114, Đ. Đặng Thuỳ Trâm, Phường 13, Bình Thạnh, TP. HCM</div>
+            <div class="review-box">
+              <div aria-hidden="true" class="review-number">5.0</div>
+              <div aria-label="Rated 5.0 out of 5" role="img" class="rating-stars">
+                <span class="rating-star" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 .587l3.668 7.431L23.6 9.748l-5.7 5.556L19.335 24 12 19.897 4.665 24l1.435-8.696L.4 9.748l7.932-1.73L12 .587z"/></svg>
+                </span>
+                <span class="rating-star" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 .587l3.668 7.431L23.6 9.748l-5.7 5.556L19.335 24 12 19.897 4.665 24l1.435-8.696L.4 9.748l7.932-1.73L12 .587z"/></svg>
+                </span>
+                <span class="rating-star" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 .587l3.668 7.431L23.6 9.748l-5.7 5.556L19.335 24 12 19.897 4.665 24l1.435-8.696L.4 9.748l7.932-1.73L12 .587z"/></svg>
+                </span>
+                <span class="rating-star" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 .587l3.668 7.431L23.6 9.748l-5.7 5.556L19.335 24 12 19.897 4.665 24l1.435-8.696L.4 9.748l7.932-1.73L12 .587z"/></svg>
+                </span>
+                <span class="rating-star" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 .587l3.668 7.431L23.6 9.748l-5.7 5.556L19.335 24 12 19.897 4.665 24l1.435-8.696L.4 9.748l7.932-1.73L12 .587z"/></svg>
+                </span>
+              </div>
+              <a aria-label="95 reviews" target="_blank" href="https://search.google.com/local/reviews?placeid=ChIJQ2zrMVMldTER5b39KGBsbzA&amp;q=Boulder+Box+Saigon,+Dang+Thuy+Tram,+Vietnam&amp;hl=en&amp;gl=VN" class="review-box-link">95 reviews</a>
+            </div>
+          </div>
+        </div>
+        
+        <div>
+          <p class="info-label"><strong>Hours:</strong></p>
+          <p class="info-text">Mon - Sun: 10:30 AM - 10:00 PM</p>
+        </div>
+        
+        <a
+          href="https://maps.app.goo.gl/ExoLejDiePDpqMsx6"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="contact-cta-button"
+        >
+          Open in Maps
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Google Maps Section (iframe removed) -->
+  <!-- iframe removed per request; map-preview moved into Contact info -->
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="section-container">
+      <div class="footer-content">
+        <p class="footer-text">
+          ©{currentYear} by Boulder Box & Office. All rights reserved.
+        </p>
+        <p class="footer-text">
+          Designed by <a href="https://zippyzack.com" target="_blank" rel="noopener">zippyzack.com</a>
+        </p>
+      </div>
+    </div>
+  </footer>
+</Layout>
+
+<style>
+  /* Container */
+  .section-container {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+  }
+
+  /* Hero Section */
+  .hero-section {
+    background-color: #fafafa;
+    color: #333;
+    padding: 2.5rem 0;
+    width: 100%;
+  }
+
+  .hero-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -1px;
+    margin-bottom: 1.5rem;
+  }
+
+  .hero-description {
+    font-size: 1.125rem;
+    color: #d1d5db;
+    margin-bottom: 2rem;
+    line-height: 1.8;
+    max-width: 600px;
+  }
+
+  /* Pricing Section */
+  .pricing-section {
+    background-color: #262626;
+    color: #fff;
+    padding: 2.5rem 0;
+    width: 100%;
+  }
+
+  .pricing-description {
+    font-size: 1rem;
+    color: #d1d5db;
+    line-height: 1.8;
+    margin-bottom: 1.5rem;
+    max-width: 700px;
+  }
+
+  .pricing-carousel {
+    position: relative;
+    margin-top: 2rem;
+  }
+
+  .pricing-carousel-container {
+    display: flex;
+    gap: 16px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    padding-bottom: 1rem;
+    scroll-behavior: smooth;
+  }
+
+  .pricing-carousel-container::-webkit-scrollbar {
+    height: 0;
+  }
+
+  .pricing-carousel-container::-webkit-scrollbar-track {
+    display: none;
+  }
+
+  .pricing-item {
+    flex-shrink: 0;
+    width: 100%;
+    scroll-snap-align: center;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    transition: opacity 0.3s ease;
+    display: block;
+  }
+
+  .pricing-item:hover {
+    opacity: 0.9;
+  }
+
+  .pricing-image {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .pricing-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: absolute;
+    inset: 0;
+    padding: 1.25rem;
+    pointer-events: auto;
+  }
+
+  .pricing-nav-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: rgba(0, 0, 0, 0.2);
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    pointer-events: auto;
+    transition: background-color 0.2s ease;
+  }
+
+  .pricing-nav-btn:hover {
+    background-color: rgba(0, 0, 0, 0.4);
+  }
+
+  .pricing-nav-btn svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  /* About Section */
+  .about-section {
+    background-color: #1a1a1a;
+    color: #fff;
+    padding: 2.5rem 0;
+    width: 100%;
+  }
+
+  .section-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    letter-spacing: -1px;
+  }
+
+  .section-description {
+    font-size: 1rem;
+    color: #d1d5db;
+    line-height: 1.8;
+    margin-bottom: 2.5rem;
+    max-width: 700px;
+  }
+
+  .team-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2rem;
+    margin-top: 2rem;
+  }
+
+  .team-card {
+    background-color: #fff;
+    border-radius: 1.5rem;
+    overflow: hidden;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: box-shadow 0.3s ease;
+  }
+
+  .team-card:hover {
+    box-shadow: 0 10px 15px rgba(0, 0, 0, 0.2);
+  }
+
+  .team-card-image {
+    width: 100%;
+    height: 250px;
+    object-fit: cover;
+    display: block;
+  }
+
+  .team-card-image-placeholder {
+    width: 100%;
+    height: 250px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #d1d5db 0%, #9ca3af 100%);
+  }
+
+  .team-card-image-initial {
+    font-size: 4rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.85);
+    line-height: 1;
+  }
+
+  .team-card-content {
+    padding: 1.5rem;
+    text-align: center;
+    color: #1f2937;
+  }
+
+  .team-name {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+
+  .team-role {
+    color: #ff5a16;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    font-size: 0.95rem;
+  }
+
+  .team-description {
+    color: #666;
+    font-size: 0.95rem;
+    line-height: 1.6;
+  }
+
+  /* Gallery Section */
+  .gallery-section {
+    background-color: #1a1a1a;
+    color: #fff;
+    padding: 2.5rem 0;
+    width: 100%;
+  }
+
+  .gallery-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    margin-top: 2rem;
+  }
+
+  .gallery-item {
+    border-radius: 0.75rem;
+    overflow: hidden;
+    transition: opacity 0.3s ease;
+  }
+
+  .gallery-item:hover {
+    opacity: 0.9;
+  }
+
+  .gallery-image {
+    width: 100%;
+    height: 250px;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.3s ease;
+  }
+
+  .gallery-item:hover .gallery-image {
+    transform: scale(1.05);
+  }
+
+  /* Contact Section */
+  .contact-section {
+    background-color: #fff;
+    color: #1f2937;
+    padding: 2.5rem 0;
+    width: 100%;
+  }
+
+  .contact-container {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+
+  .contact-details-wrapper,
+  .contact-info-wrapper {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .contact-info-wrapper {
+    padding-top: 40px;
+  }
+
+  .contact-title {
+    color: #001122;
+    margin-bottom: 2rem;
+  }
+
+  .contact-content {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2rem;
+    margin-top: 2rem;
+  }
+
+  .contact-intro {
+    color: #666;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin-bottom: 2rem;
+    max-width: 42ch;
+  }
+
+  .contact-methods {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .contact-method {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    background-color: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    text-decoration: none;
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+  }
+
+  .contact-method:hover {
+    background-color: #fff;
+    border-color: #fe5c13;
+    opacity: 1;
+  }
+
+  .contact-method-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: 0.5rem;
+    background-color: #fe5c13;
+    color: #fff;
+  }
+
+  .contact-method-icon svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .contact-method-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    min-width: 0;
+  }
+
+  .contact-method-label {
+    font-size: 0.8125rem;
+    color: #666;
+    font-weight: 500;
+  }
+
+  .contact-method-value {
+    font-size: 1.0625rem;
+    font-weight: 600;
+    color: #1f2937;
+    word-break: break-word;
+  }
+
+  .contact-method:hover .contact-method-value {
+    color: #fe5c13;
+  }
+
+  .contact-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .contact-info-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+
+  .info-item {
+    margin-bottom: 1rem;
+  }
+
+  .info-label {
+    color: #1f2937;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+  }
+
+  .info-text {
+    color: #666;
+    font-size: 0.95rem;
+    line-height: 1.6;
+  }
+
+  .info-text a {
+    color: #0099ff;
+  }
+
+  .cta-button {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    background-color: #222;
+    color: #fff;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background-color 0.2s ease;
+    text-align: center;
+    width: fit-content;
+  }
+
+  .cta-button:hover {
+    background-color: #111;
+  }
+
+  /* Footer */
+  .footer {
+    background-color: #e5e5e5;
+    color: #1f2937;
+    padding: 2rem 0;
+    border-top: 1px solid #d1d5db;
+    width: 100%;
+  }
+
+  .footer-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
+  }
+
+  .footer-text {
+    font-size: 0.875rem;
+    color: #666;
+  }
+
+  .footer-text a {
+    color: #1f2937;
+    text-decoration: none;
+  }
+
+  .footer-text a:hover {
+    text-decoration: underline;
+  }
+
+  /* Responsive Design */
+  @media (min-width: 640px) {
+    .section-container {
+      padding: 0 2.5rem;
     }
 
-    function startLockoutCountdown() {
-      var btn = document.getElementById('submit-btn');
-      if (lockoutTimer) clearInterval(lockoutTimer);
-      lockoutTimer = setInterval(function () {
-        var rem = Math.ceil(getRemainingLockout() / 1000);
-        if (rem <= 0) {
-          clearInterval(lockoutTimer); lockoutTimer = null;
-          btn.disabled = false;
-          btn.textContent = 'Sign In';
-          document.getElementById('login-error').classList.add('hidden');
-        } else {
-          btn.disabled = true;
-          btn.textContent = 'Try again in ' + rem + 's…';
-        }
-      }, 500);
+    .hero-section {
+      padding: 3.5rem 0;
     }
 
-    // Check lockout immediately (script runs after DOM is ready)
-    (function () {
-      if (getRemainingLockout() > 0) {
-        var errEl = document.getElementById('login-error');
-        errEl.textContent = 'Too many failed attempts. Please wait.';
-        errEl.classList.remove('hidden');
-        startLockoutCountdown();
-      }
-    })();
+    .hero-title {
+      font-size: 3rem;
+    }
 
-    // ── Password visibility toggle ──
-    document.getElementById('pwd-toggle').addEventListener('click', function () {
-      var pwd = document.getElementById('password');
-      var eye = document.getElementById('pwd-eye');
-      if (pwd.type === 'password') {
-        pwd.type = 'text';
-        eye.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>';
-      } else {
-        pwd.type = 'password';
-        eye.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>';
-      }
-    });
+    .pricing-section {
+      padding: 3.5rem 0;
+    }
 
-    // ── Login submit — calls /api/auth/token (server-side credential check) ──
-    document.getElementById('login-form').addEventListener('submit', async function (e) {
-      e.preventDefault();
+    .pricing-carousel-container {
+      display: flex;
+      gap: 1.5rem;
+      overflow-x: auto;
+      max-width: 100%;
+    }
 
-      if (getRemainingLockout() > 0) return; // still locked out
+    .pricing-item {
+      flex-shrink: 0;
+      width: 100%;
+    }
 
-      var username = document.getElementById('username').value.trim();
-      var password = document.getElementById('password').value;
-      var errEl    = document.getElementById('login-error');
-      var btn      = document.getElementById('submit-btn');
+    .about-section {
+      padding: 3.5rem 0;
+    }
 
-      btn.disabled = true;
-      btn.textContent = 'Signing in…';
+    .section-title {
+      font-size: 2.5rem;
+    }
 
-      var res, data;
-      try {
-        res  = await fetch('/api/auth/token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: username, password: password })
-        });
-        data = await res.json();
-      } catch (err) {
-        errEl.textContent = 'Network error. Please check your connection.';
-        errEl.classList.remove('hidden');
-        btn.disabled = false;
-        btn.textContent = 'Sign In';
-        return;
-      }
+    .team-grid {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 2rem;
+    }
 
-      if (res.ok && data.token) {
-        sessionStorage.removeItem('bbo_attempts');
-        sessionStorage.removeItem('bbo_lock_until');
-        localStorage.setItem('bbo_auth', 'true');
-        localStorage.setItem('bbo_token', data.token);
-        localStorage.setItem('bbo_admin', username);
-        // Role drives page gating in MainLayout. Older sessions predate this
-        // key, so a missing value is treated as 'admin' everywhere it is read.
-        localStorage.setItem('bbo_role', data.role === 'staff' ? 'staff' : 'admin');
-        // A fresh login must not inherit an earlier unlock.
-        sessionStorage.removeItem('bbo_elev_token');
-        sessionStorage.removeItem('bbo_elev_until');
-        window.location.replace('/dashboard');
-      } else {
-        document.getElementById('password').value = '';
-        document.getElementById('password').focus();
+    .gallery-grid {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.5rem;
+    }
 
-        var attempts = parseInt(sessionStorage.getItem('bbo_attempts') || '0', 10) + 1;
-        if (attempts >= MAX_ATTEMPTS) {
-          sessionStorage.setItem('bbo_lock_until', String(Date.now() + LOCKOUT_MS));
-          sessionStorage.setItem('bbo_attempts', '0');
-          errEl.textContent = 'Too many failed attempts. Please wait 30 seconds.';
-          errEl.classList.remove('hidden');
-          startLockoutCountdown();
-        } else {
-          sessionStorage.setItem('bbo_attempts', String(attempts));
-          var left = MAX_ATTEMPTS - attempts;
-          errEl.textContent = (data.error || 'Invalid username or password.')
-            + (left <= 2 ? ' (' + left + ' attempt' + (left === 1 ? '' : 's') + ' remaining)' : '');
-          errEl.classList.remove('hidden');
-          btn.disabled = false;
-          btn.textContent = 'Sign In';
-        }
-      }
-    });
-  </script>
-</body>
-</html>
+    .gallery-image {
+      height: 300px;
+    }
+
+    .gallery-section {
+      padding: 3.5rem 0;
+    }
+
+    .contact-section {
+      padding: 3.5rem 0;
+    }
+
+    .contact-container {
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+      align-items: start;
+    }
+
+    .contact-content {
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+    }
+
+    .footer {
+      padding: 2.5rem 0;
+    }
+
+    .footer-content {
+      flex-direction: row;
+      justify-content: space-between;
+      text-align: left;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .section-container {
+      padding: 0 4rem;
+    }
+
+    .hero-section {
+      padding: 4.5rem 0;
+    }
+
+    .hero-title {
+      font-size: 3.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .hero-description {
+      font-size: 1.25rem;
+      margin-bottom: 2.5rem;
+    }
+
+    .pricing-section {
+      padding: 4.5rem 0;
+    }
+
+    .pricing-carousel {
+      position: static;
+    }
+
+    .pricing-carousel-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      overflow-x: visible;
+      scroll-snap-type: none;
+      padding-bottom: 0;
+    }
+
+    .pricing-item {
+      width: 85%;
+      flex-shrink: 1;
+      scroll-snap-align: none;
+    }
+
+    .pricing-nav {
+      display: none;
+    }
+
+    .about-section {
+      padding: 4.5rem 0;
+    }
+
+    .section-title {
+      font-size: 3rem;
+      margin-bottom: 2rem;
+    }
+
+    .section-description {
+      margin-bottom: 3rem;
+    }
+
+    .team-grid {
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2.5rem;
+    }
+
+    .gallery-grid {
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2rem;
+    }
+
+    .gallery-image {
+      height: 350px;
+    }
+
+    .gallery-section {
+      padding: 4.5rem 0;
+    }
+
+    .contact-section {
+      padding: 4.5rem 0;
+    }
+
+    .contact-content {
+      gap: 4rem;
+    }
+
+    .footer {
+      padding: 3rem 0;
+    }
+  }
+</style>
+
+<script>
+  // Pricing carousel navigation
+  document.addEventListener('DOMContentLoaded', () => {
+    const carousel = document.querySelector('.pricing-carousel-container');
+    const prevBtn = document.querySelector('.pricing-nav-prev');
+    const nextBtn = document.querySelector('.pricing-nav-next');
+
+    if (carousel && prevBtn && nextBtn) {
+      const firstItem = carousel.querySelector('.pricing-item');
+      const gap = 16; // match CSS gap for mobile
+      const itemWidth = firstItem ? Math.round(firstItem.getBoundingClientRect().width) : 300;
+      const scrollAmount = itemWidth + gap;
+
+      prevBtn.addEventListener('click', () => {
+        carousel.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
+      });
+
+      nextBtn.addEventListener('click', () => {
+        carousel.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+      });
+    }
+  });
+
+</script>

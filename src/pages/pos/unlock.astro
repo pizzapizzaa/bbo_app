@@ -13,24 +13,24 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Admin Access — BBO Gym POS</title>
-  <link rel="icon" href="/assets/favicon.ico" />
+  <link rel="icon" type="image/png" href="/assets/Favicon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
   <script is:inline>
     // Only the three gated pages are valid destinations — an allowlist rather
     // than trusting ?next=, so this page can never be used as an open redirect.
-    var ALLOWED_NEXT = ['/customers', '/promo-codes', '/expenses'];
+    var ALLOWED_NEXT = ['/pos/customers', '/pos/promo-codes', '/pos/expenses'];
 
     function unlockTarget() {
       var next = new URLSearchParams(location.search).get('next') || '';
-      return ALLOWED_NEXT.indexOf(next) !== -1 ? next : '/dashboard';
+      return ALLOWED_NEXT.indexOf(next) !== -1 ? next : '/pos/dashboard';
     }
 
     (function () {
       // Not signed in at all → the login page, not this one.
       if (!localStorage.getItem('bbo_auth') || !localStorage.getItem('bbo_token')) {
-        window.location.replace('/');
+        window.location.replace('/pos');
         return;
       }
       // Admins never need to unlock anything.
@@ -107,7 +107,7 @@
 
       <button
         type="button"
-        onclick="window.location.replace('/dashboard')"
+        onclick="window.location.replace('/pos/dashboard')"
         class="w-full bg-transparent hover:bg-gray-700/50 text-gray-400 hover:text-gray-200
                font-medium py-2 rounded-xl text-sm transition"
       >
@@ -122,9 +122,9 @@
 
   <script is:inline>
     var PAGE_LABELS = {
-      '/customers':   'Customers',
-      '/promo-codes': 'Promo Codes',
-      '/expenses':    'Expenses',
+      '/pos/customers':   'Customers',
+      '/pos/promo-codes': 'Promo Codes',
+      '/pos/expenses':    'Expenses',
     };
 
     (function () {

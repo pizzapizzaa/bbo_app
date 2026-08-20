@@ -1,0 +1,312 @@
+---
+// Header component matching Boulder Box Framer design
+---
+
+<header class="header-wrapper">
+  <!-- Top Bar -->
+  <div class="header-topbar">
+    <div class="header-container">
+      <!-- Logo -->
+      <a href="/" class="header-logo">
+        <img
+          src="/assets/boulder-box-logo.avif"
+          alt="Boulder Box"
+        />
+      </a>
+
+      <!-- CTA Button (Desktop) -->
+      <a
+        href="https://maps.app.goo.gl/ExoLejDiePDpqMsx6"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="header-cta"
+      >
+        Visit Our Gym
+      </a>
+    </div>
+  </div>
+
+  <!-- Navigation Links -->
+  <nav class="header-nav">
+    <div class="header-container">
+      <a href="/" class="header-link">Home</a>
+      <a href="/#pricing" class="header-link">Pricing</a>
+      <a href="/#about" class="header-link">About</a>
+      <a href="/#gallery" class="header-link">Gallery</a>
+      <a href="/blog" class="header-link">Blog</a>
+      <a href="/#contact" class="header-link">Contact</a>
+    </div>
+  </nav>
+
+  <!-- Mobile Menu Button -->
+  <button
+    id="mobile-menu-button"
+    class="header-mobile-btn"
+  >
+    <svg class="header-menu-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  </button>
+
+  <!-- Mobile Menu -->
+  <div id="mobile-menu" class="header-mobile-menu">
+    <a href="/" class="header-mobile-link">Home</a>
+    <a href="/#pricing" class="header-mobile-link">Pricing</a>
+    <a href="/#about" class="header-mobile-link">About</a>
+    <a href="/#gallery" class="header-mobile-link">Gallery</a>
+    <a href="/blog" class="header-mobile-link">Blog</a>
+    <a href="/#contact" class="header-mobile-link">Contact</a>
+    <a
+      href="https://maps.app.goo.gl/ExoLejDiePDpqMsx6"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="header-mobile-cta"
+    >
+      Visit Our Gym
+    </a>
+  </div>
+</header>
+
+<script>
+  const mobileMenuButton = document.getElementById('mobile-menu-button');
+  const mobileMenu = document.getElementById('mobile-menu');
+
+  if (mobileMenuButton && mobileMenu) {
+    mobileMenuButton.addEventListener('click', () => {
+      mobileMenu.classList.toggle('header-mobile-menu-show');
+    });
+
+    // Close menu when a link is clicked
+    const mobileMenuLinks = mobileMenu.querySelectorAll('a');
+    mobileMenuLinks.forEach(link => {
+      link.addEventListener('click', () => {
+        mobileMenu.classList.remove('header-mobile-menu-show');
+      });
+    });
+  }
+</script>
+
+<style>
+  /* Header Wrapper */
+  .header-wrapper {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    width: 100%;
+    background-color: rgb(10, 10, 10);
+  }
+
+  /* Top Bar */
+  .header-topbar {
+    width: 100%;
+    border-bottom: 1px solid rgba(204, 204, 204, 0.08);
+    background-color: rgb(10, 10, 10);
+  }
+
+  .header-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 70px;
+  }
+
+  /* Logo */
+  .header-logo {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    flex-shrink: 0;
+  }
+
+  .header-logo img {
+    height: 40px;
+    width: auto;
+  }
+
+  /* CTA Button */
+  .header-cta {
+    display: none;
+    padding: 0.75rem 1.25rem;
+    background-color: rgb(34, 34, 34);
+    color: rgb(255, 255, 255);
+    border: 1px solid rgb(235, 235, 235);
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    text-decoration: none;
+    transition: background-color 0.2s ease;
+    box-shadow: rgba(0, 0, 0, 0.15) 0px 0.706592px 0.706592px -0.625px,
+                rgba(0, 0, 0, 0.14) 0px 1.80656px 1.80656px -1.25px,
+                rgba(0, 0, 0, 0.14) 0px 3.62176px 3.62176px -1.875px,
+                rgba(0, 0, 0, 0.13) 0px 6.8656px 6.8656px -2.5px,
+                rgba(0, 0, 0, 0.1) 0px 13.6468px 13.6468px -3.125px,
+                rgba(0, 0, 0, 0.05) 0px 30px 30px -3.75px;
+  }
+
+  .header-cta:hover {
+    background-color: rgb(20, 20, 20);
+  }
+
+  /* Navigation */
+  .header-nav {
+    display: none;
+    width: 100%;
+    background-color: rgb(18, 18, 18);
+    border-bottom: 1px solid rgba(204, 204, 204, 0.08);
+  }
+
+  .header-nav .header-container {
+    height: auto;
+    gap: 2rem;
+    padding: 1rem 1.5rem;
+    flex-direction: row;
+    justify-content: flex-start;
+  }
+
+  .header-link {
+    color: rgb(150, 150, 150);
+    text-decoration: none;
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    line-height: 2em;
+    transition: color 0.2s ease;
+  }
+
+  .header-link:hover {
+    color: rgb(255, 255, 255);
+  }
+
+  .header-link.active {
+    color: #fe5c13;
+  }
+
+  /* Mobile Menu Button */
+  .header-mobile-btn {
+    display: none;
+    position: absolute;
+    top: 1rem;
+    right: 1.5rem;
+    background: none;
+    border: none;
+    color: rgb(150, 150, 150);
+    cursor: pointer;
+    padding: 0;
+    z-index: 51;
+  }
+
+  .header-menu-icon {
+    width: 24px;
+    height: 24px;
+  }
+
+  /* Mobile Menu */
+  .header-mobile-menu {
+    display: none;
+    position: absolute;
+    top: 70px;
+    left: 0;
+    right: 0;
+    background-color: rgb(18, 18, 18);
+    border-bottom: 1px solid rgba(204, 204, 204, 0.08);
+    flex-direction: column;
+    padding: 1rem;
+    gap: 0.5rem;
+  }
+
+  .header-mobile-menu-show {
+    display: flex;
+  }
+
+  .header-mobile-link {
+    color: rgb(150, 150, 150);
+    text-decoration: none;
+    font-size: 15px;
+    font-weight: 500;
+    padding: 0.75rem 1rem;
+    transition: color 0.2s ease;
+  }
+
+  .header-mobile-link:hover {
+    color: rgb(255, 255, 255);
+  }
+
+  .header-mobile-link.active {
+    color: #fe5c13;
+  }
+
+  .header-mobile-cta {
+    display: block;
+    margin-top: 1rem;
+    padding: 0.75rem 1.25rem;
+    background-color: rgb(34, 34, 34);
+    color: rgb(255, 255, 255);
+    border: 1px solid rgb(235, 235, 235);
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    text-decoration: none;
+    text-align: center;
+    transition: background-color 0.2s ease;
+  }
+
+  .header-mobile-cta:hover {
+    background-color: rgb(20, 20, 20);
+  }
+
+  /* Desktop */
+  @media (min-width: 768px) {
+    .header-topbar {
+      border-bottom: 1px solid rgba(204, 204, 204, 0.08);
+    }
+
+    .header-cta {
+      display: block;
+    }
+
+    .header-nav {
+      display: block;
+    }
+
+    .header-mobile-btn {
+      display: none;
+    }
+
+    .header-mobile-menu {
+      display: none;
+    }
+  }
+
+  /* Mobile */
+  @media (max-width: 767px) {
+    .header-container {
+      height: 60px;
+      position: relative;
+    }
+
+    .header-logo img {
+      height: 35px;
+    }
+
+    .header-cta {
+      display: none;
+    }
+
+    .header-nav {
+      display: none;
+    }
+
+    .header-mobile-btn {
+      display: block;
+    }
+
+    .header-mobile-menu {
+      display: none;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+  }
+</style>
