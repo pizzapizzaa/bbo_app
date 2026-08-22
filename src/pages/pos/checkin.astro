@@ -1,5 +1,6 @@
 ---
 import MainLayout from '../../layouts/MainLayout.astro';
+import { PROMOTIONS } from '../../lib/promotions';
 ---
 
 <MainLayout title="Daily Check-in" activePage="checkin">
@@ -183,6 +184,9 @@ import MainLayout from '../../layouts/MainLayout.astro';
                 <option value="Membership – 12 Months" data-price="9850000">Membership – 12 Months (9,850,000 ₫)</option>
               </optgroup>
             </select>
+            <!-- Auto-applied promotion. Explains the amount below, and warns
+                 when a hand-picked discount is quietly costing the customer. -->
+            <p id="promo-banner" class="hidden text-xs rounded-lg px-3 py-2 mt-1.5"></p>
           </div>
 
           <!-- Add-ons (collapsible) -->
@@ -453,6 +457,9 @@ import MainLayout from '../../layouts/MainLayout.astro';
     </div>
   </div>
 
+  <!-- Single source of truth for promo windows, shared with POST /api/checkins -->
+  <script type="application/json" id="promotions-data" set:html={JSON.stringify(PROMOTIONS)}></script>
+
   <script is:inline>
     var checkinTable;
     var allCheckins  = [];
@@ -475,6 +482,9 @@ import MainLayout from '../../layouts/MainLayout.astro';
 
       updateTsPreview();
       $('#f-checkin-date, #f-checkin-time').on('change', updateTsPreview);
+      // The date decides whether a promotion is running, so re-price on change.
+      $('#f-checkin-date').on('change', recalcAmount);
+      recalcAmount();
 
       buildCustomerDatalist();
       initTable();
@@ -941,6 +951,36 @@ import MainLayout from '../../layouts/MainLayout.astro';
       _referralTimer = setTimeout(validateReferralCode, 350);
     });
 
+    // ── Automatic promotions ──────────────────────────────────────────────────
+    // Rendered from src/lib/promotions.ts so this preview and the punch grant in
+    // POST /api/checkins can never drift apart. Everything keys off the check-in
+    // DATE FIELD, not the clock, so a backdated entry prices as of that day.
+    var PROMOTIONS = JSON.parse(document.getElementById('promotions-data').textContent || '[]');
+
+    function _checkinDate() {
+      return document.getElementById('f-checkin-date').value || new Date().toISOString().slice(0, 10);
+    }
+
+    /** The promotion covering the date in the form, or null. ISO dates sort. */
+    function _activePromo() {
+      var d = _checkinDate();
+      var list = PROMOTIONS || [];
+      for (var i = 0; i < list.length; i++) {
+        if (d >= list[i].starts_on && d <= list[i].ends_on) return list[i];
+      }
+      return null;
+    }
+
+    function _promoPct(type) {
+      var p = _activePromo();
+      return (p && type && p.base_discount_pct[type]) || 0;
+    }
+
+    function _promoBonus(type) {
+      var p = _activePromo();
+      return (p && type && p.bonus_punches[type]) || 0;
+    }
+
     // ── Check-in type, add-ons & discount: auto-calculate amount ──
     function _basePrice() {
       var typeSelect  = document.getElementById('f-checkin-type');
@@ -974,7 +1014,56 @@ import MainLayout from '../../layouts/MainLayout.astro';
         return Math.round(base * (1 - pct / 100)) + addons.retail +
                Math.round(addons.rental * (1 - rentalPct / 100));
       }
-      return base + addons.retail + addons.rental;
+      // Nothing hand-picked: an active promotion sets the price on its own.
+      // Any discount above replaces it rather than stacking — one discount per
+      // check-in, and a deliberate choice is the more specific signal.
+      var promoPct = _promoPct(document.getElementById('f-checkin-type').value);
+      return Math.round(base * (1 - promoPct / 100)) + addons.retail + addons.rental;
+    }
+
+    /**
+     * Tell staff what the promotion just did to the price, so the amount is
+     * never a number that appeared from nowhere.
+     *
+     * The awkward case is a hand-picked discount during a promo: it replaces
+     * the promo instead of stacking, which can leave the customer paying MORE
+     * than if the radio had been left alone. That gets a loud warning with
+     * both figures rather than a silent overcharge.
+     */
+    function updatePromoBanner() {
+      var el    = document.getElementById('promo-banner');
+      var promo = _activePromo();
+      var type  = document.getElementById('f-checkin-type').value;
+      var pct   = _promoPct(type);
+      var bonus = _promoBonus(type);
+
+      if (!promo || (!pct && !bonus)) { el.classList.add('hidden'); return; }
+
+      var discountRb   = document.querySelector('.discount-rb:checked');
+      var manualPicked = !!(discountRb && discountRb.value);
+      // Bonus punches are part of the card, not a price cut — they survive any
+      // discount choice, so they are always worth stating.
+      var parts = [];
+      if (bonus) parts.push('+' + bonus + ' bonus punches');
+
+      var tone = 'bg-amber-900/40 border border-amber-600 text-amber-200';
+      if (!manualPicked) {
+        if (pct) parts.push(pct + '% off — applied automatically');
+      } else if (pct) {
+        var promoTotal  = totalFor('');
+        var manualTotal = totalFor(discountRb.value);
+        if (promoTotal < manualTotal) {
+          tone = 'bg-yellow-900/50 border border-yellow-500 text-yellow-200 font-medium';
+          parts.push('the automatic ' + pct + '% would charge ' + _fmtVnd(promoTotal) +
+            ' vs ' + _fmtVnd(manualTotal) + ' with the discount you picked. ' +
+            'Clear the discount to use the promo.');
+        } else {
+          parts.push(pct + '% off not applied — the discount you picked takes over');
+        }
+      }
+
+      el.className = 'text-xs rounded-lg px-3 py-2 mt-1.5 ' + tone;
+      el.textContent = '🎁 ' + promo.label + ': ' + parts.join(' · ');
     }
 
     function recalcAmount() {
@@ -984,6 +1073,7 @@ import MainLayout from '../../layouts/MainLayout.astro';
       document.getElementById('f-amount').value = total > 0 ? total : '';
       if (discountVal === 'referral') checkDiscountOverlap();
       else document.getElementById('referral-overlap').classList.add('hidden');
+      updatePromoBanner();
     }
     document.getElementById('f-checkin-type').addEventListener('change', recalcAmount);
     document.querySelectorAll('.addon-cb').forEach(function (cb) {
@@ -1049,6 +1139,15 @@ import MainLayout from '../../layouts/MainLayout.astro';
       if (discountValSub === 'referral' && _referral && _referral.rental_discount_pct &&
           document.querySelector('.addon-cb[data-rental="1"]:checked')) {
         addonsArr.push('Rental discount: ' + _referral.rental_discount_pct + '%');
+      }
+      // Record the automatic promotion so the amount stays explainable later.
+      // Bonus punches are granted server-side; note them here for the paper trail.
+      var promoSub = _activePromo();
+      if (promoSub) {
+        var promoNotes = [];
+        if (_promoPct(checkinType) && !discountValSub) promoNotes.push(_promoPct(checkinType) + '% off');
+        if (_promoBonus(checkinType)) promoNotes.push('+' + _promoBonus(checkinType) + ' bonus punches');
+        if (promoNotes.length) addonsArr.push('Promo: ' + promoSub.label + ' – ' + promoNotes.join(', '));
       }
       var addonsStr      = addonsArr.join(', ');
 
@@ -1150,6 +1249,7 @@ import MainLayout from '../../layouts/MainLayout.astro';
           document.getElementById('f-checkin-date').value = n.toISOString().slice(0, 10);
           document.getElementById('f-checkin-time').value = n.toTimeString().slice(0, 5);
           updateTsPreview();
+          updatePromoBanner();
           showToast('✓ Check-in recorded for ' + customerName + '!');
         })
         .catch(function (err) {

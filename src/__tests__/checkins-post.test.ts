@@ -458,3 +458,102 @@ describe('POST /api/checkins — punch card purchase via checkin_type', () => {
     expect(updatePayload).toMatchObject({ punches_remaining: 10, is_punch_card_holder: true });
   });
 });
+
+describe('POST /api/checkins — National Day promo (2026-08-30 → 2026-09-03)', () => {
+  /** Captures the customers.update payload for a punch-card purchase. */
+  function trackPunchUpdate() {
+    const seen: { payload: any } = { payload: null };
+    mockFromFn.mockImplementation((table: string) => {
+      if (table === 'checkins') return makeBuilder({ data: mockCheckin, error: null });
+      if (table === 'customers') {
+        const builder = makeBuilder({ data: { id: 'cust-1', punches_remaining: 0, pt_punches_remaining: 0, membership_end_date: null }, error: null });
+        builder.update = vi.fn().mockImplementation((payload: any) => {
+          seen.payload = payload;
+          return makeBuilder({ data: null, error: null });
+        });
+        return builder;
+      }
+      return makeBuilder({ data: null, error: null });
+    });
+    return seen;
+  }
+
+  it('grants 12 punches for a 10-punch card bought inside the window', async () => {
+    const seen = trackPunchUpdate();
+    const res = await POST({
+      request: makeReq({ ...validBody, date: '2026-08-30', checkin_type: '10 Punches – Adult' }),
+    } as any);
+    expect(res.status).toBe(200);
+    expect(seen.payload).toMatchObject({ punches_remaining: 12, is_punch_card_holder: true });
+  });
+
+  it('grants 25 punches for a 20-punch card on the final day of the window', async () => {
+    const seen = trackPunchUpdate();
+    const res = await POST({
+      request: makeReq({ ...validBody, date: '2026-09-03', checkin_type: '20 Punches – Adult' }),
+    } as any);
+    expect(res.status).toBe(200);
+    expect(seen.payload).toMatchObject({ punches_remaining: 25 });
+  });
+
+  it('tops up student and kid cards too', async () => {
+    for (const type of ['10 Punches – Student', '10 Punches – Kid']) {
+      const seen = trackPunchUpdate();
+      await POST({ request: makeReq({ ...validBody, date: '2026-09-01', checkin_type: type }) } as any);
+      expect(seen.payload, type).toMatchObject({ punches_remaining: 12 });
+    }
+  });
+
+  it('grants only the face value the day before the promo opens', async () => {
+    const seen = trackPunchUpdate();
+    const res = await POST({
+      request: makeReq({ ...validBody, date: '2026-08-29', checkin_type: '10 Punches – Adult' }),
+    } as any);
+    expect(res.status).toBe(200);
+    expect(seen.payload).toMatchObject({ punches_remaining: 10 });
+  });
+
+  it('grants only the face value the day after the promo closes', async () => {
+    const seen = trackPunchUpdate();
+    await POST({
+      request: makeReq({ ...validBody, date: '2026-09-04', checkin_type: '10 Punches – Adult' }),
+    } as any);
+    expect(seen.payload).toMatchObject({ punches_remaining: 10 });
+  });
+
+  it('keys off the submitted date, not today, so backdated entries stay correct', async () => {
+    const seen = trackPunchUpdate();
+    await POST({ request: makeReq({ ...validBody, date: '2026-09-02', checkin_type: '10 Punches – Adult' }) } as any);
+    expect(seen.payload).toMatchObject({ punches_remaining: 12 });
+  });
+
+  it('does not conjure punches for a day pass bought during the promo', async () => {
+    const seen = trackPunchUpdate();
+    const res = await POST({
+      request: makeReq({ ...validBody, date: '2026-09-01', checkin_type: 'Day Pass – Adult' }),
+    } as any);
+    expect(res.status).toBe(200);
+    expect(seen.payload).toBeNull();
+  });
+
+  it('leaves PT punch cards at 10 — they are outside the offer', async () => {
+    const seen = trackPunchUpdate();
+    await POST({ request: makeReq({ ...validBody, date: '2026-09-01', checkin_type: '10 PT Punches – Shingo PT' }) } as any);
+    expect(seen.payload).toMatchObject({ pt_punches_remaining: 10 });
+  });
+
+  it('stacks the bonus onto punches the customer already has', async () => {
+    let payload: any = null;
+    mockFromFn.mockImplementation((table: string) => {
+      if (table === 'checkins') return makeBuilder({ data: mockCheckin, error: null });
+      if (table === 'customers') {
+        const builder = makeBuilder({ data: { id: 'cust-1', punches_remaining: 3, pt_punches_remaining: 0, membership_end_date: null }, error: null });
+        builder.update = vi.fn().mockImplementation((p: any) => { payload = p; return makeBuilder({ data: null, error: null }); });
+        return builder;
+      }
+      return makeBuilder({ data: null, error: null });
+    });
+    await POST({ request: makeReq({ ...validBody, date: '2026-09-01', checkin_type: '10 Punches – Adult' }) } as any);
+    expect(payload).toMatchObject({ punches_remaining: 15 });  // 3 existing + 10 + 2 bonus
+  });
+});

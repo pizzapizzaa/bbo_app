@@ -10,6 +10,7 @@ import {
   normalizeReferralCode, namesMatch,
 } from '../../../lib/validate';
 import { lookupReferralCode } from '../../../lib/referral';
+import { activePromotion, promoBonusPunches } from '../../../lib/promotions';
 
 /** GET /api/checkins?date=YYYY-MM-DD          — single date
  *  GET /api/checkins?from=YYYY-MM-DD&to=YYYY-MM-DD — inclusive date range */
@@ -188,7 +189,16 @@ export const POST: APIRoute = async ({ request }) => {
     '1 Month': 1, '3 Months': 3, '6 Months': 6, '12 Months': 12,
   };
 
-  const punchesToAdd  = checkin_type ? (PUNCH_ADDS[checkin_type] ?? 0) : 0;
+  // A promotion running on the check-in date tops the card up beyond its face
+  // value (National Day: a 10-punch card is worth 12). Keyed off the submitted
+  // date, not "today", so a backdated entry grants what the promo gave that day.
+  // The face value must be non-zero first, so a bonus can never conjure punches
+  // for a product that is not a punch card.
+  const promo = activePromotion(date);
+  const faceValuePunches = checkin_type ? (PUNCH_ADDS[checkin_type] ?? 0) : 0;
+  const punchesToAdd  = faceValuePunches > 0
+    ? faceValuePunches + promoBonusPunches(promo, checkin_type)
+    : 0;
   const ptPunchesToAdd = checkin_type ? (PT_PUNCH_ADDS[checkin_type] ?? 0) : 0;
   const newMemberType = checkin_type ? (MEMBERSHIP_TYPE_MAP[checkin_type] ?? '') : '';
 
