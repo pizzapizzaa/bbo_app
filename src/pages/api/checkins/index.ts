@@ -10,7 +10,10 @@ import {
   normalizeReferralCode, namesMatch,
 } from '../../../lib/validate';
 import { lookupReferralCode } from '../../../lib/referral';
-import { activePromotion, promoBonusPunches } from '../../../lib/promotions';
+import {
+  computeCheckinAmount, describeCheckinExtras,
+  isKnownCheckinType, isKnownAddon, isKnownDiscount,
+} from '../../../lib/pricing';
 
 /** GET /api/checkins?date=YYYY-MM-DD          — single date
  *  GET /api/checkins?from=YYYY-MM-DD&to=YYYY-MM-DD — inclusive date range */
@@ -46,30 +49,41 @@ export const GET: APIRoute = async ({ url }) => {
   return ok({ checkins: data });
 };
 
-/** POST /api/checkins — add a new check-in */
+/** POST /api/checkins — add a new check-in.
+ *
+ *  The caller sends what was bought, not what it costs: `checkin_type`, an
+ *  `addons` array of product names, the `discount` picked and any `referral_code`
+ *  quoted. src/lib/pricing.ts turns those into the amount that is banked, so the
+ *  price list and the discount rules are enforced here rather than trusted from
+ *  the browser. `amount` in the body is ignored unless `amount_override` is set,
+ *  which is the one way staff can bill a figure the price list would not produce.
+ */
 export const POST: APIRoute = async ({ request }) => {
   let body: {
     customer_name: string;
     date: string;
     time: string;
     payment_method: string;
-    amount: number;
+    /** Only honoured alongside amount_override; otherwise the till decides. */
+    amount?: number;
+    amount_override?: boolean;
     notes?: string;
     punch_card_holder_id?: string;
     punch_card_holder_name?: string;
     pt_punch_holder_id?: string;
     pt_punch_holder_name?: string;
     checkin_type?: string;
-    addons?: string;
+    addons?: string[];
+    discount?: string;
     referral_code?: string;
   };
   try { body = await request.json(); }
   catch { return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400 }); }
 
-  const { customer_name, date, time, payment_method, amount, notes,
+  const { customer_name, date, time, payment_method, amount, amount_override, notes,
           punch_card_holder_id, punch_card_holder_name,
           pt_punch_holder_id, pt_punch_holder_name,
-          checkin_type, addons, referral_code } = body;
+          checkin_type, addons, discount, referral_code } = body;
   if (!customer_name || !date || !time || !payment_method) {
     return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400 });
   }
@@ -84,6 +98,29 @@ export const POST: APIRoute = async ({ request }) => {
   }
   if ((notes ?? '').length > MAX_TEXT) {
     return new Response(JSON.stringify({ error: 'notes exceeds maximum length' }), { status: 400 });
+  }
+
+  // ── Priceable inputs ──
+  // A client that predates server-side pricing sends `addons` as the joined
+  // display string, discount labels and all. There is no way to price that
+  // reliably, and guessing would undercharge or overcharge a real customer, so
+  // say plainly what is wrong instead.
+  if (typeof addons === 'string' && addons) {
+    return new Response(JSON.stringify({
+      error: 'This page is out of date. Reload the check-in page and enter the visit again.',
+    }), { status: 400 });
+  }
+  const addonNames = Array.isArray(addons) ? addons.map(String) : [];
+  const unknownAddon = addonNames.find((a) => !isKnownAddon(a));
+  if (unknownAddon) {
+    return new Response(JSON.stringify({ error: `Unknown add-on: ${unknownAddon}` }), { status: 400 });
+  }
+  if (checkin_type && !isKnownCheckinType(checkin_type)) {
+    return new Response(JSON.stringify({ error: `Unknown check-in type: ${checkin_type}` }), { status: 400 });
+  }
+  const discountId = String(discount ?? '');
+  if (!isKnownDiscount(discountId)) {
+    return new Response(JSON.stringify({ error: `Unknown discount: ${discountId}` }), { status: 400 });
   }
 
   // Validate membership when payment is "Valid Membership"
@@ -110,7 +147,22 @@ export const POST: APIRoute = async ({ request }) => {
   const referralCode = normalizeReferralCode(referral_code ?? '');
   let referredById:  string | null = null;
   let referredByName = '';
-  let referralPct    = 0;
+  let referralTerms: { discount_pct: number; rental_discount_pct: number } | null = null;
+
+  // The code and the radio have to agree. A code quoted with no discount picked
+  // is the ordinary case from an older payload, so it is read as the intent it
+  // plainly is; a code quoted alongside a *different* discount is a contradiction
+  // the server cannot resolve on the customer's behalf.
+  let effectiveDiscount = discountId;
+  if (referralCode && discountId === '') effectiveDiscount = 'referral';
+  if (referralCode && effectiveDiscount !== 'referral') {
+    return new Response(JSON.stringify({
+      error: 'A referral code cannot be combined with another discount — only one discount applies per check-in.',
+    }), { status: 400 });
+  }
+  if (!referralCode && effectiveDiscount === 'referral') {
+    return new Response(JSON.stringify({ error: 'Enter a referral or promo code, or choose a different discount.' }), { status: 400 });
+  }
 
   if (referralCode) {
     const lookup = await lookupReferralCode(referralCode);
@@ -126,26 +178,53 @@ export const POST: APIRoute = async ({ request }) => {
     }
     referredById   = owner.owner_id;
     referredByName = owner.owner_name;
-    referralPct    = owner.discount_pct;
+    // Read from the code row, never from the request — a quoted code buys the
+    // discount the gym set on it, whatever percentage the caller claims.
+    referralTerms = {
+      discount_pct:        owner.discount_pct,
+      rental_discount_pct: owner.rental_discount_pct,
+    };
   }
+
+  // ── Price the visit ──
+  // Everything above is an input; this is the only place an amount is decided.
+  const price = computeCheckinAmount({
+    date,
+    checkin_type: checkin_type ?? '',
+    addons:       addonNames,
+    discount:     effectiveDiscount,
+    referral:     referralTerms,
+  });
+
+  // Staff may still bill a figure the price list would not produce — a goodwill
+  // adjustment, a part payment — but it has to be asked for, and the row says so.
+  const overrideAmount = amount_override === true && Number.isFinite(Number(amount))
+    ? Math.max(0, Math.round(Number(amount)))
+    : null;
+  const finalAmount = overrideAmount ?? price.amount;
+
+  const extras = describeCheckinExtras(addonNames, price);
+  const addonsTrail = overrideAmount !== null && overrideAmount !== price.amount
+    ? [extras, `Manual amount (price list: ${price.amount.toLocaleString('en-US')} ₫)`].filter(Boolean).join(', ')
+    : extras;
 
   const { data, error } = await insertOwned('checkins', {
     customer_name,
     date,
     time,
     payment_method,
-    amount: amount ?? 0,
+    amount: finalAmount,
     notes: notes ?? '',
     punch_card_holder_id:   punch_card_holder_id   || null,
     punch_card_holder_name: punch_card_holder_name || '',
     pt_punch_holder_id:     pt_punch_holder_id     || null,
     pt_punch_holder_name:   pt_punch_holder_name   || '',
     checkin_type: checkin_type ?? '',
-    addons:       addons       ?? '',
+    addons:       addonsTrail,
     referral_code:         referralCode,
     referred_by_id:        referredById,
     referred_by_name:      referredByName,
-    referral_discount_pct: referralPct,
+    referral_discount_pct: referralCode ? price.base_discount_pct : 0,
   }, await authFromRequest(request));
 
   if (error) return serverError(error.message);
@@ -190,14 +269,13 @@ export const POST: APIRoute = async ({ request }) => {
   };
 
   // A promotion running on the check-in date tops the card up beyond its face
-  // value (National Day: a 10-punch card is worth 12). Keyed off the submitted
-  // date, not "today", so a backdated entry grants what the promo gave that day.
-  // The face value must be non-zero first, so a bonus can never conjure punches
-  // for a product that is not a punch card.
-  const promo = activePromotion(date);
+  // value (National Day: a 10-punch card is worth 12). `price` already resolved
+  // it off the submitted date, not "today", so a backdated entry grants what the
+  // promo gave that day. The face value must be non-zero first, so a bonus can
+  // never conjure punches for a product that is not a punch card.
   const faceValuePunches = checkin_type ? (PUNCH_ADDS[checkin_type] ?? 0) : 0;
   const punchesToAdd  = faceValuePunches > 0
-    ? faceValuePunches + promoBonusPunches(promo, checkin_type)
+    ? faceValuePunches + price.promo_bonus_punches
     : 0;
   const ptPunchesToAdd = checkin_type ? (PT_PUNCH_ADDS[checkin_type] ?? 0) : 0;
   const newMemberType = checkin_type ? (MEMBERSHIP_TYPE_MAP[checkin_type] ?? '') : '';
@@ -272,5 +350,10 @@ export const POST: APIRoute = async ({ request }) => {
     }
   }
 
-  return ok({ checkin: data });
+  // Hand back what was actually billed and why, so the form can show the till's
+  // figure rather than trusting its own preview of it.
+  return ok({
+    checkin: data,
+    price: { ...price, charged: finalAmount, overridden: overrideAmount !== null },
+  });
 };

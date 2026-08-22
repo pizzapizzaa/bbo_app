@@ -4,6 +4,7 @@ import {
   PROMOTIONS, activePromotion, promoDiscountPct, promoBonusPunches,
   type Promotion,
 } from '../lib/promotions';
+import { CHECKIN_TYPES } from '../lib/pricing';
 
 const NATIONAL_DAY = PROMOTIONS.find(p => p.id === 'national-day-2026')!;
 
@@ -109,19 +110,15 @@ describe('promoBonusPunches — National Day card top-ups', () => {
   });
 });
 
-describe('promotion keys stay in step with the check-in form', () => {
-  // The keys are matched by exact string against the form's <option value>,
-  // en dash and all. A renamed product would otherwise un-apply the promo
-  // silently at the counter, so fail the suite instead.
-  const form = readFileSync(
-    new URL('../pages/pos/checkin.astro', import.meta.url), 'utf8',
-  );
-  const optionValues = new Set(
-    [...form.matchAll(/<option value="([^"]+)" data-price/g)].map(m => m[1]),
-  );
+describe('promotion keys stay in step with the price list', () => {
+  // The keys are matched by exact string against pricing.ts's product names,
+  // en dash and all — the same table the check-in form renders and the server
+  // bills from. A renamed product would otherwise un-apply the promo silently
+  // at the counter, so fail the suite instead.
+  const productNames = new Set(CHECKIN_TYPES.map(t => t.value));
 
-  it('finds the form options to compare against', () => {
-    expect(optionValues.size).toBeGreaterThan(10);
+  it('finds the price list to compare against', () => {
+    expect(productNames.size).toBeGreaterThan(10);
   });
 
   for (const promo of PROMOTIONS) {
@@ -130,7 +127,7 @@ describe('promotion keys stay in step with the check-in form', () => {
       ...Object.keys(promo.bonus_punches),
     ];
     it.each(keys)(`${promo.id}: "%s" is a real check-in type`, (key) => {
-      expect(optionValues.has(key)).toBe(true);
+      expect(productNames.has(key)).toBe(true);
     });
   }
 });

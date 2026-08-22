@@ -19,13 +19,13 @@ function makeReq(body: unknown): Request {
   });
 }
 
-/** Minimal valid body for a cash day-pass check-in. */
+/** Minimal valid body for a cash check-in. The price is the server's to decide,
+ *  so nothing here quotes one — see the "server-side pricing" block below. */
 const validBody = {
   customer_name:  'Alice Nguyen',
   date:           '2026-06-15',
   time:           '10:30:00',
   payment_method: 'Cash',
-  amount:         50_000,
 };
 
 /** Checkin row the DB insert is expected to return. */
@@ -212,7 +212,6 @@ describe('POST /api/checkins — successful insert', () => {
     expect(json).toHaveProperty('checkin');
     expect(json.checkin.customer_name).toBe('Alice Nguyen');
     expect(json.checkin.payment_method).toBe('Cash');
-    expect(json.checkin.amount).toBe(50_000);
   });
 
   it('auto-creates a customer record when the name is not found in DB', async () => {
@@ -555,5 +554,207 @@ describe('POST /api/checkins — National Day promo (2026-08-30 → 2026-09-03)'
     });
     await POST({ request: makeReq({ ...validBody, date: '2026-09-01', checkin_type: '10 Punches – Adult' }) } as any);
     expect(payload).toMatchObject({ punches_remaining: 15 });  // 3 existing + 10 + 2 bonus
+  });
+});
+
+// ── Server-side pricing ───────────────────────────────────────────────────────
+// The browser sends what was bought; the amount banked against the visit is
+// derived here. These assert what actually reaches the `checkins` insert, not
+// what the mock echoes back.
+describe('POST /api/checkins — server-side pricing', () => {
+  /** Captures the row handed to `checkins.insert`. */
+  function trackInsert(extraTables: (table: string) => any = () => null) {
+    const seen: { row: any } = { row: null };
+    mockFromFn.mockImplementation((table: string) => {
+      if (table === 'checkins') {
+        const builder = makeBuilder({ data: mockCheckin, error: null });
+        builder.insert = vi.fn().mockImplementation((row: any) => {
+          seen.row = row;
+          return makeBuilder({ data: mockCheckin, error: null });
+        });
+        return builder;
+      }
+      return extraTables(table) ?? makeBuilder({ data: { id: 'cust-1' }, error: null });
+    });
+    return seen;
+  }
+
+  /** As above, with a `referral_codes` row for the lookup in src/lib/referral.ts. */
+  function trackInsertWithCode(code: any) {
+    return trackInsert((table) =>
+      table === 'referral_codes' ? makeBuilder({ data: code, error: null }) : null);
+  }
+
+  it('prices a day pass from the price list, not from the body', async () => {
+    const seen = trackInsert();
+    const res = await POST({ request: makeReq({
+      ...validBody, checkin_type: 'Day Pass – Adult', addons: [], discount: '', amount: 1,
+    }) } as any);
+    expect(res.status).toBe(200);
+    expect(seen.row.amount).toBe(160_000);
+  });
+
+  it('ignores a zero amount a tampered client sends', async () => {
+    const seen = trackInsert();
+    await POST({ request: makeReq({
+      ...validBody, checkin_type: 'Day Pass – Adult', addons: [], discount: '', amount: 0,
+    }) } as any);
+    expect(seen.row.amount).toBe(160_000);
+  });
+
+  it('adds up add-ons server-side', async () => {
+    const seen = trackInsert();
+    await POST({ request: makeReq({
+      ...validBody, checkin_type: 'Day Pass – Student',
+      addons: ['Shoes Rental', 'Pocari'], discount: '',
+    }) } as any);
+    expect(seen.row.amount).toBe(120_000 + 20_000 + 18_000);
+  });
+
+  it('applies a hand-picked discount server-side', async () => {
+    const seen = trackInsert();
+    await POST({ request: makeReq({
+      ...validBody, checkin_type: 'Day Pass – Adult', discount: 'lasthour50',
+    }) } as any);
+    expect(seen.row.amount).toBe(80_000);
+  });
+
+  it('applies a running promotion when no discount is picked', async () => {
+    const seen = trackInsert();
+    await POST({ request: makeReq({
+      ...validBody, date: '2026-09-01', checkin_type: 'Day Pass – Adult',
+    }) } as any);
+    expect(seen.row.amount).toBe(144_000);
+  });
+
+  it('takes the referral percentage from the code row, not from the request', async () => {
+    const seen = trackInsertWithCode({
+      id: 'code-1', code: 'PROMO10', discount_pct: 10, rental_discount_pct: 0,
+      owner_id: null, label: '', is_active: true,
+    });
+    // A client quoting a bargain price gets the 10% the gym actually set.
+    await POST({ request: makeReq({
+      ...validBody, checkin_type: 'Day Pass – Adult',
+      discount: 'referral', referral_code: 'PROMO10', amount: 16_000,
+    }) } as any);
+    expect(seen.row.amount).toBe(144_000);
+    expect(seen.row.referral_discount_pct).toBe(10);
+  });
+
+  it('cuts gear rental by the code rental percentage, retail stock never', async () => {
+    const seen = trackInsertWithCode({
+      id: 'code-1', code: 'HANIE10', discount_pct: 10, rental_discount_pct: 50,
+      owner_id: null, label: '', is_active: true,
+    });
+    await POST({ request: makeReq({
+      ...validBody, checkin_type: 'Day Pass – Adult',
+      addons: ['Shoes Rental', 'Socks'], discount: 'referral', referral_code: 'HANIE10',
+    }) } as any);
+    //     base 144,000 + shoes at half + socks in full
+    expect(seen.row.amount).toBe(144_000 + 10_000 + 10_000);
+    expect(seen.row.addons).toContain('Rental discount: 50%');
+  });
+
+  it('writes the discount and promo trail itself', async () => {
+    const seen = trackInsert();
+    await POST({ request: makeReq({
+      ...validBody, date: '2026-09-01', checkin_type: '10 Punches – Adult',
+      addons: ['Socks'], discount: '',
+    }) } as any);
+    expect(seen.row.addons).toBe('Socks, Promo: National Day Special – +2 bonus punches');
+  });
+
+  it('refuses a discount claim smuggled in as an add-on', async () => {
+    const res = await POST({ request: makeReq({
+      ...validBody, checkin_type: 'Day Pass – Adult',
+      addons: ['Socks', 'Discount: 90% discount – because I said so'],
+    }) } as any);
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/^Unknown add-on:/);
+  });
+
+  it('rejects an unknown check-in type rather than pricing it at zero', async () => {
+    const res = await POST({ request: makeReq({
+      ...validBody, checkin_type: 'Lifetime Pass', addons: [], discount: '',
+    }) } as any);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error: 'Unknown check-in type: Lifetime Pass' });
+  });
+
+  it('rejects an unknown discount', async () => {
+    const res = await POST({ request: makeReq({
+      ...validBody, checkin_type: 'Day Pass – Adult', discount: 'day99',
+    }) } as any);
+    expect(res.status).toBe(400);
+  });
+
+  it('tells an out-of-date page to reload instead of mispricing its payload', async () => {
+    const res = await POST({ request: makeReq({
+      ...validBody, checkin_type: 'Day Pass – Adult',
+      addons: 'Socks, Discount: 30% discount – Day Pass (setting day, less disturbance)',
+      amount: 112_000,
+    }) } as any);
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/out of date/i);
+  });
+
+  it('rejects a code quoted alongside a different discount', async () => {
+    const res = await POST({ request: makeReq({
+      ...validBody, checkin_type: 'Day Pass – Adult',
+      discount: 'day30', referral_code: 'PROMO10',
+    }) } as any);
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/only one discount/i);
+  });
+
+  it('rejects the referral discount with no code to back it', async () => {
+    const res = await POST({ request: makeReq({
+      ...validBody, checkin_type: 'Day Pass – Adult', discount: 'referral',
+    }) } as any);
+    expect(res.status).toBe(400);
+  });
+
+  it('honours an explicit override and records what the price list said', async () => {
+    const seen = trackInsert();
+    await POST({ request: makeReq({
+      ...validBody, checkin_type: 'Day Pass – Adult', amount: 100_000, amount_override: true,
+    }) } as any);
+    expect(seen.row.amount).toBe(100_000);
+    expect(seen.row.addons).toContain('Manual amount (price list: 160,000 ₫)');
+  });
+
+  it('leaves no override note when the override matches the price list anyway', async () => {
+    const seen = trackInsert();
+    await POST({ request: makeReq({
+      ...validBody, checkin_type: 'Day Pass – Adult', amount: 160_000, amount_override: true,
+    }) } as any);
+    expect(seen.row.addons).toBe('');
+  });
+
+  it('never banks a negative override', async () => {
+    const seen = trackInsert();
+    await POST({ request: makeReq({
+      ...validBody, checkin_type: 'Day Pass – Adult', amount: -500_000, amount_override: true,
+    }) } as any);
+    expect(seen.row.amount).toBe(0);
+  });
+
+  it('ignores an amount sent without the override flag', async () => {
+    const seen = trackInsert();
+    await POST({ request: makeReq({
+      ...validBody, checkin_type: 'Day Pass – Adult', amount: 100_000,
+    }) } as any);
+    expect(seen.row.amount).toBe(160_000);
+    expect(seen.row.addons).toBe('');
+  });
+
+  it('reports the charged figure back to the caller', async () => {
+    trackInsert();
+    const res = await POST({ request: makeReq({
+      ...validBody, checkin_type: 'Day Pass – Adult', discount: 'day30',
+    }) } as any);
+    const json = await res.json();
+    expect(json.price.charged).toBe(112_000);
+    expect(json.price.overridden).toBe(false);
   });
 });
