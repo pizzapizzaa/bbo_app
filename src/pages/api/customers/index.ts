@@ -4,6 +4,7 @@ import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
 import { adminOnly, ok, serverError } from '../../../lib/auth';
 import { fetchAllPages } from '../../../lib/paginate';
+import { withRentalPctFallback } from '../../../lib/referral';
 
 // Column map: CSV header → DB column name
 const COL_MAP: Record<string, string> = {
@@ -37,13 +38,14 @@ export const GET: APIRoute = async () => {
   // A missing table (migration not run yet) degrades to "no codes" rather
   // than breaking the whole customer list.
   const codesByOwner = new Map<string, any[]>();
-  const codesResult = await fetchAllPages((from, to) =>
-    db.from('referral_codes')
-      .select('id, code, discount_pct, rental_discount_pct, owner_id, label, is_active, created_at')
-      .not('owner_id', 'is', null)
-      .order('created_at', { ascending: true })
-      .range(from, to)
-  );
+  const codesResult = await withRentalPctFallback((columns) =>
+    fetchAllPages((from, to) =>
+      db.from('referral_codes')
+        .select(columns)
+        .not('owner_id', 'is', null)
+        .order('created_at', { ascending: true })
+        .range(from, to) as PromiseLike<{ data: any[] | null; error: any }>
+    ), 'created_at');
   if (!codesResult.error) {
     codesResult.data.forEach((c: any) => {
       const list = codesByOwner.get(c.owner_id) ?? [];

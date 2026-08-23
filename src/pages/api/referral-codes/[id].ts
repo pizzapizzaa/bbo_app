@@ -3,6 +3,7 @@ export const prerender = false;
 import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
 import { adminOnly, ok, serverError } from '../../../lib/auth';
+import { codeColumns, codePayload, withRentalPctFallback } from '../../../lib/referral';
 import {
   isValidUUID, escapeLike,
   normalizeReferralCode, isValidReferralCode, isValidReferralPct, isValidRentalPct,
@@ -77,16 +78,30 @@ export const PATCH: APIRoute = async ({ params, request }) => {
       return new Response(JSON.stringify({ error: 'No fields to update' }), { status: 400 });
     }
 
-    const { data, error } = await db
-      .from('referral_codes')
-      .update(updates)
-      .eq('id', id)
-      .select('id, code, discount_pct, rental_discount_pct, owner_id, label, is_active, created_at')
-      .single();
+    const { data, error } = await withRentalPctFallback((columns) => {
+      const payload = codePayload(updates);
+      // Dropping rental_discount_pct can empty the payload outright, when that
+      // was the only field being changed. Say so rather than sending an update
+      // with nothing in it.
+      if (Object.keys(payload).length === 0) {
+        return Promise.resolve({ data: null, error: { code: 'NO_RENTAL_COLUMN', message: 'rental discount unavailable' } });
+      }
+      return db
+        .from('referral_codes')
+        .update(payload)
+        .eq('id', id)
+        .select(columns)
+        .single() as PromiseLike<{ data: any; error: any }>;
+    }, 'created_at');
 
     if (error) {
       if (error.code === '23505') {
         return new Response(JSON.stringify({ error: 'That code is already in use.' }), { status: 409 });
+      }
+      if (error.code === 'NO_RENTAL_COLUMN') {
+        return new Response(JSON.stringify({
+          error: 'Rental discounts are unavailable until supabase/migration-rental-discount.sql is run.',
+        }), { status: 400 });
       }
       return serverError(error.message);
     }

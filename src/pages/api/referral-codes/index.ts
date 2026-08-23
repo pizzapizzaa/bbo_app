@@ -4,6 +4,7 @@ import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
 import { adminOnly, ok, serverError } from '../../../lib/auth';
 import { fetchAllPages } from '../../../lib/paginate';
+import { codeColumns, codePayload, withRentalPctFallback } from '../../../lib/referral';
 import {
   isValidUUID, escapeLike,
   normalizeReferralCode, isValidReferralCode, isValidReferralPct, isValidRentalPct,
@@ -53,17 +54,18 @@ export const GET: APIRoute = async ({ url, request }) => {
       return new Response(JSON.stringify({ error: 'Invalid owner id' }), { status: 400 });
     }
 
-    const { data, error } = await fetchAllPages((from, to) => {
-      let q = db
-        .from('referral_codes')
-        .select('id, code, discount_pct, rental_discount_pct, owner_id, label, is_active, created_at')
-        .order('created_at', { ascending: false })
-        .range(from, to);
-      if (owner)                  q = q.eq('owner_id', owner);
-      else if (scope === 'promo') q = q.is('owner_id', null);
-      else if (scope === 'customer') q = q.not('owner_id', 'is', null);
-      return q;
-    });
+    const { data, error } = await withRentalPctFallback((columns) =>
+      fetchAllPages((from, to) => {
+        let q = db
+          .from('referral_codes')
+          .select(columns)
+          .order('created_at', { ascending: false })
+          .range(from, to);
+        if (owner)                  q = q.eq('owner_id', owner);
+        else if (scope === 'promo') q = q.is('owner_id', null);
+        else if (scope === 'customer') q = q.not('owner_id', 'is', null);
+        return q as PromiseLike<{ data: any[] | null; error: any }>;
+      }), 'created_at');
 
     if (error) {
       // 42P01 = table missing → the migration has not been run yet.
@@ -141,18 +143,18 @@ export const POST: APIRoute = async ({ request }) => {
       return new Response(JSON.stringify({ error: 'That code is already in use.' }), { status: 409 });
     }
 
-    const { data, error } = await db
+    const { data, error } = await withRentalPctFallback((columns) => db
       .from('referral_codes')
-      .insert({
+      .insert(codePayload({
         code,
         discount_pct:        pct,
         rental_discount_pct: rentalPct,
         owner_id:            ownerId,
         label:               normalizeCodeLabel(body.label ?? ''),
         is_active:           body.is_active !== false,
-      })
-      .select('id, code, discount_pct, owner_id, label, is_active, created_at')
-      .single();
+      }))
+      .select(columns)
+      .single() as PromiseLike<{ data: any; error: any }>, 'created_at');
 
     if (error) {
       // 23505 = unique violation (race with a concurrent create).

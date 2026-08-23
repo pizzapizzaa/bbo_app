@@ -29,6 +29,79 @@ export type ReferralLookup =
   | { status: 'ok';                                  code: ReferralCode }
   | { status: 'invalid' | 'not_found' | 'inactive';  error: string };
 
+// ── rental_discount_pct compatibility ────────────────────────────────────────
+/**
+ * `referral_codes.rental_discount_pct` arrives with
+ * supabase/migration-rental-discount.sql, which is a manual step. Until it is
+ * run, Postgres rejects every statement naming the column with 42703, and
+ * PostgREST rejects writes with PGRST204 before they reach the database.
+ *
+ * That is a single point of failure for three unrelated screens — the Promo
+ * Codes page, the referral panel on a customer, and the check-in code lookup —
+ * so the column is treated as optional rather than assumed. Queries ask for it;
+ * the first database that says it does not exist flips the flag below, and the
+ * statement is re-issued without it. The discount then reads as 0, i.e. gear
+ * rentals bill in full, which is the default for every code anyway.
+ *
+ * Same bargain as `created_by` in ownership.ts: the feature degrades, the page
+ * does not break.
+ */
+let rentalPctMissing = false;
+
+/** Columns of `referral_codes` that always exist. */
+const CODE_COLUMNS = 'id, code, discount_pct, owner_id, label, is_active';
+
+/**
+ * Column list for a `referral_codes` select, minus `rental_discount_pct` on a
+ * database that lacks it. `extra` is appended verbatim (e.g. `'created_at'`).
+ */
+export function codeColumns(extra = ''): string {
+  return CODE_COLUMNS
+    + (rentalPctMissing ? '' : ', rental_discount_pct')
+    + (extra ? ', ' + extra : '');
+}
+
+/**
+ * Drop `rental_discount_pct` from an insert/update payload when the column is
+ * absent. Reads the flag at call time, so a payload built inside
+ * `withRentalPctFallback` is stripped automatically on the retry.
+ */
+export function codePayload<T extends Record<string, unknown>>(row: T): Record<string, unknown> {
+  if (!rentalPctMissing) return row;
+  const { rental_discount_pct, ...rest } = row;
+  return rest;
+}
+
+function isMissingRentalPct(error: { code?: string; message?: string } | null): boolean {
+  if (!error || rentalPctMissing) return false;
+  const msg = error.message ?? '';
+  if (!/rental_discount_pct/.test(msg)) return false;
+  return error.code === '42703' || error.code === 'PGRST204' || /column/i.test(msg);
+}
+
+/**
+ * Run a `referral_codes` statement, retrying once without
+ * `rental_discount_pct` if the database turns out not to have it.
+ *
+ * `run` receives the column list to select and should build its payload with
+ * `codePayload()`, so both halves of the statement drop the column together.
+ */
+export async function withRentalPctFallback<T extends { error: unknown }>(
+  run: (columns: string) => PromiseLike<T>,
+  extra = '',
+): Promise<T> {
+  const first = await run(codeColumns(extra));
+  if (!isMissingRentalPct(first.error as { code?: string; message?: string } | null)) return first;
+
+  rentalPctMissing = true;
+  console.warn(
+    '[referral] referral_codes.rental_discount_pct is missing — run ' +
+    'supabase/migration-rental-discount.sql. Codes work, but gear rentals bill ' +
+    'in full until then.'
+  );
+  return run(codeColumns(extra));
+}
+
 /**
  * Resolve a quoted code to its row plus the owner's name.
  * Throws on a database error so callers can fall through to serverError().
@@ -38,12 +111,12 @@ export async function lookupReferralCode(raw: string): Promise<ReferralLookup> {
   if (!code)                     return { status: 'invalid', error: 'Enter a referral or promo code.' };
   if (!isValidReferralCode(code)) return { status: 'invalid', error: 'Codes are 3–20 letters, numbers or dashes.' };
 
-  const { data: row, error } = await db
+  const { data: row, error } = await withRentalPctFallback((columns) => db
     .from('referral_codes')
-    .select('id, code, discount_pct, rental_discount_pct, owner_id, label, is_active')
+    .select(columns)
     .ilike('code', escapeLike(code))
     .limit(1)
-    .maybeSingle();
+    .maybeSingle() as PromiseLike<{ data: any; error: any }>);
 
   if (error) throw new Error(error.message);
   // Exact (case-insensitive) match required — a pattern match is not enough to
