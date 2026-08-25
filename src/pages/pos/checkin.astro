@@ -196,47 +196,75 @@ import MainLayout from '../../layouts/MainLayout.astro';
               </svg>
             </button>
             <div id="addons-body" class="hidden">
-              <div class="grid grid-cols-2 gap-y-2 gap-x-3 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2.5">
-                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Chalk Ball" data-price="75000" />
-                  <span>Chalk Ball <span class="text-gray-500 text-xs">75,000 ₫</span></span>
-                </label>
-                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Liquid Chalk Rental" data-price="25000" data-rental="1" />
-                  <span>Liquid Chalk Rental <span class="text-gray-500 text-xs">25,000 ₫</span></span>
-                </label>
-                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Shoes Rental" data-price="20000" data-rental="1" />
-                  <span>Shoes Rental <span class="text-gray-500 text-xs">20,000 ₫</span></span>
-                </label>
-                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Chalk Bag Rental" data-price="15000" data-rental="1" />
-                  <span>Chalk Bag Rental <span class="text-gray-500 text-xs">15,000 ₫</span></span>
-                </label>
-                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Vitani Dasani" data-price="8000" />
-                  <span>Vitani Dasani <span class="text-gray-500 text-xs">8,000 ₫</span></span>
-                </label>
-                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Ionlife" data-price="10000" />
-                  <span>Ionlife <span class="text-gray-500 text-xs">10,000 ₫</span></span>
-                </label>
-                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Pocari" data-price="18000" />
-                  <span>Pocari <span class="text-gray-500 text-xs">18,000 ₫</span></span>
-                </label>
-                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Liquid Chalk Small" data-price="70000" />
-                  <span>Liquid Chalk Small <span class="text-gray-500 text-xs">70,000 ₫</span></span>
-                </label>
-                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Liquid Chalk Big" data-price="150000" />
-                  <span>Liquid Chalk Big <span class="text-gray-500 text-xs">150,000 ₫</span></span>
-                </label>
-                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Socks" data-price="10000" />
-                  <span>Socks <span class="text-gray-500 text-xs">10,000 ₫</span></span>
-                </label>
+              <!-- Two columns by what the item is: gear you climb with on the
+                   left, drinks on the right. Stacks to one column on narrow
+                   screens so the desk tablet keeps full-width touch targets. -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4
+                          bg-gray-800 border border-gray-600 rounded-lg px-3 py-2.5">
+
+                <!-- ── Climbing ── -->
+                <div class="space-y-2">
+                  <p class="text-xs text-gray-500 uppercase tracking-wide">Climbing</p>
+
+                  <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                    <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Shoes Rental" data-price="20000" data-rental="1" />
+                    <span>Shoes Rental <span class="text-gray-500 text-xs">20,000 ₫</span></span>
+                  </label>
+
+                  <!-- Chalk bags are priced per group, not per bag, so the tier
+                       is picked with a stepper. syncChalkBag() writes the tier's
+                       price and label back onto the checkbox, which keeps the
+                       totals, the CSV add-ons string and the rental-discount
+                       lookup working off the same data attributes as every
+                       other add-on. -->
+                  <div>
+                    <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                      <input type="checkbox" id="addon-chalk-bag"
+                             class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer"
+                             data-name="Chalk Bag Rental" data-price="15000" data-rental="1" />
+                      <span>Chalk Bag Rental <span id="chalk-bag-price" class="text-gray-500 text-xs">15,000 ₫</span></span>
+                    </label>
+                    <div id="chalk-bag-qty" class="hidden mt-1.5 ml-6 flex items-center gap-2">
+                      <button type="button" id="chalk-bag-dec" aria-label="Fewer people"
+                              class="w-8 h-8 rounded-md bg-gray-700 hover:bg-gray-600 text-gray-200
+                                     text-lg leading-none focus:outline-none focus:ring-2 focus:ring-orange-400
+                                     disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-gray-700">−</button>
+                      <span id="chalk-bag-label" class="text-xs text-gray-400 min-w-[64px] text-center">1 person</span>
+                      <button type="button" id="chalk-bag-inc" aria-label="More people"
+                              class="w-8 h-8 rounded-md bg-gray-700 hover:bg-gray-600 text-gray-200
+                                     text-lg leading-none focus:outline-none focus:ring-2 focus:ring-orange-400
+                                     disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-gray-700">+</button>
+                    </div>
+                  </div>
+
+                  <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                    <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Chalk Block" data-price="65000" />
+                    <span>Chalk Block <span class="text-gray-500 text-xs">65,000 ₫</span></span>
+                  </label>
+                  <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                    <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Socks" data-price="10000" />
+                    <span>Socks <span class="text-gray-500 text-xs">10,000 ₫</span></span>
+                  </label>
+                </div>
+
+                <!-- ── Beverages ── -->
+                <div class="space-y-2">
+                  <p class="text-xs text-gray-500 uppercase tracking-wide">Beverages</p>
+
+                  <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                    <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Vitani Dasani" data-price="8000" />
+                    <span>Vitani Dasani <span class="text-gray-500 text-xs">8,000 ₫</span></span>
+                  </label>
+                  <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                    <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Ionlife" data-price="10000" />
+                    <span>Ionlife <span class="text-gray-500 text-xs">10,000 ₫</span></span>
+                  </label>
+                  <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                    <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Pocari" data-price="18000" />
+                    <span>Pocari <span class="text-gray-500 text-xs">18,000 ₫</span></span>
+                  </label>
+                </div>
+
               </div>
             </div>
           </div>
@@ -989,6 +1017,51 @@ import MainLayout from '../../layouts/MainLayout.astro';
     document.querySelectorAll('.addon-cb').forEach(function (cb) {
       cb.addEventListener('change', recalcAmount);
     });
+
+    // ── Chalk bag rental: one price for the whole group, by head count ──
+    // 3 means "3 or more" — the top tier is flat, so there is nothing above it.
+    var CHALK_BAG_TIERS = [
+      { people: 1, price: 15000, label: '1 person'    },
+      { people: 2, price: 20000, label: '2 people'    },
+      { people: 3, price: 25000, label: '3+ people'   }
+    ];
+    var chalkBagTier = 0;   // index into CHALK_BAG_TIERS
+
+    /**
+     * Push the current tier onto the checkbox's data attributes so every
+     * existing consumer — _addonTotals(), the add-ons string, the CSV export —
+     * reads the right price and label without knowing tiers exist.
+     */
+    function syncChalkBag() {
+      var cb   = document.getElementById('addon-chalk-bag');
+      var tier = CHALK_BAG_TIERS[chalkBagTier];
+      cb.dataset.price = String(tier.price);
+      cb.dataset.name  = 'Chalk Bag Rental (' + tier.label + ')';
+      document.getElementById('chalk-bag-price').textContent = tier.price.toLocaleString('en-US') + ' ₫';
+      document.getElementById('chalk-bag-label').textContent = tier.label;
+      document.getElementById('chalk-bag-qty').classList.toggle('hidden', !cb.checked);
+      document.getElementById('chalk-bag-dec').disabled = chalkBagTier === 0;
+      document.getElementById('chalk-bag-inc').disabled = chalkBagTier === CHALK_BAG_TIERS.length - 1;
+      recalcAmount();
+    }
+
+    function stepChalkBag(delta) {
+      var next = chalkBagTier + delta;
+      if (next < 0 || next >= CHALK_BAG_TIERS.length) return;
+      chalkBagTier = next;
+      syncChalkBag();
+    }
+
+    document.getElementById('addon-chalk-bag').addEventListener('change', syncChalkBag);
+    document.getElementById('chalk-bag-dec').addEventListener('click', function () { stepChalkBag(-1); });
+    document.getElementById('chalk-bag-inc').addEventListener('click', function () { stepChalkBag(1); });
+
+    /** Back to "1 person", stepper hidden — used on load and after each save. */
+    function resetChalkBag() {
+      chalkBagTier = 0;
+      syncChalkBag();
+    }
+    resetChalkBag();
     document.querySelectorAll('.discount-rb').forEach(function (rb) {
       rb.addEventListener('change', function () {
         var isReferral = this.value === 'referral';
@@ -1141,6 +1214,7 @@ import MainLayout from '../../layouts/MainLayout.astro';
           clearCustomerSelection();
           document.getElementById('f-checkin-type').value = '';
           document.querySelectorAll('.addon-cb').forEach(function (cb) { cb.checked = false; });
+          resetChalkBag();
           var noDiscRb = document.querySelector('.discount-rb[value=""]');
           if (noDiscRb) noDiscRb.checked = true;
           document.getElementById('f-amount').value     = '';
