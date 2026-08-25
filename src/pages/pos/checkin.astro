@@ -4,24 +4,426 @@ import MainLayout from '../../layouts/MainLayout.astro';
 
 <MainLayout title="Daily Check-in" activePage="checkin">
 
-  <!-- Daily stats + Date selector -->
-  <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+  <!-- ── Check-in Form ──────────────────────────────────────────────────────
+       Below `lg` this is the narrow vertical card the front desk uses on a
+       phone — one field per row, in the order staff work through them.
+       From `lg` up (desktop and landscape tablet) the same card goes full
+       width and the fields flow into rows, so a check-in fits on screen
+       without scrolling and the day's tracker sits right below it. -->
+  <div class="bg-gray-900 rounded-xl shadow-lg p-6 mb-6">
+    <h2 class="font-semibold text-white mb-5 tracking-wide">New Check-in</h2>
 
-    <!-- Daily stats (left — aligned with check-in card) -->
-    <div class="flex items-center gap-4">
-      <div class="text-center">
-        <p class="text-xs text-gray-500 uppercase tracking-wide">Check-ins</p>
-        <p id="stat-count" class="text-2xl font-bold text-gray-900">0</p>
+    <form id="checkin-form" class="space-y-4 lg:space-y-5" novalidate>
+
+      <!-- ── Row 1: who, when, what ── -->
+      <div class="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-12">
+
+        <!-- Customer search (select from dropdown only — no free entry) -->
+        <div class="xl:col-span-4">
+          <label class="block text-sm font-medium text-gray-300 mb-1.5">
+            Customer <span class="text-red-400">*</span>
+          </label>
+          <!-- Hidden value holder: written by picker, read by form submit -->
+          <input id="f-customer" type="hidden" value="" />
+          <div class="relative">
+            <input
+              id="f-customer-search"
+              type="text"
+              placeholder="Search customer name…"
+              autocomplete="off"
+              class="w-full bg-gray-800 border border-gray-600 text-white placeholder-gray-500 rounded-lg px-3 py-2 pr-8 text-sm
+                     focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+            />
+            <!-- Clear selection button -->
+            <button
+              type="button"
+              id="f-customer-clear"
+              class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white p-0.5"
+              title="Clear selection"
+              onclick="clearCustomerSelection()"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+            <!-- Live dropdown -->
+            <ul
+              id="f-customer-dropdown"
+              class="hidden absolute z-50 left-0 right-0 mt-1 bg-gray-800 border border-gray-600
+                     rounded-lg overflow-y-auto shadow-2xl max-h-52"
+            ></ul>
+          </div>
+          <!-- Shown only when "Other" is selected -->
+          <div id="f-other-name-row" class="hidden mt-2">
+            <input
+              id="f-other-name"
+              type="text"
+              placeholder="Note customer name for records…"
+              class="w-full bg-gray-800 border border-orange-500/60 text-white placeholder-gray-500
+                     rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+            />
+          </div>
+          <p id="customer-hint" class="text-xs text-gray-500 mt-1">
+            Load customers on the <a href="/pos/customers" class="text-orange-400 hover:underline">Customers</a> page first.
+          </p>
+        </div>
+
+        <!-- Check-in Date + Time -->
+        <div class="grid grid-cols-2 gap-3 xl:col-span-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1.5">
+              Date <span class="text-red-400">*</span>
+            </label>
+            <input
+              id="f-checkin-date"
+              type="date"
+              class="w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm
+                     focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1.5">
+              Time <span class="text-red-400">*</span>
+            </label>
+            <input
+              id="f-checkin-time"
+              type="time"
+              class="w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm
+                     focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+            />
+          </div>
+        </div>
+
+        <!-- Check-in Type -->
+        <div class="lg:col-span-2 xl:col-span-4">
+          <label class="block text-sm font-medium text-gray-300 mb-1.5">Check-in Type</label>
+          <select
+            id="f-checkin-type"
+            class="w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm
+                   focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+          >
+            <option value="" data-price="0">— Select type —</option>
+            <optgroup label="Day Pass">
+              <option value="Day Pass – Adult" data-price="160000">Day Pass – Adult (160,000 ₫)</option>
+              <option value="Day Pass – Student" data-price="120000">Day Pass – Student (120,000 ₫)</option>
+              <option value="Day Pass – Kid" data-price="100000">Day Pass – Kid (100,000 ₫)</option>
+            </optgroup>
+            <optgroup label="10 Punches">
+              <option value="10 Punches – Adult" data-price="1400000">10 Punches – Adult (1,400,000 ₫)</option>
+              <option value="10 Punches – Student" data-price="1000000">10 Punches – Student (1,000,000 ₫)</option>
+              <option value="10 Punches – Kid" data-price="800000">10 Punches – Kid (800,000 ₫)</option>
+            </optgroup>
+            <optgroup label="20 Punches">
+              <option value="20 Punches – Adult" data-price="2500000">20 Punches – Adult (2,500,000 ₫)</option>
+            </optgroup>
+            <optgroup label="PT Punches">
+              <option value="10 PT Punches – Shingo PT" data-price="0">10 PT Punches – Shingo PT</option>
+              <option value="10 PT Punches – Other PT" data-price="0">10 PT Punches – Other PT</option>
+            </optgroup>
+            <optgroup label="Membership">
+              <option value="Membership – 1 Month" data-price="1250000">Membership – 1 Month (1,250,000 ₫)</option>
+              <option value="Membership – 3 Months" data-price="3050000">Membership – 3 Months (3,050,000 ₫)</option>
+              <option value="Membership – 6 Months" data-price="5650000">Membership – 6 Months (5,650,000 ₫)</option>
+              <option value="Membership – 12 Months" data-price="9850000">Membership – 12 Months (9,850,000 ₫)</option>
+            </optgroup>
+          </select>
+        </div>
+
       </div>
-      <div class="w-px h-10 bg-gray-200"></div>
-      <div class="text-center">
-        <p class="text-xs text-gray-500 uppercase tracking-wide">Revenue</p>
-        <p id="stat-rev" class="text-2xl font-bold text-orange-500">0 ₫</p>
+
+      <!-- ── Row 2: the two optional panels, side by side once there is room ── -->
+      <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+
+        <!-- Add-ons (collapsible) -->
+        <div>
+          <button type="button" onclick="toggleAddons()"
+                  class="w-full flex items-center justify-between text-sm font-medium text-gray-300 mb-1.5 focus:outline-none">
+            <span>Add-ons</span>
+            <svg id="addons-chevron" class="w-4 h-4 transition-transform duration-200"
+                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
+          <div id="addons-body" class="hidden">
+            <!-- Two columns by what the item is: gear you climb with on the
+                 left, everything you consume — drinks and snacks — on the
+                 right. Stacks to one column on narrow screens so the desk
+                 tablet keeps full-width touch targets. -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4
+                        bg-gray-800 border border-gray-600 rounded-lg px-3 py-2.5">
+
+              <!-- ── Climbing ── -->
+              <div class="space-y-2">
+                <p class="text-xs text-gray-500 uppercase tracking-wide">Climbing</p>
+
+                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Shoes Rental" data-price="20000" data-rental="1" />
+                  <span>Shoes Rental <span class="text-gray-500 text-xs">20,000 ₫</span></span>
+                </label>
+
+                <!-- Chalk bags are priced per group, not per bag, so the tier
+                     is picked with a stepper. syncChalkBag() writes the tier's
+                     price and label back onto the checkbox, which keeps the
+                     totals, the CSV add-ons string and the rental-discount
+                     lookup working off the same data attributes as every
+                     other add-on. -->
+                <div>
+                  <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                    <input type="checkbox" id="addon-chalk-bag"
+                           class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer"
+                           data-name="Chalk Bag Rental" data-price="15000" data-rental="1" />
+                    <span>Chalk Bag Rental <span id="chalk-bag-price" class="text-gray-500 text-xs">15,000 ₫</span></span>
+                  </label>
+                  <div id="chalk-bag-qty" class="hidden mt-1.5 ml-6 flex items-center gap-2">
+                    <button type="button" id="chalk-bag-dec" aria-label="Fewer people"
+                            class="w-8 h-8 rounded-md bg-gray-700 hover:bg-gray-600 text-gray-200
+                                   text-lg leading-none focus:outline-none focus:ring-2 focus:ring-orange-400
+                                   disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-gray-700">−</button>
+                    <span id="chalk-bag-label" class="text-xs text-gray-400 min-w-[64px] text-center">1 person</span>
+                    <button type="button" id="chalk-bag-inc" aria-label="More people"
+                            class="w-8 h-8 rounded-md bg-gray-700 hover:bg-gray-600 text-gray-200
+                                   text-lg leading-none focus:outline-none focus:ring-2 focus:ring-orange-400
+                                   disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-gray-700">+</button>
+                  </div>
+                </div>
+
+                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Chalk Block" data-price="65000" />
+                  <span>Chalk Block <span class="text-gray-500 text-xs">65,000 ₫</span></span>
+                </label>
+                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Socks" data-price="10000" />
+                  <span>Socks <span class="text-gray-500 text-xs">10,000 ₫</span></span>
+                </label>
+              </div>
+
+              <!-- ── Food & Drinks ── -->
+              <div class="space-y-2">
+                <p class="text-xs text-gray-500 uppercase tracking-wide">Food &amp; Drinks</p>
+
+                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Vitani Dasani" data-price="8000" />
+                  <span>Vitani Dasani <span class="text-gray-500 text-xs">8,000 ₫</span></span>
+                </label>
+                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Ionlife" data-price="10000" />
+                  <span>Ionlife <span class="text-gray-500 text-xs">10,000 ₫</span></span>
+                </label>
+                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Pocari" data-price="18000" />
+                  <span>Pocari <span class="text-gray-500 text-xs">18,000 ₫</span></span>
+                </label>
+                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Apple" data-price="33000" />
+                  <span>Apple <span class="text-gray-500 text-xs">33,000 ₫</span></span>
+                </label>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <!-- Discount (collapsible) -->
+        <div>
+          <button type="button" onclick="toggleDiscount()"
+                  class="w-full flex items-center justify-between text-sm font-medium text-gray-300 mb-1.5 focus:outline-none">
+            <span>Discount</span>
+            <svg id="discount-chevron" class="w-4 h-4 transition-transform duration-200"
+                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
+          <div id="discount-body" class="hidden">
+            <div class="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2.5 space-y-2">
+              <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                <input type="radio" name="discount" class="discount-rb accent-orange-500 w-4 h-4 cursor-pointer" value="" checked />
+                <span class="text-gray-400">No discount</span>
+              </label>
+              <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                <input type="radio" name="discount" class="discount-rb accent-orange-500 w-4 h-4 cursor-pointer" value="day30" />
+                <span>30% discount <span class="text-gray-500 text-xs">Day Pass – setting day (less disturbance)</span></span>
+              </label>
+              <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                <input type="radio" name="discount" class="discount-rb accent-orange-500 w-4 h-4 cursor-pointer" value="day40" />
+                <span>40% discount <span class="text-gray-500 text-xs">Day Pass – setting day (more disturbance)</span></span>
+              </label>
+              <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                <input type="radio" name="discount" class="discount-rb accent-orange-500 w-4 h-4 cursor-pointer" value="lasthour50" />
+                <span>50% discount <span class="text-gray-500 text-xs">Day Pass (late entry)</span></span>
+              </label>
+              <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                <input type="radio" name="discount" class="discount-rb accent-orange-500 w-4 h-4 cursor-pointer" value="birthday" />
+                <span>Birthday discount <span class="text-gray-500 text-xs">Free shoes or 20,000 ₫ off</span></span>
+              </label>
+              <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                <input type="radio" name="discount" class="discount-rb accent-orange-500 w-4 h-4 cursor-pointer" value="referral" />
+                <span>Referral / promo code <span class="text-gray-500 text-xs">Discount set by the code</span></span>
+              </label>
+              <!-- Code entry — only relevant when "Referral / promo code" is picked -->
+              <div id="referral-code-row" class="hidden pl-6">
+                <input
+                  id="f-referral-code"
+                  type="text"
+                  maxlength="20"
+                  placeholder="Enter referral or promo code…"
+                  autocomplete="off"
+                  class="w-full bg-gray-900 border border-gray-600 text-white placeholder-gray-500 font-mono uppercase
+                         rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
+                />
+                <p id="referral-status" class="text-xs text-gray-500 mt-1">
+                  Ask the customer for the code shared with them.
+                </p>
+                <!-- Cross-check: flags a fixed discount above that would beat this code -->
+                <p id="referral-overlap" class="hidden text-xs text-yellow-400 mt-1"></p>
+              </div>
+              <p class="text-xs text-gray-500 pt-1 border-t border-gray-700">
+                Only one discount applies per check-in — picking one clears the others.
+              </p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ── Row 3: how it is paid for ──────────────────────────────────────
+           A wrapping flex row rather than a fixed grid: the two "use punch
+           from" fields appear only for their payment method, and flex lets
+           the remaining fields close the gap instead of leaving a hole. -->
+      <div class="flex flex-col gap-4 lg:flex-row lg:flex-wrap">
+
+        <!-- Payment method -->
+        <div class="lg:flex-1 lg:min-w-[180px]">
+          <label class="block text-sm font-medium text-gray-300 mb-1.5">
+            Payment Method <span class="text-red-400">*</span>
+          </label>
+          <select
+            id="f-payment"
+            class="w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm
+                   focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+          >
+            <option value="">— Select —</option>
+            <option value="Cash">Cash</option>
+            <option value="Local Card">Local Card</option>
+            <option value="International Card">International Card</option>
+            <option value="Local Bank Transfer">Local Bank Transfer</option>
+            <option value="Complimentary">Complimentary</option>
+            <option value="Punch Card">Punch Card</option>
+            <option value="PT Punch">PT Punch</option>
+            <option value="Valid Membership">Valid Membership</option>
+          </select>
+        </div>
+
+        <!-- Use punch from (shown only when Punch Card is selected) -->
+        <div id="punch-from-row" class="hidden lg:flex-1 lg:min-w-[200px]">
+          <label class="block text-sm font-medium text-gray-300 mb-1.5">
+            Use punch from <span class="text-red-400">*</span>
+          </label>
+          <select
+            id="f-punch-from"
+            class="w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm
+                   focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+          >
+            <option value="">— Select punch card holder —</option>
+          </select>
+          <p id="punch-from-hint" class="hidden text-xs text-yellow-400 mt-1">No punch card holders with remaining punches found.</p>
+        </div>
+
+        <!-- Use PT punch from (shown only when PT Punch is selected) -->
+        <div id="pt-punch-from-row" class="hidden lg:flex-1 lg:min-w-[200px]">
+          <label class="block text-sm font-medium text-gray-300 mb-1.5">
+            Use PT punch from <span class="text-red-400">*</span>
+          </label>
+          <select
+            id="f-pt-punch-from"
+            class="w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm
+                   focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
+          >
+            <option value="">— Select PT punch holder —</option>
+          </select>
+          <p id="pt-punch-from-hint" class="hidden text-xs text-yellow-400 mt-1">No customers with remaining PT punches found.</p>
+        </div>
+
+        <!-- Amount -->
+        <div class="lg:flex-1 lg:min-w-[160px]">
+          <label class="block text-sm font-medium text-gray-300 mb-1.5">
+            Amount (VND) <span class="text-gray-500 text-xs font-normal">— auto-calculated</span>
+          </label>
+          <input
+            id="f-amount"
+            type="number"
+            min="0"
+            step="0.01"
+            placeholder="0.00"
+            class="w-full bg-gray-800 border border-gray-600 text-white placeholder-gray-500 rounded-lg px-3 py-2 text-sm
+                   focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+          />
+        </div>
+
+        <!-- Notes -->
+        <div class="lg:flex-1 lg:min-w-[200px]">
+          <label class="block text-sm font-medium text-gray-300 mb-1.5">Notes</label>
+          <input
+            id="f-notes"
+            type="text"
+            placeholder="Optional…"
+            class="w-full bg-gray-800 border border-gray-600 text-white placeholder-gray-500 rounded-lg px-3 py-2 text-sm
+                   focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+          />
+        </div>
+
+      </div>
+
+      <!-- Error -->
+      <div id="form-error" class="hidden text-sm text-red-400 bg-red-900/40 border border-red-700 rounded-lg px-3 py-2"></div>
+
+      <!-- ── Row 4: confirm ── -->
+      <div class="flex flex-col gap-4 lg:flex-row lg:items-center">
+        <!-- Check-in timestamp preview -->
+        <div class="lg:flex-1 text-xs text-gray-400 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2">
+          Timestamp: <span id="ts-preview" class="font-medium text-gray-200"></span>
+        </div>
+
+        <button
+          type="submit"
+          class="w-full lg:w-auto lg:min-w-[220px] bg-orange-500 hover:bg-orange-600 text-white font-semibold
+                 py-3 lg:px-8 rounded-lg text-sm transition active:scale-[0.98] flex items-center justify-center gap-2"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          Record Check-in
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ── Daily tracker: stats, date range and the check-ins table ──────────
+       Everything that reads the day rather than records it lives here, below
+       the check-in card, so the range pickers sit next to the list they
+       filter instead of at the top of the page. -->
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+
+    <!-- Title + daily stats -->
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <h2 class="font-semibold text-gray-800">
+        Check-ins: <span id="table-date-label" class="text-orange-500"></span>
+      </h2>
+      <div class="flex items-center gap-4">
+        <div class="text-center">
+          <p class="text-xs text-gray-500 uppercase tracking-wide">Check-ins</p>
+          <p id="stat-count" class="text-2xl font-bold text-gray-900">0</p>
+        </div>
+        <div class="w-px h-10 bg-gray-200"></div>
+        <div class="text-center">
+          <p class="text-xs text-gray-500 uppercase tracking-wide">Revenue</p>
+          <p id="stat-rev" class="text-2xl font-bold text-orange-500">0 ₫</p>
+        </div>
       </div>
     </div>
 
-    <!-- Date range selector (right — aligned with check-in list) -->
-    <div class="flex flex-wrap items-center gap-2">
+    <!-- Date range selector + quick ranges + export -->
+    <div class="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-gray-100">
       <label class="text-sm font-medium text-gray-600">From:</label>
       <input
         id="view-from"
@@ -62,422 +464,43 @@ import MainLayout from '../../layouts/MainLayout.astro';
                      rounded-lg text-xs font-medium transition">
         Prev Month
       </button>
-    </div>
-  </div>
-
-  <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-
-    <!-- ── Check-in Form ── -->
-    <div class="xl:col-span-1">
-      <div class="bg-gray-900 rounded-xl shadow-lg p-6">
-        <h2 class="font-semibold text-white mb-5 tracking-wide">New Check-in</h2>
-
-        <form id="checkin-form" class="space-y-4" novalidate>
-
-          <!-- Customer search (select from dropdown only — no free entry) -->
-          <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1.5">
-              Customer <span class="text-red-400">*</span>
-            </label>
-            <!-- Hidden value holder: written by picker, read by form submit -->
-            <input id="f-customer" type="hidden" value="" />
-            <div class="relative">
-              <input
-                id="f-customer-search"
-                type="text"
-                placeholder="Search customer name…"
-                autocomplete="off"
-                class="w-full bg-gray-800 border border-gray-600 text-white placeholder-gray-500 rounded-lg px-3 py-2 pr-8 text-sm
-                       focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-              />
-              <!-- Clear selection button -->
-              <button
-                type="button"
-                id="f-customer-clear"
-                class="hidden absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white p-0.5"
-                title="Clear selection"
-                onclick="clearCustomerSelection()"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-              </button>
-              <!-- Live dropdown -->
-              <ul
-                id="f-customer-dropdown"
-                class="hidden absolute z-50 left-0 right-0 mt-1 bg-gray-800 border border-gray-600
-                       rounded-lg overflow-y-auto shadow-2xl max-h-52"
-              ></ul>
-            </div>
-            <!-- Shown only when "Other" is selected -->
-            <div id="f-other-name-row" class="hidden mt-2">
-              <input
-                id="f-other-name"
-                type="text"
-                placeholder="Note customer name for records…"
-                class="w-full bg-gray-800 border border-orange-500/60 text-white placeholder-gray-500
-                       rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
-              />
-            </div>
-            <p id="customer-hint" class="text-xs text-gray-500 mt-1">
-              Load customers on the <a href="/pos/customers" class="text-orange-400 hover:underline">Customers</a> page first.
-            </p>
-          </div>
-
-          <!-- Check-in Date + Time -->
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-sm font-medium text-gray-300 mb-1.5">
-                Date <span class="text-red-400">*</span>
-              </label>
-              <input
-                id="f-checkin-date"
-                type="date"
-                class="w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm
-                       focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-              />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-300 mb-1.5">
-                Time <span class="text-red-400">*</span>
-              </label>
-              <input
-                id="f-checkin-time"
-                type="time"
-                class="w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm
-                       focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-              />
-            </div>
-          </div>
-
-          <!-- Check-in Type -->
-          <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1.5">Check-in Type</label>
-            <select
-              id="f-checkin-type"
-              class="w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm
-                     focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-            >
-              <option value="" data-price="0">— Select type —</option>
-              <optgroup label="Day Pass">
-                <option value="Day Pass – Adult" data-price="160000">Day Pass – Adult (160,000 ₫)</option>
-                <option value="Day Pass – Student" data-price="120000">Day Pass – Student (120,000 ₫)</option>
-                <option value="Day Pass – Kid" data-price="100000">Day Pass – Kid (100,000 ₫)</option>
-              </optgroup>
-              <optgroup label="10 Punches">
-                <option value="10 Punches – Adult" data-price="1400000">10 Punches – Adult (1,400,000 ₫)</option>
-                <option value="10 Punches – Student" data-price="1000000">10 Punches – Student (1,000,000 ₫)</option>
-                <option value="10 Punches – Kid" data-price="800000">10 Punches – Kid (800,000 ₫)</option>
-              </optgroup>
-              <optgroup label="20 Punches">
-                <option value="20 Punches – Adult" data-price="2500000">20 Punches – Adult (2,500,000 ₫)</option>
-              </optgroup>
-              <optgroup label="PT Punches">
-                <option value="10 PT Punches – Shingo PT" data-price="0">10 PT Punches – Shingo PT</option>
-                <option value="10 PT Punches – Other PT" data-price="0">10 PT Punches – Other PT</option>
-              </optgroup>
-              <optgroup label="Membership">
-                <option value="Membership – 1 Month" data-price="1250000">Membership – 1 Month (1,250,000 ₫)</option>
-                <option value="Membership – 3 Months" data-price="3050000">Membership – 3 Months (3,050,000 ₫)</option>
-                <option value="Membership – 6 Months" data-price="5650000">Membership – 6 Months (5,650,000 ₫)</option>
-                <option value="Membership – 12 Months" data-price="9850000">Membership – 12 Months (9,850,000 ₫)</option>
-              </optgroup>
-            </select>
-          </div>
-
-          <!-- Add-ons (collapsible) -->
-          <div>
-            <button type="button" onclick="toggleAddons()"
-                    class="w-full flex items-center justify-between text-sm font-medium text-gray-300 mb-1.5 focus:outline-none">
-              <span>Add-ons</span>
-              <svg id="addons-chevron" class="w-4 h-4 transition-transform duration-200"
-                   fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-              </svg>
-            </button>
-            <div id="addons-body" class="hidden">
-              <!-- Two columns by what the item is: gear you climb with on the
-                   left, drinks on the right. Stacks to one column on narrow
-                   screens so the desk tablet keeps full-width touch targets. -->
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4
-                          bg-gray-800 border border-gray-600 rounded-lg px-3 py-2.5">
-
-                <!-- ── Climbing ── -->
-                <div class="space-y-2">
-                  <p class="text-xs text-gray-500 uppercase tracking-wide">Climbing</p>
-
-                  <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                    <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Shoes Rental" data-price="20000" data-rental="1" />
-                    <span>Shoes Rental <span class="text-gray-500 text-xs">20,000 ₫</span></span>
-                  </label>
-
-                  <!-- Chalk bags are priced per group, not per bag, so the tier
-                       is picked with a stepper. syncChalkBag() writes the tier's
-                       price and label back onto the checkbox, which keeps the
-                       totals, the CSV add-ons string and the rental-discount
-                       lookup working off the same data attributes as every
-                       other add-on. -->
-                  <div>
-                    <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                      <input type="checkbox" id="addon-chalk-bag"
-                             class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer"
-                             data-name="Chalk Bag Rental" data-price="15000" data-rental="1" />
-                      <span>Chalk Bag Rental <span id="chalk-bag-price" class="text-gray-500 text-xs">15,000 ₫</span></span>
-                    </label>
-                    <div id="chalk-bag-qty" class="hidden mt-1.5 ml-6 flex items-center gap-2">
-                      <button type="button" id="chalk-bag-dec" aria-label="Fewer people"
-                              class="w-8 h-8 rounded-md bg-gray-700 hover:bg-gray-600 text-gray-200
-                                     text-lg leading-none focus:outline-none focus:ring-2 focus:ring-orange-400
-                                     disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-gray-700">−</button>
-                      <span id="chalk-bag-label" class="text-xs text-gray-400 min-w-[64px] text-center">1 person</span>
-                      <button type="button" id="chalk-bag-inc" aria-label="More people"
-                              class="w-8 h-8 rounded-md bg-gray-700 hover:bg-gray-600 text-gray-200
-                                     text-lg leading-none focus:outline-none focus:ring-2 focus:ring-orange-400
-                                     disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-gray-700">+</button>
-                    </div>
-                  </div>
-
-                  <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                    <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Chalk Block" data-price="65000" />
-                    <span>Chalk Block <span class="text-gray-500 text-xs">65,000 ₫</span></span>
-                  </label>
-                  <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                    <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Socks" data-price="10000" />
-                    <span>Socks <span class="text-gray-500 text-xs">10,000 ₫</span></span>
-                  </label>
-                </div>
-
-                <!-- ── Beverages ── -->
-                <div class="space-y-2">
-                  <p class="text-xs text-gray-500 uppercase tracking-wide">Beverages</p>
-
-                  <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                    <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Vitani Dasani" data-price="8000" />
-                    <span>Vitani Dasani <span class="text-gray-500 text-xs">8,000 ₫</span></span>
-                  </label>
-                  <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                    <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Ionlife" data-price="10000" />
-                    <span>Ionlife <span class="text-gray-500 text-xs">10,000 ₫</span></span>
-                  </label>
-                  <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                    <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Pocari" data-price="18000" />
-                    <span>Pocari <span class="text-gray-500 text-xs">18,000 ₫</span></span>
-                  </label>
-                </div>
-
-              </div>
-            </div>
-          </div>
-
-          <!-- Discount (collapsible) -->
-          <div>
-            <button type="button" onclick="toggleDiscount()"
-                    class="w-full flex items-center justify-between text-sm font-medium text-gray-300 mb-1.5 focus:outline-none">
-              <span>Discount</span>
-              <svg id="discount-chevron" class="w-4 h-4 transition-transform duration-200"
-                   fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-              </svg>
-            </button>
-            <div id="discount-body" class="hidden">
-              <div class="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2.5 space-y-2">
-                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                  <input type="radio" name="discount" class="discount-rb accent-orange-500 w-4 h-4 cursor-pointer" value="" checked />
-                  <span class="text-gray-400">No discount</span>
-                </label>
-                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                  <input type="radio" name="discount" class="discount-rb accent-orange-500 w-4 h-4 cursor-pointer" value="day30" />
-                  <span>30% discount <span class="text-gray-500 text-xs">Day Pass – setting day (less disturbance)</span></span>
-                </label>
-                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                  <input type="radio" name="discount" class="discount-rb accent-orange-500 w-4 h-4 cursor-pointer" value="day40" />
-                  <span>40% discount <span class="text-gray-500 text-xs">Day Pass – setting day (more disturbance)</span></span>
-                </label>
-                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                  <input type="radio" name="discount" class="discount-rb accent-orange-500 w-4 h-4 cursor-pointer" value="lasthour50" />
-                  <span>50% discount <span class="text-gray-500 text-xs">Day Pass (late entry)</span></span>
-                </label>
-                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                  <input type="radio" name="discount" class="discount-rb accent-orange-500 w-4 h-4 cursor-pointer" value="birthday" />
-                  <span>Birthday discount <span class="text-gray-500 text-xs">Free shoes or 20,000 ₫ off</span></span>
-                </label>
-                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                  <input type="radio" name="discount" class="discount-rb accent-orange-500 w-4 h-4 cursor-pointer" value="referral" />
-                  <span>Referral / promo code <span class="text-gray-500 text-xs">Discount set by the code</span></span>
-                </label>
-                <!-- Code entry — only relevant when "Referral / promo code" is picked -->
-                <div id="referral-code-row" class="hidden pl-6">
-                  <input
-                    id="f-referral-code"
-                    type="text"
-                    maxlength="20"
-                    placeholder="Enter referral or promo code…"
-                    autocomplete="off"
-                    class="w-full bg-gray-900 border border-gray-600 text-white placeholder-gray-500 font-mono uppercase
-                           rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400"
-                  />
-                  <p id="referral-status" class="text-xs text-gray-500 mt-1">
-                    Ask the customer for the code shared with them.
-                  </p>
-                  <!-- Cross-check: flags a fixed discount above that would beat this code -->
-                  <p id="referral-overlap" class="hidden text-xs text-yellow-400 mt-1"></p>
-                </div>
-                <p class="text-xs text-gray-500 pt-1 border-t border-gray-700">
-                  Only one discount applies per check-in — picking one clears the others.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Payment method -->
-          <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1.5">
-              Payment Method <span class="text-red-400">*</span>
-            </label>
-            <select
-              id="f-payment"
-              class="w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm
-                     focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-            >
-              <option value="">— Select —</option>
-              <option value="Cash">Cash</option>
-              <option value="Local Card">Local Card</option>
-              <option value="International Card">International Card</option>
-              <option value="Local Bank Transfer">Local Bank Transfer</option>
-              <option value="Complimentary">Complimentary</option>
-              <option value="Punch Card">Punch Card</option>
-              <option value="PT Punch">PT Punch</option>
-              <option value="Valid Membership">Valid Membership</option>
-            </select>
-          </div>
-
-          <!-- Use punch from (shown only when Punch Card is selected) -->
-          <div id="punch-from-row" class="hidden">
-            <label class="block text-sm font-medium text-gray-300 mb-1.5">
-              Use punch from <span class="text-red-400">*</span>
-            </label>
-            <select
-              id="f-punch-from"
-              class="w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm
-                     focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-            >
-              <option value="">— Select punch card holder —</option>
-            </select>
-            <p id="punch-from-hint" class="hidden text-xs text-yellow-400 mt-1">No punch card holders with remaining punches found.</p>
-          </div>
-
-          <!-- Use PT punch from (shown only when PT Punch is selected) -->
-          <div id="pt-punch-from-row" class="hidden">
-            <label class="block text-sm font-medium text-gray-300 mb-1.5">
-              Use PT punch from <span class="text-red-400">*</span>
-            </label>
-            <select
-              id="f-pt-punch-from"
-              class="w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm
-                     focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
-            >
-              <option value="">— Select PT punch holder —</option>
-            </select>
-            <p id="pt-punch-from-hint" class="hidden text-xs text-yellow-400 mt-1">No customers with remaining PT punches found.</p>
-          </div>
-
-          <!-- Amount -->
-          <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1.5">
-              Amount (VND) <span class="text-gray-500 text-xs font-normal">— auto-calculated</span>
-            </label>
-            <input
-              id="f-amount"
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="0.00"
-              class="w-full bg-gray-800 border border-gray-600 text-white placeholder-gray-500 rounded-lg px-3 py-2 text-sm
-                     focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-            />
-          </div>
-
-          <!-- Notes -->
-          <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1.5">Notes</label>
-            <input
-              id="f-notes"
-              type="text"
-              placeholder="Optional…"
-              class="w-full bg-gray-800 border border-gray-600 text-white placeholder-gray-500 rounded-lg px-3 py-2 text-sm
-                     focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-            />
-          </div>
-
-          <!-- Check-in timestamp preview -->
-          <div class="text-xs text-gray-400 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2">
-            Timestamp: <span id="ts-preview" class="font-medium text-gray-200"></span>
-          </div>
-
-          <!-- Error -->
-          <div id="form-error" class="hidden text-sm text-red-400 bg-red-900/40 border border-red-700 rounded-lg px-3 py-2"></div>
-
-          <button
-            type="submit"
-            class="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold
-                   py-3 rounded-lg text-sm transition active:scale-[0.98] flex items-center justify-center gap-2"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-            Record Check-in
-          </button>
-        </form>
-      </div>
+      <button onclick="exportCheckins()"
+              class="sm:ml-auto inline-flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-800
+                     bg-gray-50 hover:bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-lg transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+        </svg>
+        Export CSV
+      </button>
     </div>
 
-    <!-- ── Check-ins Table ── -->
-    <div class="xl:col-span-2">
-      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <div class="flex items-center justify-between mb-5">
-          <h2 class="font-semibold text-gray-800">
-            Check-ins: <span id="table-date-label" class="text-orange-500"></span>
-          </h2>
-          <button onclick="exportCheckins()"
-                  class="inline-flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-800
-                         bg-gray-50 hover:bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-lg transition">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-            </svg>
-            Export CSV
-          </button>
-        </div>
+    <!-- Loading spinner -->
+    <div id="checkin-loading" class="hidden py-16 flex flex-col items-center justify-center gap-3">
+      <div class="w-10 h-10 border-4 border-orange-200 border-t-orange-500 rounded-full animate-spin"></div>
+      <p class="text-sm text-gray-400">Loading check-ins…</p>
+    </div>
 
-        <!-- Loading spinner -->
-        <div id="checkin-loading" class="hidden py-16 flex flex-col items-center justify-center gap-3">
-          <div class="w-10 h-10 border-4 border-orange-200 border-t-orange-500 rounded-full animate-spin"></div>
-          <p class="text-sm text-gray-400">Loading check-ins…</p>
-        </div>
-
-        <div id="checkin-table-wrap" class="overflow-x-auto">
-          <table id="checkin-table" class="w-full" style="width:100%">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Time</th>
-                <th>Customer</th>
-                <th>Type</th>
-                <th>Payment</th>
-                <th>Amount (VND)</th>
-                <th>Add-ons</th>
-                <th>Punch From</th>
-                <th>PT Punch From</th>
-                <th>Referral</th>
-                <th>Notes</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </div>
+    <div id="checkin-table-wrap" class="overflow-x-auto mt-5">
+      <table id="checkin-table" class="w-full" style="width:100%">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Time</th>
+            <th>Customer</th>
+            <th>Type</th>
+            <th>Payment</th>
+            <th>Amount (VND)</th>
+            <th>Add-ons</th>
+            <th>Punch From</th>
+            <th>PT Punch From</th>
+            <th>Referral</th>
+            <th>Notes</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
     </div>
   </div>
 
@@ -794,13 +817,44 @@ import MainLayout from '../../layouts/MainLayout.astro';
         searchInput.focus();
       };
 
+      /**
+       * Fold a name down to plain lowercase ASCII so what staff can type on the
+       * desk keyboard matches what is stored: "Huyền" is reachable as "huyen".
+       */
+      function foldName(s) {
+        return String(s || '')
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          .replace(/[đĐ]/g, 'd')
+          .toLowerCase();
+      }
+
+      /**
+       * Match on each typed word independently, anywhere in the name, in any
+       * order — staff recall the parts of a name, not the order it was entered
+       * in. A single substring test would find "Nguyen Thu Huyen" from "thu
+       * huyen" but not from "nguyen huyen"; this finds it from either.
+       */
+      function nameMatches(name, terms) {
+        var hay = foldName(name);
+        return terms.every(function (t) { return hay.indexOf(t) !== -1; });
+      }
+
       function renderDropdown(q) {
-        var lower    = (q || '').toLowerCase();
-        var filtered = lower
-          ? allCustomers.filter(function (c) {
-              return (c['Full Name'] || '').toLowerCase().includes(lower);
-            })
-          : allCustomers;
+        var terms    = foldName(q).split(/\s+/).filter(Boolean);
+        var filtered = terms.length
+          ? allCustomers.filter(function (c) { return nameMatches(c['Full Name'], terms); })
+          : allCustomers.slice();
+
+        // The list is capped at 25 below, so float the names that start with
+        // what was typed to the top — otherwise an exact match can fall off
+        // the end of a common surname's results.
+        if (terms.length) {
+          filtered.sort(function (a, b) {
+            var aStarts = foldName(a['Full Name']).indexOf(terms[0]) === 0 ? 0 : 1;
+            var bStarts = foldName(b['Full Name']).indexOf(terms[0]) === 0 ? 0 : 1;
+            return aStarts - bStarts;
+          });
+        }
 
         dropdown.innerHTML = '';
         activeIdx = -1;
