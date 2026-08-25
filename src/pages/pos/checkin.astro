@@ -1,5 +1,47 @@
 ---
 import MainLayout from '../../layouts/MainLayout.astro';
+import { PROMOTIONS } from '../../lib/promotions';
+import { CHECKIN_TYPES, ADDONS, MANUAL_DISCOUNTS, type AddonDef } from '../../lib/pricing';
+
+/** Products grouped for the <optgroup>s, in the order pricing.ts lists them. */
+const TYPE_GROUPS: { group: string; items: typeof CHECKIN_TYPES }[] = [];
+for (const t of CHECKIN_TYPES) {
+  const last = TYPE_GROUPS[TYPE_GROUPS.length - 1];
+  if (last && last.group === t.group) last.items.push(t);
+  else TYPE_GROUPS.push({ group: t.group, items: [t] });
+}
+const vnd = (n: number) => n.toLocaleString('en-US');
+
+/** Element-id stem for a tier set. Mirrored by tierSlug() in the inline script. */
+const slug = (v: string) => v.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+/**
+ * Add-ons as the form draws them: one column per group, with each tier set
+ * collapsed into a single entry carrying all of its rates. A tier set is one
+ * checkbox and a stepper — three chalk-bag checkboxes would invite booking two
+ * of them for the same group.
+ */
+type AddonEntry =
+  | { kind: 'single'; addon: AddonDef }
+  | { kind: 'tiered'; name: string; tiers: AddonDef[] };
+
+const ADDON_GROUPS: { group: string; entries: AddonEntry[] }[] = [];
+for (const a of ADDONS) {
+  let g = ADDON_GROUPS.find((x) => x.group === a.group);
+  if (!g) ADDON_GROUPS.push((g = { group: a.group, entries: [] }));
+  if (!a.tier) {
+    g.entries.push({ kind: 'single', addon: a });
+    continue;
+  }
+  const open = g.entries.find(
+    (e): e is Extract<AddonEntry, { kind: 'tiered' }> => e.kind === 'tiered' && e.name === a.tier!.of,
+  );
+  if (open) open.tiers.push(a);
+  else g.entries.push({ kind: 'tiered', name: a.tier.of, tiers: [a] });
+}
+
+/** Tables the inline preview prices against — the same ones the server bills from. */
+const PRICING_DATA = { checkin_types: CHECKIN_TYPES, addons: ADDONS, discounts: MANUAL_DISCOUNTS };
 ---
 
 <MainLayout title="Daily Check-in" activePage="checkin">
@@ -102,31 +144,22 @@ import MainLayout from '../../layouts/MainLayout.astro';
             class="w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm
                    focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
           >
+            <!-- Options come from src/lib/pricing.ts, the table the server
+                 bills from, so the counter can never quote a stale price. -->
             <option value="" data-price="0">— Select type —</option>
-            <optgroup label="Day Pass">
-              <option value="Day Pass – Adult" data-price="160000">Day Pass – Adult (160,000 ₫)</option>
-              <option value="Day Pass – Student" data-price="120000">Day Pass – Student (120,000 ₫)</option>
-              <option value="Day Pass – Kid" data-price="100000">Day Pass – Kid (100,000 ₫)</option>
-            </optgroup>
-            <optgroup label="10 Punches">
-              <option value="10 Punches – Adult" data-price="1400000">10 Punches – Adult (1,400,000 ₫)</option>
-              <option value="10 Punches – Student" data-price="1000000">10 Punches – Student (1,000,000 ₫)</option>
-              <option value="10 Punches – Kid" data-price="800000">10 Punches – Kid (800,000 ₫)</option>
-            </optgroup>
-            <optgroup label="20 Punches">
-              <option value="20 Punches – Adult" data-price="2500000">20 Punches – Adult (2,500,000 ₫)</option>
-            </optgroup>
-            <optgroup label="PT Punches">
-              <option value="10 PT Punches – Shingo PT" data-price="0">10 PT Punches – Shingo PT</option>
-              <option value="10 PT Punches – Other PT" data-price="0">10 PT Punches – Other PT</option>
-            </optgroup>
-            <optgroup label="Membership">
-              <option value="Membership – 1 Month" data-price="1250000">Membership – 1 Month (1,250,000 ₫)</option>
-              <option value="Membership – 3 Months" data-price="3050000">Membership – 3 Months (3,050,000 ₫)</option>
-              <option value="Membership – 6 Months" data-price="5650000">Membership – 6 Months (5,650,000 ₫)</option>
-              <option value="Membership – 12 Months" data-price="9850000">Membership – 12 Months (9,850,000 ₫)</option>
-            </optgroup>
+            {TYPE_GROUPS.map((g) => (
+              <optgroup label={g.group}>
+                {g.items.map((t) => (
+                  <option value={t.value} data-price={t.price}>
+                    {t.price ? `${t.value} (${vnd(t.price)} ₫)` : t.value}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
           </select>
+          <!-- Auto-applied promotion. Explains the amount below, and warns
+               when a hand-picked discount is quietly costing the customer. -->
+          <p id="promo-banner" class="hidden text-xs rounded-lg px-3 py-2 mt-1.5"></p>
         </div>
 
       </div>
@@ -145,80 +178,54 @@ import MainLayout from '../../layouts/MainLayout.astro';
             </svg>
           </button>
           <div id="addons-body" class="hidden">
-            <!-- Two columns by what the item is: gear you climb with on the
-                 left, everything you consume — drinks and snacks — on the
-                 right. Stacks to one column on narrow screens so the desk
-                 tablet keeps full-width touch targets. -->
+            <!-- One column per group in pricing.ts — gear you climb with on
+                 the left, everything you consume on the right. Stacks to one
+                 column on narrow screens so the desk tablet keeps full-width
+                 touch targets. -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4
                         bg-gray-800 border border-gray-600 rounded-lg px-3 py-2.5">
+              {ADDON_GROUPS.map((g) => (
+                <div class="space-y-2">
+                  <p class="text-xs text-gray-500 uppercase tracking-wide">{g.group}</p>
 
-              <!-- ── Climbing ── -->
-              <div class="space-y-2">
-                <p class="text-xs text-gray-500 uppercase tracking-wide">Climbing</p>
-
-                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Shoes Rental" data-price="20000" data-rental="1" />
-                  <span>Shoes Rental <span class="text-gray-500 text-xs">20,000 ₫</span></span>
-                </label>
-
-                <!-- Chalk bags are priced per group, not per bag, so the tier
-                     is picked with a stepper. syncChalkBag() writes the tier's
-                     price and label back onto the checkbox, which keeps the
-                     totals, the CSV add-ons string and the rental-discount
-                     lookup working off the same data attributes as every
-                     other add-on. -->
-                <div>
-                  <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                    <input type="checkbox" id="addon-chalk-bag"
-                           class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer"
-                           data-name="Chalk Bag Rental" data-price="15000" data-rental="1" />
-                    <span>Chalk Bag Rental <span id="chalk-bag-price" class="text-gray-500 text-xs">15,000 ₫</span></span>
-                  </label>
-                  <div id="chalk-bag-qty" class="hidden mt-1.5 ml-6 flex items-center gap-2">
-                    <button type="button" id="chalk-bag-dec" aria-label="Fewer people"
-                            class="w-8 h-8 rounded-md bg-gray-700 hover:bg-gray-600 text-gray-200
-                                   text-lg leading-none focus:outline-none focus:ring-2 focus:ring-orange-400
-                                   disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-gray-700">−</button>
-                    <span id="chalk-bag-label" class="text-xs text-gray-400 min-w-[64px] text-center">1 person</span>
-                    <button type="button" id="chalk-bag-inc" aria-label="More people"
-                            class="w-8 h-8 rounded-md bg-gray-700 hover:bg-gray-600 text-gray-200
-                                   text-lg leading-none focus:outline-none focus:ring-2 focus:ring-orange-400
-                                   disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-gray-700">+</button>
-                  </div>
+                  {g.entries.map((e) => e.kind === 'single' ? (
+                    <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                      <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer"
+                             data-name={e.addon.name} data-price={e.addon.price}
+                             data-rental={e.addon.rental ? '1' : null} />
+                      <span>{e.addon.name} <span class="text-gray-500 text-xs">{vnd(e.addon.price)} ₫</span></span>
+                    </label>
+                  ) : (
+                    <!-- A tier set: one checkbox, one stepper. syncAddonTier()
+                         writes the chosen tier's product name and price onto the
+                         checkbox, so the totals, the submitted add-on list and
+                         the rental-discount lookup read the same data attributes
+                         as every other add-on — and the name that lands on the
+                         row is a real product the server will accept. -->
+                    <div>
+                      <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                        <input type="checkbox" id={`addon-tier-${slug(e.name)}`}
+                               class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer"
+                               data-tier-of={e.name}
+                               data-name={e.tiers[0].name} data-price={e.tiers[0].price}
+                               data-rental={e.tiers[0].rental ? '1' : null} />
+                        <span>{e.name} <span id={`tier-price-${slug(e.name)}`} class="text-gray-500 text-xs">{vnd(e.tiers[0].price)} ₫</span></span>
+                      </label>
+                      <div id={`tier-qty-${slug(e.name)}`} class="hidden mt-1.5 ml-6 flex items-center gap-2">
+                        <button type="button" id={`tier-dec-${slug(e.name)}`} aria-label={`Fewer — ${e.name}`}
+                                class="w-8 h-8 rounded-md bg-gray-700 hover:bg-gray-600 text-gray-200
+                                       text-lg leading-none focus:outline-none focus:ring-2 focus:ring-orange-400
+                                       disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-gray-700">−</button>
+                        <span id={`tier-label-${slug(e.name)}`} class="text-xs text-gray-400 min-w-[64px] text-center">{e.tiers[0].tier?.label}</span>
+                        <button type="button" id={`tier-inc-${slug(e.name)}`} aria-label={`More — ${e.name}`}
+                                class="w-8 h-8 rounded-md bg-gray-700 hover:bg-gray-600 text-gray-200
+                                       text-lg leading-none focus:outline-none focus:ring-2 focus:ring-orange-400
+                                       disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-gray-700">+</button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-
-                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Chalk Block" data-price="65000" />
-                  <span>Chalk Block <span class="text-gray-500 text-xs">65,000 ₫</span></span>
-                </label>
-                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Socks" data-price="10000" />
-                  <span>Socks <span class="text-gray-500 text-xs">10,000 ₫</span></span>
-                </label>
-              </div>
-
-              <!-- ── Food & Drinks ── -->
-              <div class="space-y-2">
-                <p class="text-xs text-gray-500 uppercase tracking-wide">Food &amp; Drinks</p>
-
-                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Vitani Dasani" data-price="8000" />
-                  <span>Vitani Dasani <span class="text-gray-500 text-xs">8,000 ₫</span></span>
-                </label>
-                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Ionlife" data-price="10000" />
-                  <span>Ionlife <span class="text-gray-500 text-xs">10,000 ₫</span></span>
-                </label>
-                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Pocari" data-price="18000" />
-                  <span>Pocari <span class="text-gray-500 text-xs">18,000 ₫</span></span>
-                </label>
-                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                  <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer" data-name="Apple" data-price="33000" />
-                  <span>Apple <span class="text-gray-500 text-xs">33,000 ₫</span></span>
-                </label>
-              </div>
-
+              ))}
             </div>
           </div>
         </div>
@@ -239,22 +246,12 @@ import MainLayout from '../../layouts/MainLayout.astro';
                 <input type="radio" name="discount" class="discount-rb accent-orange-500 w-4 h-4 cursor-pointer" value="" checked />
                 <span class="text-gray-400">No discount</span>
               </label>
-              <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                <input type="radio" name="discount" class="discount-rb accent-orange-500 w-4 h-4 cursor-pointer" value="day30" />
-                <span>30% discount <span class="text-gray-500 text-xs">Day Pass – setting day (less disturbance)</span></span>
-              </label>
-              <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                <input type="radio" name="discount" class="discount-rb accent-orange-500 w-4 h-4 cursor-pointer" value="day40" />
-                <span>40% discount <span class="text-gray-500 text-xs">Day Pass – setting day (more disturbance)</span></span>
-              </label>
-              <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                <input type="radio" name="discount" class="discount-rb accent-orange-500 w-4 h-4 cursor-pointer" value="lasthour50" />
-                <span>50% discount <span class="text-gray-500 text-xs">Day Pass (late entry)</span></span>
-              </label>
-              <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                <input type="radio" name="discount" class="discount-rb accent-orange-500 w-4 h-4 cursor-pointer" value="birthday" />
-                <span>Birthday discount <span class="text-gray-500 text-xs">Free shoes or 20,000 ₫ off</span></span>
-              </label>
+              {MANUAL_DISCOUNTS.map((d) => (
+                <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                  <input type="radio" name="discount" class="discount-rb accent-orange-500 w-4 h-4 cursor-pointer" value={d.id} />
+                  <span>{d.title} <span class="text-gray-500 text-xs">{d.hint}</span></span>
+                </label>
+              ))}
               <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
                 <input type="radio" name="discount" class="discount-rb accent-orange-500 w-4 h-4 cursor-pointer" value="referral" />
                 <span>Referral / promo code <span class="text-gray-500 text-xs">Discount set by the code</span></span>
@@ -344,9 +341,9 @@ import MainLayout from '../../layouts/MainLayout.astro';
         </div>
 
         <!-- Amount -->
-        <div class="lg:flex-1 lg:min-w-[160px]">
+        <div class="lg:flex-1 lg:min-w-[180px]">
           <label class="block text-sm font-medium text-gray-300 mb-1.5">
-            Amount (VND) <span class="text-gray-500 text-xs font-normal">— auto-calculated</span>
+            Amount (VND) <span class="text-gray-500 text-xs font-normal">— priced by the server</span>
           </label>
           <input
             id="f-amount"
@@ -357,6 +354,8 @@ import MainLayout from '../../layouts/MainLayout.astro';
             class="w-full bg-gray-800 border border-gray-600 text-white placeholder-gray-500 rounded-lg px-3 py-2 text-sm
                    focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
           />
+          <!-- Shown only when staff type over the quoted figure. -->
+          <p id="amount-note" class="hidden text-xs text-yellow-400 mt-1"></p>
         </div>
 
         <!-- Notes -->
@@ -504,12 +503,26 @@ import MainLayout from '../../layouts/MainLayout.astro';
     </div>
   </div>
 
+  <!-- Single source of truth for promo windows, shared with POST /api/checkins -->
+  <script type="application/json" id="promotions-data" set:html={JSON.stringify(PROMOTIONS)}></script>
+  <!-- Price list + discount rules, from src/lib/pricing.ts. The preview below
+       quotes from these; the server bills from the same module, and its figure
+       is what gets stored — the box is a quote, never the invoice. -->
+  <script type="application/json" id="pricing-data" set:html={JSON.stringify(PRICING_DATA)}></script>
+
   <script is:inline>
     var checkinTable;
     var allCheckins  = [];
     var activeFrom   = '';
     var activeTo     = '';
     var allCustomers = [];  // cache with punch card info
+
+    // The price list and discount rules, rendered from src/lib/pricing.ts. The
+    // quote in the amount box is computed from these; the server bills from the
+    // same module and its figure is the one that gets stored.
+    var PRICING   = JSON.parse(document.getElementById('pricing-data').textContent || '{}');
+    var DISCOUNTS = {};
+    (PRICING.discounts || []).forEach(function (d) { DISCOUNTS[d.id] = d; });
 
     $(document).ready(function () {
       var now   = new Date();
@@ -526,6 +539,9 @@ import MainLayout from '../../layouts/MainLayout.astro';
 
       updateTsPreview();
       $('#f-checkin-date, #f-checkin-time').on('change', updateTsPreview);
+      // The date decides whether a promotion is running, so re-price on change.
+      $('#f-checkin-date').on('change', recalcAmount);
+      recalcAmount();
 
       buildCustomerDatalist();
       initTable();
@@ -819,17 +835,17 @@ import MainLayout from '../../layouts/MainLayout.astro';
 
       /**
        * Fold a name down to plain lowercase ASCII so what staff can type on the
-       * desk keyboard matches what is stored: "Huyền" is reachable as "huyen".
+       * desk keyboard matches what is stored: "Huyen" finds "Huy\u1ec1n".
        */
       function foldName(s) {
         return String(s || '')
           .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-          .replace(/[đĐ]/g, 'd')
+          .replace(/[\u0111\u0110]/g, 'd')
           .toLowerCase();
       }
 
       /**
-       * Match on each typed word independently, anywhere in the name, in any
+       * Match each typed word independently, anywhere in the name, in any
        * order — staff recall the parts of a name, not the order it was entered
        * in. A single substring test would find "Nguyen Thu Huyen" from "thu
        * huyen" but not from "nguyen huyen"; this finds it from either.
@@ -956,12 +972,11 @@ import MainLayout from '../../layouts/MainLayout.astro';
     // The discount options are mutually exclusive radios, so nothing stacks.
     // What staff can still miss is picking a code when a fixed discount above
     // would have taken more off, so compare them and say so.
-    var FIXED_DISCOUNTS = [
-      { value: 'day30',      label: '30% (setting day, less disturbance)' },
-      { value: 'day40',      label: '40% (setting day, more disturbance)' },
-      { value: 'lasthour50', label: '50% (late entry)' },
-      { value: 'birthday',   label: 'Birthday (20,000 ₫ off)' }
-    ];
+    // Listed from the same table as the radios themselves, so a discount added
+    // to pricing.ts is compared here without a second edit.
+    var FIXED_DISCOUNTS = (PRICING.discounts || []).map(function (d) {
+      return { value: d.id, label: d.title + ' (' + d.hint + ')' };
+    });
 
     function _fmtVnd(n) { return Number(n || 0).toLocaleString('en-US') + ' ₫'; }
 
@@ -1023,6 +1038,36 @@ import MainLayout from '../../layouts/MainLayout.astro';
       _referralTimer = setTimeout(validateReferralCode, 350);
     });
 
+    // ── Automatic promotions ──────────────────────────────────────────────────
+    // Rendered from src/lib/promotions.ts so this preview and the punch grant in
+    // POST /api/checkins can never drift apart. Everything keys off the check-in
+    // DATE FIELD, not the clock, so a backdated entry prices as of that day.
+    var PROMOTIONS = JSON.parse(document.getElementById('promotions-data').textContent || '[]');
+
+    function _checkinDate() {
+      return document.getElementById('f-checkin-date').value || new Date().toISOString().slice(0, 10);
+    }
+
+    /** The promotion covering the date in the form, or null. ISO dates sort. */
+    function _activePromo() {
+      var d = _checkinDate();
+      var list = PROMOTIONS || [];
+      for (var i = 0; i < list.length; i++) {
+        if (d >= list[i].starts_on && d <= list[i].ends_on) return list[i];
+      }
+      return null;
+    }
+
+    function _promoPct(type) {
+      var p = _activePromo();
+      return (p && type && p.base_discount_pct[type]) || 0;
+    }
+
+    function _promoBonus(type) {
+      var p = _activePromo();
+      return (p && type && p.bonus_punches[type]) || 0;
+    }
+
     // ── Check-in type, add-ons & discount: auto-calculate amount ──
     function _basePrice() {
       var typeSelect  = document.getElementById('f-checkin-type');
@@ -1040,82 +1085,181 @@ import MainLayout from '../../layouts/MainLayout.astro';
       return { retail: retail, rental: rental };
     }
 
-    /** What the visit costs under one discount option. */
+    /** `n` less `pct`, mirroring lessPct() in src/lib/pricing.ts exactly. */
+    function _lessPct(n, pct) {
+      return pct ? Math.round((n * (100 - pct)) / 100) : n;
+    }
+
+    /**
+     * What the visit costs under one discount option — a preview of what the
+     * server will bill, computed from the same tables it uses. If the two ever
+     * disagree the server's figure wins and is what lands on the row.
+     */
     function totalFor(discountVal) {
       var base   = _basePrice();
       var addons = _addonTotals();
-      if (discountVal === 'day30')      return Math.round(base * 0.7) + addons.retail + addons.rental;
-      if (discountVal === 'day40')      return Math.round(base * 0.6) + addons.retail + addons.rental;
-      if (discountVal === 'lasthour50') return Math.round(base * 0.5) + addons.retail + addons.rental;
-      if (discountVal === 'birthday')   return Math.max(0, (base + addons.retail + addons.rental) - 20000);
+      var basePct = 0, rentalPct = 0, flat = 0;
+
       if (discountVal === 'referral') {
         // Only a verified code discounts anything. Retail add-ons are never
         // discounted; the rental add-ons are, when the code says so.
-        var pct       = _referral ? (_referral.discount_pct || 0) : 0;
-        var rentalPct = _referral ? (_referral.rental_discount_pct || 0) : 0;
-        return Math.round(base * (1 - pct / 100)) + addons.retail +
-               Math.round(addons.rental * (1 - rentalPct / 100));
+        basePct   = _referral ? (_referral.discount_pct || 0) : 0;
+        rentalPct = _referral ? (_referral.rental_discount_pct || 0) : 0;
+      } else if (DISCOUNTS[discountVal]) {
+        basePct = DISCOUNTS[discountVal].pct;
+        flat    = DISCOUNTS[discountVal].flat;
+      } else {
+        // Nothing hand-picked: an active promotion sets the price on its own.
+        // Any discount above replaces it rather than stacking — one discount per
+        // check-in, and a deliberate choice is the more specific signal.
+        basePct = _promoPct(document.getElementById('f-checkin-type').value);
       }
-      return base + addons.retail + addons.rental;
+
+      var subtotal = _lessPct(base, basePct) + addons.retail + _lessPct(addons.rental, rentalPct);
+      return Math.max(0, subtotal - flat);
+    }
+
+    /**
+     * Tell staff what the promotion just did to the price, so the amount is
+     * never a number that appeared from nowhere.
+     *
+     * The awkward case is a hand-picked discount during a promo: it replaces
+     * the promo instead of stacking, which can leave the customer paying MORE
+     * than if the radio had been left alone. That gets a loud warning with
+     * both figures rather than a silent overcharge.
+     */
+    function updatePromoBanner() {
+      var el    = document.getElementById('promo-banner');
+      var promo = _activePromo();
+      var type  = document.getElementById('f-checkin-type').value;
+      var pct   = _promoPct(type);
+      var bonus = _promoBonus(type);
+
+      if (!promo || (!pct && !bonus)) { el.classList.add('hidden'); return; }
+
+      var discountRb   = document.querySelector('.discount-rb:checked');
+      var manualPicked = !!(discountRb && discountRb.value);
+      // Bonus punches are part of the card, not a price cut — they survive any
+      // discount choice, so they are always worth stating.
+      var parts = [];
+      if (bonus) parts.push('+' + bonus + ' bonus punches');
+
+      var tone = 'bg-amber-900/40 border border-amber-600 text-amber-200';
+      if (!manualPicked) {
+        if (pct) parts.push(pct + '% off — applied automatically');
+      } else if (pct) {
+        var promoTotal  = totalFor('');
+        var manualTotal = totalFor(discountRb.value);
+        if (promoTotal < manualTotal) {
+          tone = 'bg-yellow-900/50 border border-yellow-500 text-yellow-200 font-medium';
+          parts.push('the automatic ' + pct + '% would charge ' + _fmtVnd(promoTotal) +
+            ' vs ' + _fmtVnd(manualTotal) + ' with the discount you picked. ' +
+            'Clear the discount to use the promo.');
+        } else {
+          parts.push(pct + '% off not applied — the discount you picked takes over');
+        }
+      }
+
+      el.className = 'text-xs rounded-lg px-3 py-2 mt-1.5 ' + tone;
+      el.textContent = '🎁 ' + promo.label + ': ' + parts.join(' · ');
+    }
+
+    // The last figure the price list quoted. Anything else in the amount box is
+    // staff overruling it, which the server only accepts when told so explicitly.
+    var _autoAmount = 0;
+
+    function _amountIsOverridden() {
+      var raw = document.getElementById('f-amount').value.trim();
+      if (raw === '') return false;
+      return Math.round(parseFloat(raw) || 0) !== _autoAmount;
+    }
+
+    function updateAmountNote() {
+      var note = document.getElementById('amount-note');
+      if (!_amountIsOverridden()) { note.classList.add('hidden'); return; }
+      note.textContent = 'Manual amount — the price list says ' + _fmtVnd(_autoAmount) +
+        '. This will be recorded as an override.';
+      note.classList.remove('hidden');
     }
 
     function recalcAmount() {
       var discountRb  = document.querySelector('.discount-rb:checked');
       var discountVal = discountRb ? discountRb.value : '';
       var total       = totalFor(discountVal);
+      _autoAmount = total > 0 ? total : 0;
       document.getElementById('f-amount').value = total > 0 ? total : '';
       if (discountVal === 'referral') checkDiscountOverlap();
       else document.getElementById('referral-overlap').classList.add('hidden');
+      updatePromoBanner();
+      updateAmountNote();
     }
+    document.getElementById('f-amount').addEventListener('input', updateAmountNote);
     document.getElementById('f-checkin-type').addEventListener('change', recalcAmount);
     document.querySelectorAll('.addon-cb').forEach(function (cb) {
       cb.addEventListener('change', recalcAmount);
     });
 
-    // ── Chalk bag rental: one price for the whole group, by head count ──
-    // 3 means "3 or more" — the top tier is flat, so there is nothing above it.
-    var CHALK_BAG_TIERS = [
-      { people: 1, price: 15000, label: '1 person'    },
-      { people: 2, price: 20000, label: '2 people'    },
-      { people: 3, price: 25000, label: '3+ people'   }
-    ];
-    var chalkBagTier = 0;   // index into CHALK_BAG_TIERS
+    // ── Tiered add-ons ─────────────────────────────────────────────────────
+    // Chalk bags are hired per group, so one checkbox carries several rates and
+    // a stepper picks between them. The rates come from pricing.ts rather than
+    // a copy kept here, and stepping writes the chosen tier's product name and
+    // price onto the checkbox — so the totals, the submitted add-on list and
+    // the rental-discount lookup all read the same data attributes as any other
+    // add-on, and the name that reaches the server is one it will accept.
+    var ADDON_TIERS = {};
+    (PRICING.addons || []).forEach(function (a) {
+      if (!a.tier) return;
+      var set = ADDON_TIERS[a.tier.of] || (ADDON_TIERS[a.tier.of] = { tiers: [], index: 0 });
+      set.tiers.push(a);
+    });
 
-    /**
-     * Push the current tier onto the checkbox's data attributes so every
-     * existing consumer — _addonTotals(), the add-ons string, the CSV export —
-     * reads the right price and label without knowing tiers exist.
-     */
-    function syncChalkBag() {
-      var cb   = document.getElementById('addon-chalk-bag');
-      var tier = CHALK_BAG_TIERS[chalkBagTier];
+    /** Must produce the same stem as slug() in this page's frontmatter. */
+    function tierSlug(v) {
+      return String(v).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    }
+
+    function syncAddonTier(name) {
+      var set  = ADDON_TIERS[name];
+      var id   = tierSlug(name);
+      var cb   = document.getElementById('addon-tier-' + id);
+      var tier = set.tiers[set.index];
+      cb.dataset.name  = tier.name;
       cb.dataset.price = String(tier.price);
-      cb.dataset.name  = 'Chalk Bag Rental (' + tier.label + ')';
-      document.getElementById('chalk-bag-price').textContent = tier.price.toLocaleString('en-US') + ' ₫';
-      document.getElementById('chalk-bag-label').textContent = tier.label;
-      document.getElementById('chalk-bag-qty').classList.toggle('hidden', !cb.checked);
-      document.getElementById('chalk-bag-dec').disabled = chalkBagTier === 0;
-      document.getElementById('chalk-bag-inc').disabled = chalkBagTier === CHALK_BAG_TIERS.length - 1;
+      document.getElementById('tier-price-' + id).textContent = Number(tier.price).toLocaleString('en-US') + ' ₫';
+      document.getElementById('tier-label-' + id).textContent = tier.tier.label;
+      document.getElementById('tier-qty-'   + id).classList.toggle('hidden', !cb.checked);
+      document.getElementById('tier-dec-'   + id).disabled = set.index === 0;
+      document.getElementById('tier-inc-'   + id).disabled = set.index === set.tiers.length - 1;
       recalcAmount();
     }
 
-    function stepChalkBag(delta) {
-      var next = chalkBagTier + delta;
-      if (next < 0 || next >= CHALK_BAG_TIERS.length) return;
-      chalkBagTier = next;
-      syncChalkBag();
+    function stepAddonTier(name, delta) {
+      var set  = ADDON_TIERS[name];
+      var next = set.index + delta;
+      if (next < 0 || next >= set.tiers.length) return;
+      set.index = next;
+      syncAddonTier(name);
     }
 
-    document.getElementById('addon-chalk-bag').addEventListener('change', syncChalkBag);
-    document.getElementById('chalk-bag-dec').addEventListener('click', function () { stepChalkBag(-1); });
-    document.getElementById('chalk-bag-inc').addEventListener('click', function () { stepChalkBag(1); });
-
-    /** Back to "1 person", stepper hidden — used on load and after each save. */
-    function resetChalkBag() {
-      chalkBagTier = 0;
-      syncChalkBag();
+    /** Back to the cheapest tier, stepper hidden — on load and after each save. */
+    function resetAddonTiers() {
+      Object.keys(ADDON_TIERS).forEach(function (name) {
+        ADDON_TIERS[name].index = 0;
+        syncAddonTier(name);
+      });
     }
-    resetChalkBag();
+
+    Object.keys(ADDON_TIERS).forEach(function (name) {
+      var id = tierSlug(name);
+      document.getElementById('addon-tier-' + id)
+        .addEventListener('change', function () { syncAddonTier(name); });
+      document.getElementById('tier-dec-' + id)
+        .addEventListener('click', function () { stepAddonTier(name, -1); });
+      document.getElementById('tier-inc-' + id)
+        .addEventListener('click', function () { stepAddonTier(name, 1); });
+    });
+    resetAddonTiers();
+
     document.querySelectorAll('.discount-rb').forEach(function (rb) {
       rb.addEventListener('change', function () {
         var isReferral = this.value === 'referral';
@@ -1161,23 +1305,13 @@ import MainLayout from '../../layouts/MainLayout.astro';
         notes = 'Unregistered: ' + otherName + (notes ? ' | ' + notes : '');
       }
       var checkinType    = document.getElementById('f-checkin-type').value;
+      // Only the raw product names travel. The discount label, the rental cut and
+      // the promo note are written by the server from the same figures it prices
+      // with, so a stored row can never claim a discount it was not given.
       var addonsArr      = [];
       document.querySelectorAll('.addon-cb:checked').forEach(function (cb) { addonsArr.push(cb.dataset.name); });
-      var DISCOUNT_LABELS = {
-        'day30':      '30% discount – Day Pass (setting day, less disturbance)',
-        'day40':      '40% discount – Day Pass (setting day, more disturbance)',
-        'lasthour50': '50% discount – Day Pass (late entry)',
-        'birthday':   'Birthday discount'
-      };
       var discountRbSub  = document.querySelector('.discount-rb:checked');
       var discountValSub = discountRbSub ? discountRbSub.value : '';
-      if (discountValSub && DISCOUNT_LABELS[discountValSub]) addonsArr.push('Discount: ' + DISCOUNT_LABELS[discountValSub]);
-      // Record the rental cut too — the referral columns only carry the base-price %.
-      if (discountValSub === 'referral' && _referral && _referral.rental_discount_pct &&
-          document.querySelector('.addon-cb[data-rental="1"]:checked')) {
-        addonsArr.push('Rental discount: ' + _referral.rental_discount_pct + '%');
-      }
-      var addonsStr      = addonsArr.join(', ');
 
       // Referral / promo discount requires a code that verified successfully
       var referralCode = '';
@@ -1227,6 +1361,8 @@ import MainLayout from '../../layouts/MainLayout.astro';
         errEl.classList.remove('hidden'); return;
       }
 
+      var amountOverridden = _amountIsOverridden();
+
       var now     = new Date();
       var dateStr = document.getElementById('f-checkin-date').value || now.toISOString().slice(0, 10);
       var timeStr = document.getElementById('f-checkin-time').value || now.toTimeString().slice(0, 5);
@@ -1241,10 +1377,14 @@ import MainLayout from '../../layouts/MainLayout.astro';
           date:                 dateStr,
           time:                 timeStr,
           payment_method:       payment,
-          amount:               amount ? parseFloat(amount) : 0,
+          // The server prices the visit; `amount` is only read when staff have
+          // deliberately typed over the quote, and is recorded as an override.
+          amount:               amountOverridden ? Math.round(parseFloat(amount) || 0) : undefined,
+          amount_override:      amountOverridden || undefined,
           notes:                notes,
           checkin_type:         checkinType,
-          addons:               addonsStr,
+          addons:               addonsArr,
+          discount:             discountValSub,
           referral_code:        referralCode,
           punch_card_holder_id:   punchHolderId   || undefined,
           punch_card_holder_name: punchHolderName || undefined,
@@ -1268,17 +1408,24 @@ import MainLayout from '../../layouts/MainLayout.astro';
           clearCustomerSelection();
           document.getElementById('f-checkin-type').value = '';
           document.querySelectorAll('.addon-cb').forEach(function (cb) { cb.checked = false; });
-          resetChalkBag();
+          resetAddonTiers();
           var noDiscRb = document.querySelector('.discount-rb[value=""]');
           if (noDiscRb) noDiscRb.checked = true;
           document.getElementById('f-amount').value     = '';
+          document.getElementById('amount-note').classList.add('hidden');
+          _autoAmount = 0;
           document.getElementById('f-notes').value      = '';
           // Reset date+time to now for next entry
           var n = new Date();
           document.getElementById('f-checkin-date').value = n.toISOString().slice(0, 10);
           document.getElementById('f-checkin-time').value = n.toTimeString().slice(0, 5);
           updateTsPreview();
-          showToast('✓ Check-in recorded for ' + customerName + '!');
+          updatePromoBanner();
+          // Quote the server's figure, not the box's — they are the same in the
+          // ordinary case, and when they are not it is the server's that was banked.
+          var charged = data.price ? data.price.charged : null;
+          showToast('✓ Check-in recorded for ' + customerName +
+            (charged !== null && charged > 0 ? ' — ' + _fmtVnd(charged) : '') + '!');
         })
         .catch(function (err) {
           btn.disabled = false;

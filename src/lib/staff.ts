@@ -17,6 +17,8 @@ export const STAFF_NAMES = [
   'Le Nghia',
   'Kim An',
   'Bich Van',
+  'Thuy Vy',
+  'Hong Hanh',
 ] as const;
 
 /** True if `name` is on the roster (exact match after trimming). */
@@ -47,6 +49,8 @@ export const PART_TIMER_NAMES = [
   'Le Nghia',
   'Kim An',
   'Bich Van',
+  'Thuy Vy',
+  'Hong Hanh',
 ] as const;
 
 /** True if `name` is on the part-timer roster (exact match after trimming). */
