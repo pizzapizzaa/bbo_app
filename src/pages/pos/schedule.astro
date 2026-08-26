@@ -1244,7 +1244,7 @@ import MainLayout from '../../layouts/MainLayout.astro';
         bodyHtml += '<td class="py-2.5 pr-3 align-top w-24">' +
           '<span class="text-xs font-semibold text-gray-700 leading-tight">' + escHtml(staffName) + '</span>' +
           '</td>';
-        var weekTotalMin = 0;
+        var weekEntries = [];
         weekDates.forEach(function (d) {
           var iso     = fmtDate(d);
           var isToday = iso === todayIso;
@@ -1257,7 +1257,7 @@ import MainLayout from '../../layouts/MainLayout.astro';
             var end   = entry.end_time   || '';
             var diff  = timeToMin(end) - timeToMin(start);
             if (diff <= 0) diff += 1440;
-            weekTotalMin += diff;
+            weekEntries.push(entry);
             var h = Math.floor(diff / 60), m = diff % 60;
             var dur = h + 'h' + (m ? ' ' + m + 'm' : '');
             bodyHtml +=
@@ -1281,6 +1281,7 @@ import MainLayout from '../../layouts/MainLayout.astro';
           });
           bodyHtml += '</td>';
         });
+        var weekTotalMin = unionMinutes(weekEntries);
         var th = Math.floor(weekTotalMin / 60), tm = weekTotalMin % 60;
         var totalLabel = weekTotalMin > 0
           ? th + 'h' + (tm ? ' ' + tm + 'm' : '')
@@ -1321,6 +1322,47 @@ import MainLayout from '../../layouts/MainLayout.astro';
       if (!t) return 0;
       var p = t.split(':');
       return parseInt(p[0]) * 60 + parseInt(p[1]);
+    }
+
+    // ── Hours worked ──
+    // Somebody can hold two shifts that overlap — 15:00–19:00 plus 18:00–22:00
+    // is one 7h stretch on the floor, not 8h. Every hours figure on this page
+    // therefore measures the *union* of a person's shifts, never the sum of
+    // their lengths. Only one person's own shifts are ever merged; two people
+    // on the floor at once are still two people being paid.
+
+    function dayNum(iso) {
+      var p = String(iso || '').split('-');
+      if (p.length !== 3) return 0;
+      return Date.UTC(+p[0], +p[1] - 1, +p[2]) / 86400000;
+    }
+
+    // Minutes counted from an absolute origin, not from the shift's own
+    // midnight, so an overnight shift still merges with the next morning's.
+    function shiftInterval(entry) {
+      var start = dayNum(entry.date) * 1440 + timeToMin(entry.start_time);
+      var diff  = timeToMin(entry.end_time) - timeToMin(entry.start_time);
+      if (diff <= 0) diff += 1440; // crosses midnight
+      return { start: start, end: start + diff };
+    }
+
+    function unionMinutes(entries) {
+      var iv = entries.map(shiftInterval).sort(function (a, b) {
+        return a.start - b.start;
+      });
+      var total = 0, curStart = null, curEnd = null;
+      iv.forEach(function (s) {
+        if (curEnd === null) {
+          curStart = s.start; curEnd = s.end;
+        } else if (s.start > curEnd) {          // gap — bank the finished stretch
+          total += curEnd - curStart;
+          curStart = s.start; curEnd = s.end;
+        } else if (s.end > curEnd) {            // overlapping or touching — extend
+          curEnd = s.end;
+        }
+      });
+      if (curEnd !== null) total += curEnd - curStart;
+      return total;
     }
 
     // ── Part-timer hours summary ──
@@ -1384,23 +1426,16 @@ import MainLayout from '../../layouts/MainLayout.astro';
     }
 
     function sumStaffMinutes(staffName, dateSet) {
-      return scheduleData.reduce(function (acc, s) {
-        if (s.staff_name !== staffName) return acc;
-        if (dateSet.indexOf(s.date) === -1) return acc;
-        var diff = timeToMin(s.end_time) - timeToMin(s.start_time);
-        if (diff <= 0) diff += 1440;
-        return acc + diff;
-      }, 0);
+      return unionMinutes(scheduleData.filter(function (s) {
+        return s.staff_name === staffName && dateSet.indexOf(s.date) !== -1;
+      }));
     }
 
     function sumStaffMinutesInRange(staffName, rangeStart, rangeEnd) {
-      return scheduleData.reduce(function (acc, s) {
-        if (s.staff_name !== staffName) return acc;
-        if (!s.date || s.date < rangeStart || s.date > rangeEnd) return acc;
-        var diff = timeToMin(s.end_time) - timeToMin(s.start_time);
-        if (diff <= 0) diff += 1440;
-        return acc + diff;
-      }, 0);
+      return unionMinutes(scheduleData.filter(function (s) {
+        return s.staff_name === staffName &&
+               s.date && s.date >= rangeStart && s.date <= rangeEnd;
+      }));
     }
 
     var MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -2031,11 +2066,12 @@ import MainLayout from '../../layouts/MainLayout.astro';
       entries.forEach(function (s) {
         var name = s.staff_name;
         if (!name) return;
-        if (!staffMap[name]) staffMap[name] = { shifts: 0, totalMin: 0 };
+        if (!staffMap[name]) staffMap[name] = { shifts: 0, totalMin: 0, entries: [] };
         staffMap[name].shifts++;
-        var diff = timeToMin(s.end_time) - timeToMin(s.start_time);
-        if (diff <= 0) diff += 1440;
-        staffMap[name].totalMin += diff;
+        staffMap[name].entries.push(s);
+      });
+      Object.keys(staffMap).forEach(function (name) {
+        staffMap[name].totalMin = unionMinutes(staffMap[name].entries);
       });
 
       var staffList = Object.keys(staffMap);
