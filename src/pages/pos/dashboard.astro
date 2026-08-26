@@ -172,7 +172,14 @@ import MainLayout from '../../layouts/MainLayout.astro';
 
         // ── Schedule ──
         var allEntries  = schedData.entries || [];
-        var todaySched  = allEntries.filter(function (s) { return s.date === today; });
+        // The API orders by date only — sort the day's shifts by clock time so
+        // the list reads as the running order of the day.
+        var todaySched  = allEntries
+          .filter(function (s) { return s.date === today; })
+          .sort(function (a, b) {
+            return String(a.start_time || '').localeCompare(String(b.start_time || '')) ||
+                   String(a.end_time   || '').localeCompare(String(b.end_time   || ''));
+          });
         document.getElementById('stat-staff').textContent = todaySched.length;
 
         var schedDiv = document.getElementById('today-schedule');

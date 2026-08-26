@@ -1133,7 +1133,9 @@ import MainLayout from '../../layouts/MainLayout.astro';
     function renderOpenRow(weekDates, todayIso) {
       var weekOpen = weekDates.map(function (d) {
         var iso = fmtDate(d);
-        return scheduleData.filter(function (s) { return isOpenShift(s) && s.date === iso; });
+        return scheduleData
+          .filter(function (s) { return isOpenShift(s) && s.date === iso; })
+          .sort(byStartTime);
       });
       var total = weekOpen.reduce(function (n, list) { return n + list.length; }, 0);
       if (!total) return '';
@@ -1250,7 +1252,7 @@ import MainLayout from '../../layouts/MainLayout.astro';
           var isToday = iso === todayIso;
           var entries = scheduleData.filter(function (s) {
             return s.staff_name === staffName && s.date === iso;
-          });
+          }).sort(byStartTime);
           bodyHtml += '<td class="py-2 px-1 align-top' + (isToday ? ' bg-orange-50/30' : '') + '" style="min-width:80px">';
           entries.forEach(function (entry) {
             var start = entry.start_time || '';
@@ -1322,6 +1324,14 @@ import MainLayout from '../../layouts/MainLayout.astro';
       if (!t) return 0;
       var p = t.split(':');
       return parseInt(p[0]) * 60 + parseInt(p[1]);
+    }
+
+    // The API orders entries by date only, so within a day they arrive in
+    // whatever order the database happened to return them. Chips in a day cell
+    // are read as a running order for that day, so sort them by clock time.
+    function byStartTime(a, b) {
+      return (timeToMin(a.start_time) - timeToMin(b.start_time)) ||
+             (timeToMin(a.end_time)   - timeToMin(b.end_time));
     }
 
     // ── Hours worked ──
