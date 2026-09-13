@@ -98,3 +98,17 @@ export function referralCodesMatch(a: string | null | undefined, b: string | nul
   if (typeof a !== 'string' || typeof b !== 'string') return false;
   return normalizeReferralCode(a) === normalizeReferralCode(b);
 }
+
+/**
+ * Today's date at the gym (Asia/Ho_Chi_Minh), as YYYY-MM-DD.
+ *
+ * The server runs in UTC, seven hours behind, so a plain `new Date()` would call
+ * it "yesterday" for the whole Vietnamese evening — which would put the busiest
+ * hours of a shift outside any rule that asks "is this row from today?".
+ */
+export function gymToday(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date());
+}

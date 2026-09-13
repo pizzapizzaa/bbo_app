@@ -102,6 +102,25 @@ export function isKnownAddon(name: string): boolean {
   return ADDON_BY_NAME.has(name);
 }
 
+/**
+ * Product groups that credit something lasting to a customer account — punches,
+ * PT punches or membership months — rather than admitting them for the day only.
+ */
+const BALANCE_GRANTING_GROUPS = new Set(['10 Punches', '20 Punches', 'PT Punches', 'Membership']);
+
+/**
+ * Does selling `value` credit the buyer's account?
+ *
+ * POST /api/checkins grants those credits as a side effect of the sale, and the
+ * row does not record how many were granted — a membership even folds its months
+ * into a single end date. So the grant cannot be recomputed and taken back, which
+ * is why PUT /api/checkins/:id refuses to edit the fields that decided it.
+ */
+export function grantsBalance(value: string): boolean {
+  const def = CHECKIN_TYPE_BY_VALUE.get(value);
+  return !!def && BALANCE_GRANTING_GROUPS.has(def.group);
+}
+
 // ── Hand-picked discounts ────────────────────────────────────────────────────
 
 export interface DiscountDef {
@@ -278,4 +297,20 @@ export function describeCheckinExtras(addons: string[], price: PriceBreakdown): 
   }
 
   return parts.join(', ');
+}
+
+/**
+ * Recover the add-on names from a stored `checkins.addons` trail.
+ *
+ * The trail lists the add-ons first and then annotations that all read as prose
+ * ("Discount: …", "Promo: …", "Manual amount …"), and no product name contains a
+ * comma — so keeping the segments that name a real add-on returns exactly the
+ * list that was submitted. That is what lets the edit form re-tick the right
+ * boxes rather than asking staff to remember what was on the bill.
+ */
+export function parseCheckinExtras(trail: string): string[] {
+  return String(trail ?? '')
+    .split(',')
+    .map((part) => part.trim())
+    .filter(isKnownAddon);
 }

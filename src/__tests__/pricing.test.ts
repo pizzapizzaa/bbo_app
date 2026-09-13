@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   CHECKIN_TYPES, ADDONS, MANUAL_DISCOUNTS,
   checkinTypePrice, isKnownCheckinType, isKnownAddon, isKnownDiscount,
-  computeCheckinAmount, describeCheckinExtras,
+  computeCheckinAmount, describeCheckinExtras, parseCheckinExtras, grantsBalance,
 } from '../lib/pricing';
 
 /** A day outside every promotion window, so the base rules show through. */
@@ -287,5 +287,66 @@ describe('describeCheckinExtras', () => {
   it('drops anything not on the price list rather than repeating it back', () => {
     const p = computeCheckinAmount({ date: ORDINARY, checkin_type: 'Day Pass – Adult' });
     expect(describeCheckinExtras(['Free Beer'], p)).toBe('');
+  });
+});
+
+// ── The trail, read back ──────────────────────────────────────────────────────
+// The edit form re-ticks its add-on boxes from the stored trail, so what
+// describeCheckinExtras writes has to survive the round trip.
+describe('parseCheckinExtras', () => {
+  it('recovers a plain add-on list', () => {
+    expect(parseCheckinExtras('Shoes Rental, Pocari')).toEqual(['Shoes Rental', 'Pocari']);
+  });
+
+  it('returns nothing for an empty or absent trail', () => {
+    expect(parseCheckinExtras('')).toEqual([]);
+    expect(parseCheckinExtras(undefined as any)).toEqual([]);
+  });
+
+  it('keeps the tier that was actually sold', () => {
+    expect(parseCheckinExtras('Chalk Bag Rental (3+ people)')).toEqual(['Chalk Bag Rental (3+ people)']);
+  });
+
+  it('ignores the discount, promo and override notes around the add-ons', () => {
+    const p = computeCheckinAmount({
+      date: PROMO_DAY, checkin_type: 'Day Pass – Adult',
+      addons: ['Shoes Rental', 'Socks'], discount: 'day40',
+    });
+    const trail = [describeCheckinExtras(['Shoes Rental', 'Socks'], p), 'Manual amount (price list: 99 ₫)'].join(', ');
+    expect(parseCheckinExtras(trail)).toEqual(['Shoes Rental', 'Socks']);
+  });
+
+  it('round-trips every add-on on the price list', () => {
+    const names = ADDONS.map((a) => a.name);
+    const p = computeCheckinAmount({ date: ORDINARY, checkin_type: 'Day Pass – Adult', addons: names });
+    expect(parseCheckinExtras(describeCheckinExtras(names, p))).toEqual(names);
+  });
+});
+
+// ── Which sales credit an account ─────────────────────────────────────────────
+describe('grantsBalance', () => {
+  it('is true for punch cards, PT punches and memberships', () => {
+    expect(grantsBalance('10 Punches – Adult')).toBe(true);
+    expect(grantsBalance('20 Punches – Adult')).toBe(true);
+    expect(grantsBalance('10 PT Punches – Shingo PT')).toBe(true);
+    expect(grantsBalance('Membership – 12 Months')).toBe(true);
+  });
+
+  it('is false for a day pass, which admits and nothing more', () => {
+    expect(grantsBalance('Day Pass – Adult')).toBe(false);
+    expect(grantsBalance('Day Pass – Kid')).toBe(false);
+  });
+
+  it('is false for an empty or unknown product', () => {
+    expect(grantsBalance('')).toBe(false);
+    expect(grantsBalance('Free Pass')).toBe(false);
+  });
+
+  it('covers every product whose group credits something', () => {
+    // A new punch or membership product must be caught without editing this list.
+    CHECKIN_TYPES.forEach((t) => {
+      const credits = /Punches|Membership/.test(t.group);
+      expect(grantsBalance(t.value)).toBe(credits);
+    });
   });
 });
