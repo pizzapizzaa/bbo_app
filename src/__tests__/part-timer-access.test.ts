@@ -13,6 +13,7 @@ vi.mock('../lib/db', () => ({
 import { signToken, adminOnly, forbidden, ELEVATED_TTL_MS } from '../lib/auth';
 import { matchEnvAccount, isEnvAccountName, secretEquals, envValue } from '../lib/env-accounts';
 import { insertOwned, canModifyRow } from '../lib/ownership';
+import { gymToday } from '../lib/validate';
 import { verifyToken } from '../lib/auth';
 import { POST as loginPost } from '../pages/api/auth/token';
 import { POST as elevatePost } from '../pages/api/auth/elevate';
@@ -404,6 +405,54 @@ describe('row ownership', () => {
     await expect(canModifyRow('checkins', 'row-1', null)).resolves.toBe(false);
   });
 
+  // ── The same-day rule ───────────────────────────────────────────────────────
+  // Whoever is on the desk fixes the day's mistakes, because the person who
+  // typed the wrong name has usually gone home.
+  it("lets a part-timer modify today's check-in logged by someone else", async () => {
+    mockFromFn.mockImplementation(() =>
+      makeBuilder({ data: { created_by: 'someone-else', date: gymToday() }, error: null })
+    );
+    await expect(canModifyRow('checkins', 'row-1', staff)).resolves.toBe(true);
+  });
+
+  it("lets a part-timer modify today's unowned pre-migration check-in", async () => {
+    mockFromFn.mockImplementation(() =>
+      makeBuilder({ data: { created_by: null, date: gymToday() }, error: null })
+    );
+    await expect(canModifyRow('checkins', 'row-1', staff)).resolves.toBe(true);
+  });
+
+  it("refuses a part-timer yesterday's check-in logged by someone else", async () => {
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+    mockFromFn.mockImplementation(() =>
+      makeBuilder({ data: { created_by: 'someone-else', date: yesterday }, error: null })
+    );
+    await expect(canModifyRow('checkins', 'row-1', staff)).resolves.toBe(false);
+  });
+
+  it('still lets a part-timer modify their own older check-in', async () => {
+    mockFromFn.mockImplementation(() =>
+      makeBuilder({ data: { created_by: 'parttimer', date: '2026-01-01' }, error: null })
+    );
+    await expect(canModifyRow('checkins', 'row-1', staff)).resolves.toBe(true);
+  });
+
+  it('reads both the owner and the date in one lookup', async () => {
+    const builder = makeBuilder({ data: { created_by: 'parttimer', date: gymToday() }, error: null });
+    mockFromFn.mockImplementation(() => builder);
+
+    await canModifyRow('checkins', 'row-1', staff);
+
+    expect(builder.select).toHaveBeenCalledWith('created_by, date');
+  });
+
+  it('does not extend the same-day rule to schedule entries', async () => {
+    mockFromFn.mockImplementation(() =>
+      makeBuilder({ data: { created_by: 'someone-else', date: gymToday() }, error: null })
+    );
+    await expect(canModifyRow('schedule_entries', 'row-1', staff)).resolves.toBe(false);
+  });
+
   it('retries the insert without created_by when the column is missing', async () => {
     // Fresh module instance: the "column is missing" flag is process-wide.
     vi.resetModules();
@@ -419,8 +468,39 @@ describe('row ownership', () => {
     expect(accepting.insert).toHaveBeenCalledWith({ customer_name: 'Ann' });
     expect(res.error).toBeNull();
 
-    // With no ownership column, edit/delete stays admin-only.
+    // With no ownership column there is nothing to own, so an older row stays
+    // admin-only — the same-day rule is all a part-timer has left.
     await expect(freshCanModify('checkins', 'row-1', staff)).resolves.toBe(false);
     await expect(freshCanModify('checkins', 'row-1', admin)).resolves.toBe(true);
+  });
+
+  it("falls back to the same-day rule when created_by does not exist", async () => {
+    vi.resetModules();
+    const { canModifyRow: freshCanModify } = await import('../lib/ownership');
+
+    // First lookup is rejected for naming created_by; the retry asks for the date
+    // alone, which is enough to clear today's row.
+    const rejecting = makeBuilder({ data: null, error: { code: '42703', message: 'column checkins.created_by does not exist' } });
+    const dateOnly  = makeBuilder({ data: { date: gymToday() }, error: null });
+    mockFromFn.mockImplementationOnce(() => rejecting).mockImplementation(() => dateOnly);
+
+    await expect(freshCanModify('checkins', 'row-1', staff)).resolves.toBe(true);
+    expect(dateOnly.select).toHaveBeenCalledWith('date');
+  });
+
+  it('asks only for the date once created_by is known to be missing', async () => {
+    vi.resetModules();
+    const { canModifyRow: freshCanModify } = await import('../lib/ownership');
+
+    const rejecting = makeBuilder({ data: null, error: { code: '42703', message: 'column checkins.created_by does not exist' } });
+    mockFromFn.mockImplementationOnce(() => rejecting)
+              .mockImplementation(() => makeBuilder({ data: { date: '2026-01-01' }, error: null }));
+    await freshCanModify('checkins', 'row-1', staff);
+
+    // Second call: no retry, and an older row is refused.
+    const later = makeBuilder({ data: { date: '2026-01-01' }, error: null });
+    mockFromFn.mockImplementation(() => later);
+    await expect(freshCanModify('checkins', 'row-2', staff)).resolves.toBe(false);
+    expect(later.select).toHaveBeenCalledWith('date');
   });
 });

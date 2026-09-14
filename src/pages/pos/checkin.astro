@@ -53,7 +53,7 @@ const PRICING_DATA = { checkin_types: CHECKIN_TYPES, addons: ADDONS, discounts: 
        width and the fields flow into rows, so a check-in fits on screen
        without scrolling and the day's tracker sits right below it. -->
   <div class="bg-gray-900 rounded-xl shadow-lg p-6 mb-6">
-    <h2 class="font-semibold text-white mb-5 tracking-wide">New Check-in</h2>
+    <h2 id="form-heading" class="font-semibold text-white mb-5 tracking-wide">New Check-in</h2>
 
     <form id="checkin-form" class="space-y-4 lg:space-y-5" novalidate>
 
@@ -382,6 +382,17 @@ const PRICING_DATA = { checkin_types: CHECKIN_TYPES, addons: ADDONS, discounts: 
           Timestamp: <span id="ts-preview" class="font-medium text-gray-200"></span>
         </div>
 
+        <!-- Only shown while editing, so the ordinary path keeps one button. -->
+        <button
+          type="button"
+          id="cancel-edit-btn"
+          onclick="exitEditMode()"
+          class="hidden w-full lg:w-auto bg-gray-700 hover:bg-gray-600 text-gray-200 font-medium
+                 py-3 lg:px-6 rounded-lg text-sm transition active:scale-[0.98]"
+        >
+          Cancel
+        </button>
+
         <button
           type="submit"
           class="w-full lg:w-auto lg:min-w-[220px] bg-orange-500 hover:bg-orange-600 text-white font-semibold
@@ -391,7 +402,7 @@ const PRICING_DATA = { checkin_types: CHECKIN_TYPES, addons: ADDONS, discounts: 
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
               d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
           </svg>
-          Record Check-in
+          <span id="submit-label">Record Check-in</span>
         </button>
       </div>
     </form>
@@ -652,7 +663,8 @@ const PRICING_DATA = { checkin_types: CHECKIN_TYPES, addons: ADDONS, discounts: 
         dom: "<'flex flex-wrap items-center justify-between gap-3 mb-3'<'text-sm text-gray-500'i><'flex-1 text-right'f>>" +
              "t" +
              "<'flex flex-wrap items-center justify-between mt-3'<''><'flex gap-1'p>>",
-        order: [[0, 'asc'], [1, 'asc']],
+        // Newest check-in first: staff read the top of the table for what just happened.
+        order: [[0, 'desc'], [1, 'desc']],
         pageLength: 20,
         language: { emptyTable: 'No check-ins for this period.' }
       });
@@ -688,13 +700,22 @@ const PRICING_DATA = { checkin_types: CHECKIN_TYPES, addons: ADDONS, discounts: 
                 (c.referral_discount_pct ? ' · ' + c.referral_discount_pct + '% off' : '') + '</span>'
             : '<span class="text-gray-300">—</span>',
           escHtml(c.notes || ''),
-          '<button onclick="deleteCheckin(\'' + c.id + '\')" ' +
-            'class="inline-flex items-center gap-1 text-xs text-red-500 hover:text-red-700 ' +
-            'hover:bg-red-50 px-2 py-1 rounded transition">' +
-            '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" ' +
-            'd="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>' +
-            '</svg>Delete</button>'
+          '<div class="flex items-center gap-1">' +
+            '<button onclick="editCheckin(\'' + c.id + '\')" ' +
+              'class="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-orange-600 ' +
+              'hover:bg-orange-50 px-2 py-1 rounded transition">' +
+              '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+              '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" ' +
+              'd="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>' +
+              '</svg>Edit</button>' +
+            '<button onclick="deleteCheckin(\'' + c.id + '\')" ' +
+              'class="inline-flex items-center gap-1 text-xs text-red-500 hover:text-red-700 ' +
+              'hover:bg-red-50 px-2 py-1 rounded transition">' +
+              '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+              '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" ' +
+              'd="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>' +
+              '</svg>Delete</button>' +
+          '</div>'
         ];
       });
     }
@@ -809,6 +830,9 @@ const PRICING_DATA = { checkin_types: CHECKIN_TYPES, addons: ADDONS, discounts: 
         closeDropdown();
         onCustomerSelected(name);
       }
+
+      // The edit flow needs to drop a stored name straight into the picker.
+      window.selectCustomerByName = selectCustomer;
 
       window.clearCustomerSelection = function () {
         hiddenInput.value    = '';
@@ -997,17 +1021,18 @@ const PRICING_DATA = { checkin_types: CHECKIN_TYPES, addons: ADDONS, discounts: 
       el.classList.remove('hidden');
     }
 
+    /** Resolves once the verdict is in, so callers can re-quote after it lands. */
     function validateReferralCode() {
       var code = document.getElementById('f-referral-code').value.trim().toUpperCase();
       _referral = null;
       if (!code) {
         _setReferralStatus('Ask the customer for the code shared with them.', 'muted');
         recalcAmount();
-        return;
+        return Promise.resolve();
       }
       _setReferralStatus('Checking…', 'muted');
       var customer = document.getElementById('f-customer').value.trim();
-      apiFetch('/api/referral?code=' + encodeURIComponent(code) +
+      return apiFetch('/api/referral?code=' + encodeURIComponent(code) +
                (customer ? '&customer=' + encodeURIComponent(customer) : ''))
         .then(function (res) { return res.json(); })
         .then(function (data) {
@@ -1370,8 +1395,10 @@ const PRICING_DATA = { checkin_types: CHECKIN_TYPES, addons: ADDONS, discounts: 
       var btn = e.target.querySelector('[type="submit"]');
       btn.disabled = true;
 
-      apiFetch('/api/checkins', {
-        method: 'POST',
+      // Read once: exitEditMode() clears the flag before the toast is written.
+      var editingId = _editingId;
+      apiFetch('/api/checkins' + (editingId ? '/' + editingId : ''), {
+        method: editingId ? 'PUT' : 'POST',
         body: JSON.stringify({
           customer_name:        customerName,
           date:                 dateStr,
@@ -1403,28 +1430,15 @@ const PRICING_DATA = { checkin_types: CHECKIN_TYPES, addons: ADDONS, discounts: 
           document.getElementById('view-to').value   = dateStr;
           document.getElementById('table-date-label').textContent = formatDateLabel(dateStr);
           loadCheckinsForRange(dateStr, dateStr);
-          // Refresh punch card dropdown counts if a punch was used
-          if (punchHolderId || ptPunchHolderId) buildCustomerDatalist();
-          clearCustomerSelection();
-          document.getElementById('f-checkin-type').value = '';
-          document.querySelectorAll('.addon-cb').forEach(function (cb) { cb.checked = false; });
-          resetAddonTiers();
-          var noDiscRb = document.querySelector('.discount-rb[value=""]');
-          if (noDiscRb) noDiscRb.checked = true;
-          document.getElementById('f-amount').value     = '';
-          document.getElementById('amount-note').classList.add('hidden');
-          _autoAmount = 0;
-          document.getElementById('f-notes').value      = '';
-          // Reset date+time to now for next entry
-          var n = new Date();
-          document.getElementById('f-checkin-date').value = n.toISOString().slice(0, 10);
-          document.getElementById('f-checkin-time').value = n.toTimeString().slice(0, 5);
-          updateTsPreview();
-          updatePromoBanner();
+          // Refresh punch card dropdown counts if a punch was used. An edit may
+          // also have handed one back to a holder it no longer names, so it
+          // always re-reads them.
+          if (punchHolderId || ptPunchHolderId || editingId) buildCustomerDatalist();
+          if (editingId) exitEditMode(); else resetFormFields();
           // Quote the server's figure, not the box's — they are the same in the
           // ordinary case, and when they are not it is the server's that was banked.
           var charged = data.price ? data.price.charged : null;
-          showToast('✓ Check-in recorded for ' + customerName +
+          showToast('✓ Check-in ' + (editingId ? 'updated' : 'recorded') + ' for ' + customerName +
             (charged !== null && charged > 0 ? ' — ' + _fmtVnd(charged) : '') + '!');
         })
         .catch(function (err) {
@@ -1433,6 +1447,186 @@ const PRICING_DATA = { checkin_types: CHECKIN_TYPES, addons: ADDONS, discounts: 
           errEl.classList.remove('hidden');
         });
     });
+
+    // ── Editing an existing check-in ────────────────────────────────────────
+    // The same form does both jobs. A second one would mean a second copy of the
+    // pricing preview, the tier stepper and the referral check, each free to
+    // drift from this one — so Edit fills this form in and the submit handler
+    // aims at a different verb.
+    var _editingId = null;
+
+    /** Put the form back to a blank check-in, dated now. */
+    function resetFormFields() {
+      clearCustomerSelection();
+      document.getElementById('f-checkin-type').value = '';
+      document.querySelectorAll('.addon-cb').forEach(function (cb) { cb.checked = false; });
+      resetAddonTiers();
+      var noDiscRb = document.querySelector('.discount-rb[value=""]');
+      if (noDiscRb) noDiscRb.checked = true;
+      document.getElementById('f-amount').value = '';
+      document.getElementById('amount-note').classList.add('hidden');
+      _autoAmount = 0;
+      document.getElementById('f-notes').value = '';
+      // Date+time back to now, ready for the next entry
+      var n = new Date();
+      document.getElementById('f-checkin-date').value = n.toISOString().slice(0, 10);
+      document.getElementById('f-checkin-time').value = n.toTimeString().slice(0, 5);
+      updateTsPreview();
+      updatePromoBanner();
+    }
+
+    /** Add-on names the form knows, for reading a stored trail back into boxes. */
+    var ADDON_NAMES = {};
+    (PRICING.addons || []).forEach(function (a) { ADDON_NAMES[a.name] = true; });
+
+    function trailParts(trail) {
+      return String(trail || '').split(',').map(function (p) { return p.trim(); });
+    }
+
+    /**
+     * The add-ons behind a stored `addons` trail — the mirror of
+     * parseCheckinExtras in pricing.ts. The trail opens with the product names
+     * and then annotates ("Discount: …", "Promo: …"), and no product name holds a
+     * comma, so the segments naming a real add-on are exactly what was submitted.
+     */
+    function addonsFromTrail(trail) {
+      return trailParts(trail).filter(function (p) { return ADDON_NAMES[p]; });
+    }
+
+    /** The discount behind a stored row: its referral column, else the trail label. */
+    function discountFromRow(c) {
+      if (c.referral_code) return 'referral';
+      // Matched against the whole trail rather than a comma-split segment of it:
+      // two of the labels ("… (setting day, less disturbance)") hold a comma
+      // themselves, and splitting on one tears them in half.
+      var trail = String(c.addons || '');
+      var hit = (PRICING.discounts || []).find(function (d) {
+        return trail.indexOf('Discount: ' + d.label) !== -1;
+      });
+      return hit ? hit.id : '';
+    }
+
+    /** Tick a tiered add-on and point its stepper at the tier that was sold. */
+    function restoreAddonTier(name) {
+      var found = null;
+      Object.keys(ADDON_TIERS).forEach(function (of) {
+        ADDON_TIERS[of].tiers.forEach(function (t, i) {
+          if (t.name === name) found = { of: of, index: i };
+        });
+      });
+      if (!found) return false;
+      ADDON_TIERS[found.of].index = found.index;
+      document.getElementById('addon-tier-' + tierSlug(found.of)).checked = true;
+      syncAddonTier(found.of);
+      return true;
+    }
+
+    /**
+     * Make sure a punch-card select can show a stored holder. The dropdowns list
+     * only customers with punches left, so the holder of a card since spent would
+     * otherwise be missing from the form and dropped on save.
+     */
+    function ensureHolderOption(selectId, holderId, holderName) {
+      var sel = document.getElementById(selectId);
+      if (sel.querySelector('option[value="' + holderId + '"]')) return;
+      var opt = document.createElement('option');
+      opt.value = holderId;
+      opt.dataset.holderName = holderName || '';
+      opt.textContent = (holderName || 'Punch card holder') + ' (on this check-in)';
+      sel.appendChild(opt);
+    }
+
+    /**
+     * Put the amount that was actually banked back over the fresh quote. Where
+     * the two differ the row was an override, and keeping the stored figure keeps
+     * it one — so re-saving does not quietly re-price a goodwill adjustment back
+     * up to list.
+     */
+    function applyStoredAmount(c) {
+      recalcAmount();
+      if (c.amount === null || c.amount === undefined || c.amount === '') return;
+      document.getElementById('f-amount').value = Math.round(parseFloat(c.amount) || 0);
+      updateAmountNote();
+    }
+
+    function editCheckin(id) {
+      var c = allCheckins.find(function (x) { return x.id === id; });
+      if (!c) { showToast('That check-in is no longer on screen — reload and try again.', 'error'); return; }
+
+      document.getElementById('form-error').classList.add('hidden');
+      // Start clean, so nothing from a half-typed entry survives into the edit.
+      resetFormFields();
+      _editingId = id;
+
+      // Customer first: picking one auto-selects a payment method, so the stored
+      // payment has to be written after it rather than before.
+      if (c.customer_name) window.selectCustomerByName(c.customer_name);
+
+      document.getElementById('f-checkin-date').value = c.date || '';
+      document.getElementById('f-checkin-time').value = (c.time || '').slice(0, 5);
+      document.getElementById('f-checkin-type').value = c.checkin_type || '';
+
+      addonsFromTrail(c.addons).forEach(function (name) {
+        if (restoreAddonTier(name)) return;
+        var cb = document.querySelector('.addon-cb[data-name="' + name + '"]');
+        if (cb) cb.checked = true;
+      });
+
+      var discountId = discountFromRow(c);
+      var rb = document.querySelector('.discount-rb[value="' + discountId + '"]');
+      if (rb) { rb.checked = true; rb.dispatchEvent(new Event('change')); }
+
+      var paySel = document.getElementById('f-payment');
+      paySel.value = c.payment_method || '';
+      paySel.dispatchEvent(new Event('change'));
+      if (c.punch_card_holder_id) {
+        ensureHolderOption('f-punch-from', c.punch_card_holder_id, c.punch_card_holder_name);
+        document.getElementById('f-punch-from').value = c.punch_card_holder_id;
+      }
+      if (c.pt_punch_holder_id) {
+        ensureHolderOption('f-pt-punch-from', c.pt_punch_holder_id, c.pt_punch_holder_name);
+        document.getElementById('f-pt-punch-from').value = c.pt_punch_holder_id;
+      }
+
+      // An "Other" check-in folds the unregistered name into notes on save.
+      // Unfold it, so re-saving does not prefix it a second time.
+      var notesVal = c.notes || '';
+      if (c.customer_name === 'Other') {
+        var m = /^Unregistered: ([^|]*?)(?: \| ([\s\S]*))?$/.exec(notesVal);
+        if (m) {
+          document.getElementById('f-other-name').value = m[1].trim();
+          notesVal = m[2] || '';
+        }
+      }
+      document.getElementById('f-notes').value = notesVal;
+
+      var codeCheck = Promise.resolve();
+      if (discountId === 'referral' && c.referral_code) {
+        document.getElementById('f-referral-code').value = c.referral_code;
+        codeCheck = validateReferralCode() || Promise.resolve();
+      }
+      // The amount goes in last, once any code check has landed — verifying a
+      // code re-quotes the price, which would otherwise overwrite it.
+      codeCheck.then(function () { applyStoredAmount(c); });
+
+      updateTsPreview();
+      updatePromoBanner();
+
+      document.getElementById('form-heading').textContent =
+        'Editing check-in — ' + (c.customer_name || '') + ' · ' + formatDateLabel(c.date);
+      document.getElementById('submit-label').textContent = 'Save Changes';
+      document.getElementById('cancel-edit-btn').classList.remove('hidden');
+      document.getElementById('checkin-form').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function exitEditMode() {
+      _editingId = null;
+      document.getElementById('form-heading').textContent  = 'New Check-in';
+      document.getElementById('submit-label').textContent  = 'Record Check-in';
+      document.getElementById('cancel-edit-btn').classList.add('hidden');
+      document.getElementById('form-error').classList.add('hidden');
+      resetFormFields();
+    }
 
     function deleteCheckin(id) {
       if (!confirm('Delete this check-in record?')) return;

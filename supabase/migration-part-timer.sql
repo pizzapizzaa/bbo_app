@@ -7,22 +7,31 @@
 --
 -- WHY
 -- ---
--- Part-timers may add check-ins and shifts, and may fix their own mistakes —
--- but must not edit or delete an admin's rows, or each other's. `created_by`
--- records the username that inserted the row so the API can enforce that.
+-- Part-timers may add check-ins and shifts, and may fix mistakes — but must not
+-- rewrite a week already counted. `created_by` records the username that
+-- inserted the row, which is one of the two ways the API grants an edit:
+--
+--   1. the row is yours — `created_by` matches the caller, any date; or
+--   2. it is a check-in from today — whoever logged it. Whoever is on the desk
+--      fixes the day's mistakes, because the colleague who typed the wrong name
+--      has usually gone home. See `sameDayDateColumn` in src/lib/ownership.ts.
+--
+-- Rule 2 covers check-ins only. A shift is not a till entry, so who may claim or
+-- drop one is decided by /api/schedule/:id/claim instead.
 --
 -- BEFORE YOU RUN IT
 -- -----------------
--- The app works without this migration: part-timers can still add check-ins
--- and shifts (the insert silently drops the column when it is absent). What
--- they cannot do until you run it is edit or delete their own entries —
--- ownership cannot be proven, so those actions stay admin-only.
+-- The app works without this migration: part-timers can still add check-ins and
+-- shifts (the insert silently drops the column when it is absent), and rule 2
+-- needs no column, so today's check-ins stay editable at the desk. What they
+-- cannot do until you run it is touch their *own* older entries — ownership
+-- cannot be proven, so for past days those stay admin-only.
 --
 -- AFTER YOU RUN IT
 -- ----------------
--- Rows that already existed keep created_by = NULL. They are treated as
--- unowned, so they remain admin-only to edit or delete. Only rows added from
--- here on are attributable to a part-timer.
+-- Rows that already existed keep created_by = NULL. They are unowned, so once
+-- their date has passed they are admin-only. Only rows added from here on are
+-- attributable to a part-timer.
 
 ALTER TABLE checkins
   ADD COLUMN IF NOT EXISTS created_by TEXT;
@@ -31,7 +40,7 @@ ALTER TABLE schedule_entries
   ADD COLUMN IF NOT EXISTS created_by TEXT;
 
 COMMENT ON COLUMN checkins.created_by IS
-  'Username that logged this check-in. NULL = pre-migration row (admin-only to modify).';
+  'Username that logged this check-in. NULL = pre-migration row; modifiable by a part-timer only while it is still today''s.';
 
 COMMENT ON COLUMN schedule_entries.created_by IS
   'Username that added this shift. NULL = pre-migration row (admin-only to modify).';

@@ -3,7 +3,7 @@ export const prerender = false;
 import type { APIRoute } from 'astro';
 import { db } from '../../../../lib/db';
 import { ok, serverError, unauthorized, authFromRequest } from '../../../../lib/auth';
-import { isValidUUID } from '../../../../lib/validate';
+import { isValidUUID, gymToday } from '../../../../lib/validate';
 import { isKnownPartTimer } from '../../../../lib/staff';
 
 /**
@@ -30,20 +30,6 @@ const forbidden = (msg: string): Response =>
     status: 403,
     headers: { 'Content-Type': 'application/json' },
   });
-
-/**
- * Today's date at the gym (Asia/Ho_Chi_Minh), as YYYY-MM-DD.
- *
- * The server runs in UTC, seven hours behind, so a plain `new Date()` would call
- * it "yesterday" for the whole Vietnamese evening — long enough for a part-timer
- * to drop a shift they were already meant to be working.
- */
-function gymToday(): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Ho_Chi_Minh',
-    year: 'numeric', month: '2-digit', day: '2-digit',
-  }).format(new Date());
-}
 
 /** POST /api/schedule/:id/claim — put your name on an open part-time shift */
 export const POST: APIRoute = async ({ params, request }) => {
