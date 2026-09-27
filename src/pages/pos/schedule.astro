@@ -1387,6 +1387,7 @@ import MainLayout from '../../layouts/MainLayout.astro';
           escHtml(name) + ' · ' + suffix + '</p>' +
         '<p id="pt-' + prefix + '-' + ptSlug(name) + '" ' +
           'class="text-xl font-bold ' + valueClass + ' tabular-nums mt-1">—</p>' +
+        '<p id="pt-' + prefix + '-meals-' + ptSlug(name) + '" class="text-[11px] text-gray-400 tabular-nums mt-0.5"></p>' +
         '</div>';
     }
 
@@ -1396,6 +1397,7 @@ import MainLayout from '../../layouts/MainLayout.astro';
       return '<div class="bg-gray-800 rounded-xl p-4 border ' + borderClass + '">' +
         '<p class="text-[10px] uppercase tracking-wide mb-0.5 ' + textClass + '">Combined · ' + suffix + '</p>' +
         '<p id="pt-' + prefix + '-total" class="text-xl font-bold tabular-nums mt-1 ' + textClass + '">—</p>' +
+        '<p id="pt-' + prefix + '-meals-total" class="text-[11px] text-gray-400 tabular-nums mt-0.5"></p>' +
         '</div>';
     }
 
@@ -1435,17 +1437,36 @@ import MainLayout from '../../layouts/MainLayout.astro';
       return { start: fmtDate(start), end: fmtDate(end), startDate: start, endDate: end };
     }
 
-    function sumStaffMinutes(staffName, dateSet) {
-      return unionMinutes(scheduleData.filter(function (s) {
+    function staffShiftsIn(staffName, dateSet) {
+      return scheduleData.filter(function (s) {
         return s.staff_name === staffName && dateSet.indexOf(s.date) !== -1;
-      }));
+      });
     }
 
-    function sumStaffMinutesInRange(staffName, rangeStart, rangeEnd) {
-      return unionMinutes(scheduleData.filter(function (s) {
+    function staffShiftsInRange(staffName, rangeStart, rangeEnd) {
+      return scheduleData.filter(function (s) {
         return s.staff_name === staffName &&
                s.date && s.date >= rangeStart && s.date <= rangeEnd;
-      }));
+      });
+    }
+
+    // ── Meal allowance ──
+    // A day on which one person's shifts add up to more than 5 hours (overlaps
+    // counted once, by the date each shift is booked on) earns a meal
+    // allowance. Mirrors mealDays() in src/lib/fixed-costs.ts, which bills it
+    // on the Expenses page — this script is is:inline and can't import it.
+    var MEAL_MIN_MINUTES = 5 * 60;
+
+    function mealDays(entries) {
+      var byDate = {};
+      entries.forEach(function (s) { (byDate[s.date] = byDate[s.date] || []).push(s); });
+      return Object.keys(byDate).filter(function (d) {
+        return unionMinutes(byDate[d]) > MEAL_MIN_MINUTES;
+      }).length;
+    }
+
+    function fmtMeals(n) {
+      return n ? n + ' meal day' + (n === 1 ? '' : 's') : 'No meal days';
     }
 
     var MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -1463,17 +1484,23 @@ import MainLayout from '../../layouts/MainLayout.astro';
       var endLabel   = MONTHS_SHORT[fin.endDate.getMonth()]   + ' ' + fin.endDate.getDate() + ' ' + fin.endDate.getFullYear();
       document.getElementById('pt-finance-period').textContent = 'Finance period: ' + startLabel + ' – ' + endLabel;
 
-      var weekTotal = 0, monTotal = 0;
+      var weekTotal = 0, monTotal = 0, weekMeals = 0, monMeals = 0;
       PART_TIMER_NAMES.forEach(function (name) {
-        var wMin = sumStaffMinutes(name, weekDates);
-        var mMin = sumStaffMinutesInRange(name, fin.start, fin.end);
-        weekTotal += wMin;
-        monTotal  += mMin;
+        var wShifts = staffShiftsIn(name, weekDates);
+        var mShifts = staffShiftsInRange(name, fin.start, fin.end);
+        var wMin = unionMinutes(wShifts), mMin = unionMinutes(mShifts);
+        var wMeal = mealDays(wShifts),    mMeal = mealDays(mShifts);
+        weekTotal += wMin;  monTotal += mMin;
+        weekMeals += wMeal; monMeals += mMeal;
         document.getElementById('pt-week-' + ptSlug(name)).textContent = fmtHours(wMin);
         document.getElementById('pt-mon-'  + ptSlug(name)).textContent = fmtHours(mMin);
+        document.getElementById('pt-week-meals-' + ptSlug(name)).textContent = fmtMeals(wMeal);
+        document.getElementById('pt-mon-meals-'  + ptSlug(name)).textContent = fmtMeals(mMeal);
       });
       document.getElementById('pt-week-total').textContent = fmtHours(weekTotal);
       document.getElementById('pt-mon-total').textContent  = fmtHours(monTotal);
+      document.getElementById('pt-week-meals-total').textContent = fmtMeals(weekMeals);
+      document.getElementById('pt-mon-meals-total').textContent  = fmtMeals(monMeals);
     }
 
     function loadSchedule() {

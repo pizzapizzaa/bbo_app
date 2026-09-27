@@ -68,6 +68,27 @@ describe('projectFixedCosts', () => {
     expect(p.lines.some(l => l.label === 'Danny')).toBe(false);
   });
 
+  it('adds a 35,000 meal allowance for each day worked over 5 hours', () => {
+    const sh = (date: string, start_time: string, end_time: string) =>
+      ({ staff_name: 'Bao Anh', date, start_time, end_time });
+    const p = projectFixedCosts({
+      ...base,
+      shifts: [
+        sh('2026-09-01', '09:00', '15:00'),   // one 6h shift            → meal
+        sh('2026-09-02', '09:00', '12:00'),   // 3h + 3h the same day   → meal
+        sh('2026-09-02', '14:00', '17:00'),
+        sh('2026-09-03', '10:00', '15:00'),   // exactly 5h             → no meal
+        sh('2026-09-04', '09:00', '13:00'),   // 4h + overlapping 12–15 = 6h → meal
+        sh('2026-09-04', '12:00', '15:00'),
+      ],
+    });
+    const l = line(p, 'Bao Anh');
+    expect(l.meals).toBe(3);
+    // 6 + 6 + 5 + 6 = 23h × 35,000 + 3 × 35,000
+    expect(l.amount).toBe(23 * 35_000 + 3 * 35_000);
+    expect(l.detail).toContain('3 meals × 35,000');
+  });
+
   it('charges 4 setting days for Shingo and the guest setters', () => {
     const p = projectFixedCosts(base);
     expect(line(p, 'Shingo — route setting').amount).toBe(3_200_000);

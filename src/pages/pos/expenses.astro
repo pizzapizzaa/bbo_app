@@ -501,6 +501,8 @@ import MainLayout from '../../layouts/MainLayout.astro';
           var min = hourly.reduce(function (a, l) { return a + l.minutes; }, 0);
           var h = Math.floor(min / 60), mm = min % 60;
           note = h + 'h' + (mm ? ' ' + mm + 'm' : '') + ' combined';
+          var meals = hourly.reduce(function (a, l) { return a + (l.meals || 0); }, 0);
+          if (meals) note += ' · ' + meals + ' meal allowance' + (meals === 1 ? '' : 's');
         }
         html += '<tr class="proj-line border-t border-gray-200 bg-gray-50/60' + hide + '" data-gi="' + gi + '">' +
           '<td class="py-2 pr-4 pl-5 font-semibold text-gray-800">Total ' + escHtml(g.name.toLowerCase()) + '</td>' +

@@ -21,6 +21,13 @@ export const PART_TIMER_RATES: Record<string, number> = {
   'Thuy Vy':   40_000,
 };
 
+/**
+ * A part-timer on the floor for more than 5 hours in a day — one shift or
+ * several, overlaps counted once — gets a meal allowance for that day.
+ */
+export const MEAL_ALLOWANCE   = 35_000;
+export const MEAL_MIN_MINUTES = 5 * 60;
+
 export const ACCOUNTANT_MONTHLY = 1_000_000;
 
 export const SHINGO_PT_CHECKIN_TYPE = '10 PT Punches – Shingo PT';
@@ -100,6 +107,19 @@ export function unionMinutes(shifts: Shift[]): number {
   return total;
 }
 
+/**
+ * Days on which one person's shifts add up to more than MEAL_MIN_MINUTES.
+ * A day is the date a shift is booked on, so an overnight shift counts toward
+ * the day it started.
+ */
+export function mealDays(shifts: Shift[]): number {
+  const byDate = new Map<string, Shift[]>();
+  for (const s of shifts) byDate.set(s.date, [...(byDate.get(s.date) ?? []), s]);
+  let days = 0;
+  for (const day of byDate.values()) if (unionMinutes(day) > MEAL_MIN_MINUTES) days++;
+  return days;
+}
+
 // ── Projection ───────────────────────────────────────────────────────────────
 
 export interface CostLine {
@@ -115,6 +135,8 @@ export interface CostLine {
   person?: string;
   /** Minutes worked, on hourly-paid lines only. */
   minutes?: number;
+  /** Meal-allowance days, on hourly-paid lines only. */
+  meals?: number;
 }
 
 export interface ProjectionInput {
@@ -151,14 +173,18 @@ export function projectFixedCosts(input: ProjectionInput): Projection {
 
   // Part-timers: hours actually rostered this finance month × their rate.
   for (const [name, rate] of Object.entries(PART_TIMER_RATES)) {
-    const min = unionMinutes(shifts.filter(s => s.staff_name === name));
+    const own   = shifts.filter(s => s.staff_name === name);
+    const min   = unionMinutes(own);
+    const meals = mealDays(own);
     lines.push({
       group: 'Part-timers',
       label: name,
-      detail: `${fmtHours(min)} × ${fmt(rate)}/h`,
+      detail: `${fmtHours(min)} × ${fmt(rate)}/h` +
+        (meals ? ` + ${meals} meal${meals === 1 ? '' : 's'} × ${fmt(MEAL_ALLOWANCE)}` : ''),
       // Rate is per hour; bill the minutes, rounded to the dong.
-      amount: Math.round(min * rate / 60),
+      amount: Math.round(min * rate / 60) + meals * MEAL_ALLOWANCE,
       minutes: min,
+      meals,
     });
   }
 
