@@ -70,7 +70,7 @@ describe('projectFixedCosts', () => {
 
   it('charges 4 setting days for Shingo and the guest setters', () => {
     const p = projectFixedCosts(base);
-    expect(line(p, 'Route setting').amount).toBe(3_200_000);
+    expect(line(p, 'Shingo — route setting').amount).toBe(3_200_000);
     expect(line(p, 'Guest setters (2 / day)').amount).toBe(6_000_000);
   });
 
@@ -83,7 +83,7 @@ describe('projectFixedCosts', () => {
         { amount: 0, checkin_type: '10 PT Punches – Other PT' },
       ],
     });
-    expect(line(p, 'PT punch card share').amount).toBe(Math.round(2 * SHINGO_PT_CARD_PRICE * 0.45));
+    expect(line(p, 'Shingo — PT punch card share').amount).toBe(Math.round(2 * SHINGO_PT_CARD_PRICE * 0.45));
   });
 
   it('takes 45% of 3,000,000 per card, ignoring card-fee surcharges', () => {
@@ -94,7 +94,7 @@ describe('projectFixedCosts', () => {
         { amount: 3_090_000, checkin_type: SHINGO_PT_CHECKIN_TYPE },  // 3% card fee
       ],
     });
-    expect(line(p, 'PT punch card share').amount).toBe(2_700_000);
+    expect(line(p, 'Shingo — PT punch card share').amount).toBe(2_700_000);
   });
 
   it('gives Duyen Ha 5% of revenue minus logged expenses, never below zero', () => {

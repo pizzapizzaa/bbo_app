@@ -110,6 +110,11 @@ export interface CostLine {
   amount: number;
   /** Set only for a cost quoted as a range; `amount` is then the low end. */
   amount_max?: number;
+  /** Whose pay this is, when one person is paid on several lines; the page
+   *  closes each such run with a per-person total. */
+  person?: string;
+  /** Minutes worked, on hourly-paid lines only. */
+  minutes?: number;
 }
 
 export interface ProjectionInput {
@@ -153,6 +158,7 @@ export function projectFixedCosts(input: ProjectionInput): Projection {
       detail: `${fmtHours(min)} × ${fmt(rate)}/h`,
       // Rate is per hour; bill the minutes, rounded to the dong.
       amount: Math.round(min * rate / 60),
+      minutes: min,
     });
   }
 
@@ -160,21 +166,23 @@ export function projectFixedCosts(input: ProjectionInput): Projection {
 
   const shingoCards = checkins.filter(c => c.checkin_type === SHINGO_PT_CHECKIN_TYPE).length;
   lines.push({
-    group: 'Shingo',
-    label: 'PT punch card share',
+    group: 'Staff',
+    label: 'Shingo — PT punch card share',
+    person: 'Shingo',
     detail: SHINGO_PT_CARD_PRICE > 0
       ? `${shingoCards} card${shingoCards === 1 ? '' : 's'} × ${fmt(SHINGO_PT_CARD_PRICE)} × ${SHINGO_PT_SHARE_PCT}%`
       : `${shingoCards} card${shingoCards === 1 ? '' : 's'} sold — card price not set`,
     amount: Math.round(shingoCards * SHINGO_PT_CARD_PRICE * SHINGO_PT_SHARE_PCT / 100),
   });
   lines.push({
-    group: 'Shingo',
-    label: 'Route setting',
+    group: 'Staff',
+    label: 'Shingo — route setting',
+    person: 'Shingo',
     detail: `${SETTING_DAYS_PER_MONTH} days × ${fmt(SHINGO_SETTING_DAY_FEE)}`,
     amount: SETTING_DAYS_PER_MONTH * SHINGO_SETTING_DAY_FEE,
   });
   lines.push({
-    group: 'Route setting',
+    group: 'Staff',
     label: 'Guest setters (2 / day)',
     detail: `${SETTING_DAYS_PER_MONTH} days × ${fmt(GUEST_SETTERS_PER_DAY)}`,
     amount: SETTING_DAYS_PER_MONTH * GUEST_SETTERS_PER_DAY,
@@ -184,10 +192,11 @@ export function projectFixedCosts(input: ProjectionInput): Projection {
   const logged  = expenses.reduce((a, e) => a + (Number(e.amount) || 0), 0);
   const profit  = revenue - logged;
   for (const [name, base] of Object.entries(FULL_TIME_BASE)) {
-    lines.push({ group: 'Full-time', label: `${name} — base salary`, detail: 'Monthly', amount: base });
+    lines.push({ group: 'Staff', label: `${name} — base salary`, person: name, detail: 'Monthly', amount: base });
     lines.push({
-      group: 'Full-time',
+      group: 'Staff',
       label: `${name} — ${FULL_TIME_PROFIT_PCT}% of profit`,
+      person: name,
       detail: profit > 0
         ? `${FULL_TIME_PROFIT_PCT}% × ${fmt(profit)} (revenue − logged expenses)`
         : 'No profit this month',
