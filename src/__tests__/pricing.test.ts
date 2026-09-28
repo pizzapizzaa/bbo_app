@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  CHECKIN_TYPES, ADDONS, MANUAL_DISCOUNTS,
+  CHECKIN_TYPES, ADDONS, MANUAL_DISCOUNTS, PRICE_CHANGES,
   checkinTypePrice, isKnownCheckinType, isKnownAddon, isKnownDiscount,
   computeCheckinAmount, describeCheckinExtras, parseCheckinExtras, grantsBalance,
 } from '../lib/pricing';
@@ -348,5 +348,37 @@ describe('grantsBalance', () => {
       const credits = /Punches|Membership/.test(t.group);
       expect(grantsBalance(t.value)).toBe(credits);
     });
+  });
+});
+
+describe('scheduled price changes', () => {
+  it('keeps the old prices up to 31 Dec 2026 and switches on 1 Jan 2027', () => {
+    expect(checkinTypePrice('Day Pass – Adult', '2026-12-31')).toBe(160_000);
+    expect(checkinTypePrice('Day Pass – Adult', '2027-01-01')).toBe(175_000);
+    expect(checkinTypePrice('Membership – 12 Months', '2026-12-31')).toBe(9_850_000);
+    expect(checkinTypePrice('Membership – 12 Months', '2027-01-01')).toBe(10_150_000);
+    expect(checkinTypePrice('20 Punches – Adult', '2027-06-01')).toBe(2_750_000);
+  });
+
+  it('leaves products the change does not name at their listed price', () => {
+    expect(checkinTypePrice('10 PT Punches – Shingo PT', '2027-01-01')).toBe(0);
+  });
+
+  it('bills a check-in at the price in force on its own date', () => {
+    const before = computeCheckinAmount({ date: '2026-12-31', checkin_type: 'Day Pass – Student' });
+    const after  = computeCheckinAmount({ date: '2027-01-01', checkin_type: 'Day Pass – Student' });
+    expect(before.amount).toBe(120_000);
+    expect(after.amount).toBe(135_000);
+  });
+
+  it('only names real products, at whole-dong prices, in date order', () => {
+    for (const change of PRICE_CHANGES) {
+      for (const [name, price] of Object.entries(change.prices)) {
+        expect(isKnownCheckinType(name)).toBe(true);
+        expect(Number.isInteger(price)).toBe(true);
+      }
+    }
+    const dates = PRICE_CHANGES.map(c => c.from);
+    expect([...dates].sort()).toEqual(dates);
   });
 });

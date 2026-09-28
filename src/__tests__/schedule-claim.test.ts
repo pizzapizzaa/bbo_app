@@ -132,10 +132,26 @@ describe('POST /api/schedule/:id/claim', () => {
     expect(await res.json()).toMatchObject({ error: 'Please select your name' });
   });
 
-  it('rejects a name that is not on the part-timer roster', async () => {
-    const res = await POST({ params: { id: SHIFT_ID }, request: makeReq(partTimerToken(), { part_timer_name: 'Mallory' }) } as any);
+  it('lets full-time staff and a typed-in "Other" name claim a slot', async () => {
+    for (const name of ['Huyen', 'Mallory']) {
+      const builder = makeBuilder({ data: [{ ...claimedRow, staff_name: name }], error: null });
+      mockFromFn.mockImplementation(() => builder);
+      const res = await POST({ params: { id: SHIFT_ID }, request: makeReq(partTimerToken(), { part_timer_name: name }) } as any);
+      expect(res.status).toBe(200);
+      expect(builder.update).toHaveBeenCalledWith(expect.objectContaining({ staff_name: name }));
+    }
+  });
+
+  it('snaps a roster name typed in different case or spacing to the roster spelling', async () => {
+    const builder = makeBuilder({ data: [claimedRow], error: null });
+    mockFromFn.mockImplementation(() => builder);
+    await POST({ params: { id: SHIFT_ID }, request: makeReq(partTimerToken(), { part_timer_name: '  minh   CHAU ' }) } as any);
+    expect(builder.update).toHaveBeenCalledWith(expect.objectContaining({ staff_name: 'Minh Chau', claimed_by: 'Minh Chau' }));
+  });
+
+  it('rejects a name longer than the limit', async () => {
+    const res = await POST({ params: { id: SHIFT_ID }, request: makeReq(partTimerToken(), { part_timer_name: 'x'.repeat(301) }) } as any);
     expect(res.status).toBe(400);
-    expect(await res.json()).toMatchObject({ error: 'Not a known part-timer' });
     expect(mockFromFn).not.toHaveBeenCalledWith('schedule_entries');
   });
 

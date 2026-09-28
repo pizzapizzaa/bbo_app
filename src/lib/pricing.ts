@@ -48,6 +48,40 @@ export const CHECKIN_TYPES: CheckinTypeDef[] = [
   { value: 'Membership – 12 Months',    price: 9_850_000, group: 'Membership' },
 ];
 
+/**
+ * Scheduled price changes, oldest first. A check-in is priced by its own date,
+ * so a visit back-dated to before `from` still bills at the old price, and the
+ * list above stays the price until the first change takes effect.
+ *
+ * Only products whose price changes are listed; anything absent keeps its
+ * price from CHECKIN_TYPES (or the latest earlier change that named it).
+ */
+export interface PriceChange {
+  /** First day (YYYY-MM-DD, gym-local) the new prices apply. */
+  from: string;
+  prices: Record<string, number>;
+}
+
+export const PRICE_CHANGES: PriceChange[] = [
+  {
+    // 2027 price rise: Day Passes and punch cards up ~10%, memberships ~3%.
+    from: '2027-01-01',
+    prices: {
+      'Day Pass – Adult':       175_000,
+      'Day Pass – Student':     135_000,
+      'Day Pass – Kid':         120_000,
+      '10 Punches – Adult':   1_540_000,
+      '10 Punches – Student': 1_100_000,
+      '10 Punches – Kid':       880_000,
+      '20 Punches – Adult':   2_750_000,
+      'Membership – 1 Month':   1_300_000,
+      'Membership – 3 Months':  3_150_000,
+      'Membership – 6 Months':  5_820_000,
+      'Membership – 12 Months': 10_150_000,
+    },
+  },
+];
+
 export interface AddonDef {
   name: string;
   price: number;
@@ -91,9 +125,21 @@ export const ADDONS: AddonDef[] = [
 const CHECKIN_TYPE_BY_VALUE = new Map(CHECKIN_TYPES.map((t) => [t.value, t]));
 const ADDON_BY_NAME         = new Map(ADDONS.map((a) => [a.name, a]));
 
-/** Base price of a product; 0 for anything not on the price list. */
-export function checkinTypePrice(value: string): number {
-  return CHECKIN_TYPE_BY_VALUE.get(value)?.price ?? 0;
+/**
+ * Base price of a product on `date` (YYYY-MM-DD); 0 for anything not on the
+ * price list. Without a date it is the CHECKIN_TYPES price, before any change.
+ */
+export function checkinTypePrice(value: string, date?: string): number {
+  const def = CHECKIN_TYPE_BY_VALUE.get(value);
+  if (!def) return 0;
+  let price = def.price;
+  if (date) {
+    // ISO dates sort as strings; later changes override earlier ones.
+    for (const change of PRICE_CHANGES) {
+      if (change.from <= date && value in change.prices) price = change.prices[value];
+    }
+  }
+  return price;
 }
 export function isKnownCheckinType(value: string): boolean {
   return CHECKIN_TYPE_BY_VALUE.has(value);
@@ -220,7 +266,7 @@ function lessPct(n: number, pct: number): number {
  * exception to that: it comes off the bill as a whole, add-ons and all.
  */
 export function computeCheckinAmount(input: PriceInput): PriceBreakdown {
-  const base = input.checkin_type ? checkinTypePrice(input.checkin_type) : 0;
+  const base = input.checkin_type ? checkinTypePrice(input.checkin_type, input.date) : 0;
 
   let retail = 0;
   let rental = 0;

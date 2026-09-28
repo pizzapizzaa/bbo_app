@@ -1,7 +1,7 @@
 ---
 import MainLayout from '../../layouts/MainLayout.astro';
 import { PROMOTIONS } from '../../lib/promotions';
-import { CHECKIN_TYPES, ADDONS, MANUAL_DISCOUNTS, type AddonDef } from '../../lib/pricing';
+import { CHECKIN_TYPES, ADDONS, MANUAL_DISCOUNTS, PRICE_CHANGES, type AddonDef } from '../../lib/pricing';
 
 /** Products grouped for the <optgroup>s, in the order pricing.ts lists them. */
 const TYPE_GROUPS: { group: string; items: typeof CHECKIN_TYPES }[] = [];
@@ -41,7 +41,7 @@ for (const a of ADDONS) {
 }
 
 /** Tables the inline preview prices against — the same ones the server bills from. */
-const PRICING_DATA = { checkin_types: CHECKIN_TYPES, addons: ADDONS, discounts: MANUAL_DISCOUNTS };
+const PRICING_DATA = { checkin_types: CHECKIN_TYPES, addons: ADDONS, discounts: MANUAL_DISCOUNTS, price_changes: PRICE_CHANGES };
 ---
 
 <MainLayout title="Daily Check-in" activePage="checkin">
@@ -1094,10 +1094,34 @@ const PRICING_DATA = { checkin_types: CHECKIN_TYPES, addons: ADDONS, discounts: 
     }
 
     // ── Check-in type, add-ons & discount: auto-calculate amount ──
+    /**
+     * A product's price on the form's date — mirrors checkinTypePrice() in
+     * src/lib/pricing.ts, so a check-in dated on or after a scheduled change
+     * is quoted at the new price, and a back-dated one at the old.
+     */
+    function _priceOn(type, listPrice) {
+      var d = _checkinDate();
+      var price = listPrice;
+      (PRICING.price_changes || []).forEach(function (c) {
+        if (c.from <= d && Object.prototype.hasOwnProperty.call(c.prices, type)) price = c.prices[type];
+      });
+      return price;
+    }
+
     function _basePrice() {
       var typeSelect  = document.getElementById('f-checkin-type');
       var selectedOpt = typeSelect.options[typeSelect.selectedIndex];
-      return selectedOpt ? (parseInt(selectedOpt.dataset.price || '0') || 0) : 0;
+      if (!selectedOpt || !selectedOpt.value) return 0;
+      return _priceOn(selectedOpt.value, parseInt(selectedOpt.dataset.price || '0') || 0);
+    }
+
+    /** Re-label the product dropdown with the prices in force on the form's date. */
+    function refreshTypeLabels() {
+      document.querySelectorAll('#f-checkin-type option').forEach(function (opt) {
+        if (!opt.value) return;
+        var price = _priceOn(opt.value, parseInt(opt.dataset.price || '0') || 0);
+        opt.textContent = price ? opt.value + ' (' + Number(price).toLocaleString('en-US') + ' ₫)' : opt.value;
+      });
     }
 
     /** Add-on subtotals, split so a code can discount gear rental on its own. */
@@ -1208,6 +1232,7 @@ const PRICING_DATA = { checkin_types: CHECKIN_TYPES, addons: ADDONS, discounts: 
     }
 
     function recalcAmount() {
+      refreshTypeLabels();
       var discountRb  = document.querySelector('.discount-rb:checked');
       var discountVal = discountRb ? discountRb.value : '';
       var total       = totalFor(discountVal);
