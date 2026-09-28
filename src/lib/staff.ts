@@ -37,8 +37,9 @@ export function isKnownStaff(name: string): boolean {
  * Every name here is also in STAFF_NAMES, on purpose: part-timers work the desk
  * and sign off leaderboard submissions like anyone else, and the admin assigns
  * them shifts directly as well as posting open slots. The two lists stay
- * separate because only this one may claim an open part-time shift, and only
- * this one is totalled in the part-timer hours panel.
+ * separate because only this one is totalled in the part-timer hours panel and
+ * paid an hourly rate. (Anyone on STAFF_NAMES, or a typed-in helper, may claim
+ * an open part-time shift — see `canonicalStaffName`.)
  *
  * Mirrored in `src/pages/schedule.astro` (see note above).
  */
@@ -56,6 +57,18 @@ export const PART_TIMER_NAMES = [
 /** True if `name` is on the part-timer roster (exact match after trimming). */
 export function isKnownPartTimer(name: string): boolean {
   return (PART_TIMER_NAMES as readonly string[]).includes(name.trim());
+}
+
+/**
+ * Tidy a typed-in name and, if it is a roster name in different case or
+ * spacing ("minh  chau"), return the roster spelling instead — so a free-text
+ * "Other" claim can't split someone's hours across two variants of their name.
+ * Anything not on the roster comes back trimmed with inner spaces collapsed.
+ */
+export function canonicalStaffName(name: string): string {
+  const tidy = name.trim().replace(/\s+/g, ' ');
+  const match = (STAFF_NAMES as readonly string[]).find((n) => n.toLowerCase() === tidy.toLowerCase());
+  return match ?? tidy;
 }
 
 /**

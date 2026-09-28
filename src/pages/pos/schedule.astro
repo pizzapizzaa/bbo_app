@@ -523,9 +523,15 @@ import MainLayout from '../../layouts/MainLayout.astro';
       </label>
       <select id="claim-name"
         class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
-               focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent">
-        <!-- populated by JS from PART_TIMER_NAMES -->
+               focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
+        onchange="toggleClaimOther(this.value)">
+        <!-- populated by JS from PART_TIMER_NAMES + STAFF_NAMES, plus "Other" -->
       </select>
+      <input id="claim-name-other" type="text" maxlength="100"
+        placeholder="Enter their name…"
+        class="hidden mt-2 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+               focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
+        onkeydown="if(event.key==='Enter')submitClaim()" />
       <p id="claim-name-hint" class="mt-1.5 text-xs text-gray-400">Your hours are tracked under the name you pick.</p>
 
       <div id="claim-error" class="hidden mt-3 text-sm text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2"></div>
@@ -921,8 +927,20 @@ import MainLayout from '../../layouts/MainLayout.astro';
 
       document.getElementById('f-staff').innerHTML = staffOptions;
       document.getElementById('e-staff').innerHTML = staffOptions;
+      // Part-timers first (they take most open slots), then the rest of the
+      // staff, then "Other" for an impromptu helper who isn't on the roster.
       document.getElementById('claim-name').innerHTML =
-        '<option value="">— Select your name —</option>' + optionsHtml(PART_TIMER_NAMES);
+        '<option value="">— Select your name —</option>' +
+        '<optgroup label="Part-timers">' + optionsHtml(PART_TIMER_NAMES) + '</optgroup>' +
+        '<optgroup label="Staff">'       + optionsHtml(fullTimers)       + '</optgroup>' +
+        '<option value="__other__">Other…</option>';
+    }
+
+    function toggleClaimOther(selectValue) {
+      var el = document.getElementById('claim-name-other');
+      var other = selectValue === '__other__';
+      el.classList.toggle('hidden', !other);
+      if (other) el.focus(); else el.value = '';
     }
 
     function fmtDayLabel(iso) {
@@ -953,6 +971,7 @@ import MainLayout from '../../layouts/MainLayout.astro';
         fmtDayLabel(entry.date) + ' · ' + entry.start_time + '–' + entry.end_time +
         (entry.notes ? ' · ' + entry.notes : '');
       document.getElementById('claim-name').value = '';
+      toggleClaimOther('');
       document.getElementById('claim-error').classList.add('hidden');
       var btn = document.getElementById('claim-confirm-btn');
       btn.disabled = false; btn.textContent = 'Confirm';
@@ -968,8 +987,10 @@ import MainLayout from '../../layouts/MainLayout.astro';
       var errEl = document.getElementById('claim-error');
       errEl.classList.add('hidden');
       var name = document.getElementById('claim-name').value;
+      var isOther = name === '__other__';
+      if (isOther) name = document.getElementById('claim-name-other').value.trim();
       if (!name) {
-        errEl.textContent = 'Please select your name.';
+        errEl.textContent = isOther ? 'Please type the name.' : 'Please select your name.';
         errEl.classList.remove('hidden');
         return;
       }
@@ -996,7 +1017,7 @@ import MainLayout from '../../layouts/MainLayout.astro';
           currentWeekStart = getWeekStart(new Date(data.entry.date + 'T00:00:00'));
           renderCalendar();
           showToast((isAdmin ? 'Shift filled — ' : 'Shift taken — ') +
-            name + ' is on ' + fmtDayLabel(data.entry.date) + '.');
+            data.entry.staff_name + ' is on ' + fmtDayLabel(data.entry.date) + '.');
         })
         .catch(function (err) {
           btn.disabled = false; btn.textContent = 'Confirm';

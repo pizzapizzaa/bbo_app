@@ -3,16 +3,18 @@ export const prerender = false;
 import type { APIRoute } from 'astro';
 import { db } from '../../../../lib/db';
 import { ok, serverError, unauthorized, authFromRequest } from '../../../../lib/auth';
-import { isValidUUID, gymToday } from '../../../../lib/validate';
-import { isKnownPartTimer } from '../../../../lib/staff';
+import { isValidUUID, gymToday, MAX_NAME } from '../../../../lib/validate';
+import { canonicalStaffName } from '../../../../lib/staff';
 
 /**
  * Claiming and releasing open part-time shifts.
  *
  * All part-timers share one login, so the account can't say who is standing
- * there — the claimer picks their own name from the roster and the server checks
- * it against `PART_TIMER_NAMES`. The claim writes that name into `staff_name`,
- * which is what every hours calculation in the app reads.
+ * there — the claimer picks their own name. Anyone on the staff roster may take
+ * an open slot, and an impromptu helper can be typed in via "Other"; a typed
+ * name matching a roster name is snapped to the roster spelling so hours never
+ * split across variants. The claim writes that name into `staff_name`, which is
+ * what every hours calculation in the app reads.
  *
  * There is deliberately no cap on how many slots exist per day or per time
  * range, nor on how many one person may hold: the gym runs several part-time
@@ -43,12 +45,12 @@ export const POST: APIRoute = async ({ params, request }) => {
   try { body = await request.json(); }
   catch { return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400 }); }
 
-  const name = String(body.part_timer_name ?? '').trim();
+  const name = canonicalStaffName(String(body.part_timer_name ?? ''));
   if (!name) {
     return new Response(JSON.stringify({ error: 'Please select your name' }), { status: 400 });
   }
-  if (!isKnownPartTimer(name)) {
-    return new Response(JSON.stringify({ error: 'Not a known part-timer' }), { status: 400 });
+  if (name.length > MAX_NAME) {
+    return new Response(JSON.stringify({ error: 'Name is too long' }), { status: 400 });
   }
 
   // Single conditional UPDATE rather than read-then-write: two part-timers
