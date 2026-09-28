@@ -1,0 +1,44 @@
+---
+import BlogArticle from '../components/BlogArticle.astro';
+
+const photos = [
+  { src: '/assets/media/Blog_photos/Onboarding_01.webp', alt: 'A climber reaching for a hold on one of our walls' },
+  { src: '/assets/media/Blog_photos/Onboarding_02.webp', alt: 'A climber working through the moves on the overhang' },
+];
+---
+
+<BlogArticle
+  title="Never Climbed Before? Your Onboarding Is On Us"
+  description="Complimentary bouldering onboarding for every first-timer. We'll show you the ropes (well, the mats)."
+  date="2026-09-28"
+  photos={photos}
+>
+  <p class="excerpt">Complimentary bouldering onboarding for every first-timer. We'll show you the ropes (well, the mats).</p>
+
+  <p>Walking into a climbing gym for the first time can feel a bit weird. Everyone seems to know what they're doing, there's chalk everywhere, and you're not sure which coloured holds you're even allowed to touch. We get it. Every one of us was that person once.</p>
+  <p>That's why every first-timer at Boulder Box gets a complimentary onboarding session with one of our crew.</p>
+
+  <h2>What we'll cover</h2>
+  <ul>
+    <li>How to read the problems: colours, start holds, top holds and grades</li>
+    <li>How to fall safely and how to get down from the wall</li>
+    <li>Gym etiquette, like not walking under someone who's climbing and taking turns on busy problems</li>
+    <li>Basic moves to get you started, like using your feet and keeping your arms straight</li>
+  </ul>
+  <p>It takes about 30 to 45 minutes, and after that the gym is all yours for the rest of the day.</p>
+
+  <h2>What does it cost?</h2>
+  <p>The onboarding itself is complimentary. You just pay for your Day Pass like any other climber, plus shoe rental if you don't have your own climbing shoes. No extra charge for the coaching.</p>
+
+  <h2>Do I need to be fit or strong?</h2>
+  <p>No. Honestly, no. Bouldering is more about balance, footwork and figuring out puzzles than pulling hard. Our V0s are made for total beginners, and you'll be surprised how quickly you move up.</p>
+
+  <h2>What should I bring?</h2>
+  <p>Comfortable clothes you can move in. If you don't have climbing shoes, you can rent a pair at the front desk.</p>
+
+  <h2>How do I sign up?</h2>
+  <p>Just walk in and tell the front desk it's your first time. We'll take it from there.</p>
+
+  <p>Bring a friend, too. Climbing's more fun when there's someone to cheer you on (and laugh when you fall off the first hold).</p>
+  <p>We're open every day from 10:30 AM to 10:00 PM at 96/114 Dang Thuy Tram, Binh Thanh. See you on the mats.</p>
+</BlogArticle>

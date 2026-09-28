@@ -1,0 +1,121 @@
+---
+/**
+ * Hand-picked Google reviews for a blog post.
+ *
+ * Copied in by hand from the gym's Google Maps listing, so the page is fully
+ * static: nothing loads from Google and there's no API key to manage. To add a
+ * review, copy its author, star rating, text and rough date into REVIEWS below.
+ * Update `RATING` and `COUNT` from the listing when you add some.
+ */
+
+interface Review {
+  author: string;
+  /** Whole stars, 1–5. */
+  rating: number;
+  text: string;
+  /** As Google shows it, e.g. "2 months ago" or "March 2026". */
+  when?: string;
+}
+
+const RATING = 5.0;
+const COUNT = 95;
+const REVIEWS_URL = 'https://maps.app.goo.gl/U2goWHwje167GUAQ7';
+
+// Dates are the month/year the review was posted, not Google's "2 months ago":
+// this page is static, so a relative date would quietly go stale.
+const REVIEWS: Review[] = [
+  {
+    author: 'Dan Le',
+    rating: 5,
+    when: '2025',
+    text: `Cant believed it’s been 25 years since I’ve been back to Vietnam.
+Being a climber of course I have to explore the climbing scene of Vietnam and my local community.
+The climbing community is friendly, passionate, and honest. Bouldering Box Saigon is all that and more!
+Although I might be a foreigner and stranger to them they treated me like family and show immense hospitality. Special Thanks to the staffs that works there! They helped me navigate the routes. They even assisted me with beta!
+The location is prime next to multiple store outlet and food options. The facility is immaculate with AC, WC, and training/warm up area.
+The routes themselves are well thought out and display the setters passion and attention to details.
+I would highly recommend if you’re in the area and want to try something new or novice climber this is the place for you.
+Thanks for reading !!`,
+  },
+  {
+    author: 'Alexandre',
+    rating: 5,
+    when: 'July 2026',
+    text: 'Awesome gym, human sized, awesome people and great owner, you feel at home here and have a lot of fun while climbing ✨ come learn some physic ✨ 🤣',
+  },
+  {
+    author: 'Shen Jia Wang',
+    rating: 5,
+    when: 'July 2026',
+    text: 'Amazing gym. Very clean, with plenty of training equipment. I loved the setting style, will definitely come back next time i am in vietnam. Shoutout to Ha at the front desk, she was super helpful!',
+  },
+  {
+    author: 'Benedict Foo',
+    rating: 5,
+    when: 'December 2025',
+    text: 'Went Monday morning 11am till about 3. Really fun especially since I had the place to myself, only had Du and Hi (hope I spelt their names right) there. They were really friendly and helpful, and it made the whole experience much more enjoyable! They have a toilet and showers in the back, and the gym was cosy and clean. It was definitely worth the trip out!',
+  },
+  {
+    author: 'Joe Nguyen',
+    rating: 5,
+    when: '2025',
+    text: `5/5 bouldering gym.
+
+Although the gym was relatively small with only three walls, there were plenty of problem routes with a wide variety of wall types (slab, overhangs, cave, etc). They had a route that went between the two walls of a walkway, and an endurance traverse that went around the whole gym. So they really know how to utilize the space. They also had the typical warm up, hang board and campus gear. I heard the route-setters here are the best in the city.
+
+The staff and other members were all super friendly and welcoming. I went on a Tuesday evening and there were about ~7 people. So neither crowded nor empty, a perfect amount imo.
+
+This would definitely be my gym of choice for a membership if/when I move to Saigon.`,
+  },
+];
+
+/** Five stars with `n` lit (rounded). */
+const lit = (n: number) => Math.round(n);
+const starLabel = (n: number) => `${Number.isInteger(n) ? n : n.toFixed(1)} out of 5 stars`;
+---
+
+<section class="gr">
+  <p class="gr-summary">
+    <span class="gr-stars gr-stars-lg" role="img" aria-label={starLabel(RATING)}>
+      {[1, 2, 3, 4, 5].map((i) => <span class={i <= lit(RATING) ? 'on' : ''}>★</span>)}
+    </span>
+    {RATING.toFixed(1)} from {COUNT} reviews on Google
+  </p>
+
+  <div class="gr-list">
+    {REVIEWS.map((r) => (
+      <article class="gr-card">
+        <div class="gr-head">
+          <span class="gr-author">{r.author}</span>
+          <span class="gr-meta">
+            <span class="gr-stars" role="img" aria-label={starLabel(r.rating)}>
+              {[1, 2, 3, 4, 5].map((i) => <span class={i <= lit(r.rating) ? 'on' : ''}>★</span>)}
+            </span>
+            {r.when && ` ${r.when}`}
+          </span>
+        </div>
+        <p class="gr-text">{r.text}</p>
+      </article>
+    ))}
+  </div>
+
+  <p class="gr-credit">
+    <a class="gr-all" href={REVIEWS_URL} target="_blank" rel="noopener noreferrer">Read all our reviews on Google</a>
+  </p>
+</section>
+
+<style>
+  .gr { margin-top: 24px; }
+  .gr-summary { font-weight: 600; margin-bottom: 12px; }
+  .gr-list { display: grid; gap: 12px; }
+  .gr-card { background: #fff; border: 1px solid #E5E7EB; border-radius: 8px; padding: 16px; }
+  .gr-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 8px; }
+  .gr-author { font-weight: 600; }
+  .gr-meta { font-size: 13px; color: #6B7280; }
+  .gr-stars { color: #D1D5DB; letter-spacing: 1px; }
+  .gr-stars .on { color: #F59E0B; }
+  .gr-stars-lg { font-size: 18px; margin-right: 6px; }
+  .gr-text { margin: 0; line-height: 1.6; white-space: pre-line; overflow-wrap: anywhere; }
+  .gr-credit { margin-top: 12px; font-size: 14px; }
+  .gr-all { color: #111827; font-weight: 600; }
+</style>

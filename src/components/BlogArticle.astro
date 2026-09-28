@@ -1,0 +1,92 @@
+---
+/**
+ * Shared shell for a blog post: title, date, an optional strip of photos, and
+ * readable typography for whatever the post puts in its slot.
+ *
+ * Photos are shown side by side as a strip rather than one big 3:2 hero,
+ * because the gym's photos are mostly portrait phone shots and a wide crop
+ * would cut the climber out. Each one links to the full-size image.
+ */
+import Layout from '../layouts/Layout-landing-page.astro';
+
+interface Photo { src: string; alt: string }
+
+interface Props {
+  title: string;
+  description: string;
+  /** YYYY-MM-DD */
+  date: string;
+  photos?: Photo[];
+}
+
+const { title, description, date, photos = [] } = Astro.props;
+const shownDate = new Date(`${date}T00:00:00`).toLocaleDateString('en-US', {
+  month: 'short', day: 'numeric', year: 'numeric',
+});
+---
+
+<Layout title={`${title} | Boulder Box Vietnam`} description={description}>
+  <article class="ba">
+    <header>
+      <h1 class="ba-title">{title}</h1>
+      <time class="ba-date" datetime={date}>{shownDate}</time>
+    </header>
+
+    {photos.length > 0 && (
+      <div class="ba-photos" style={`grid-template-columns: repeat(${photos.length}, 1fr);`}>
+        {photos.map((p) => (
+          <a href={p.src} target="_blank" rel="noopener" class="ba-photo">
+            <img src={p.src} alt={p.alt} loading="lazy" />
+          </a>
+        ))}
+      </div>
+    )}
+
+    <div class="ba-body">
+      <slot />
+    </div>
+
+    <footer class="ba-footer">
+      <a href="/blog" class="ba-back">Back to Blog</a>
+    </footer>
+  </article>
+</Layout>
+
+<style is:global>
+  body { background-color: #FAFAFA !important; color: #111827 !important; }
+</style>
+
+<style>
+  .ba { max-width: 900px; margin: 48px auto; padding: 32px; color: #111827; }
+  .ba-title { font-size: 36px; line-height: 1.2; margin-bottom: 12px; }
+  .ba-date { color: #fe5c13; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  .ba-photos { display: grid; gap: 10px; margin-top: 24px; }
+  .ba-photo { display: block; aspect-ratio: 3 / 4; overflow: hidden; border-radius: 8px; background: #e5e7eb; }
+  .ba-photo img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.3s ease; }
+  .ba-photo:hover img { transform: scale(1.03); }
+
+  .ba-body { margin-top: 28px; font-size: 17px; line-height: 1.7; }
+  .ba-body :global(p) { margin: 0 0 16px; }
+  .ba-body :global(h2) { font-size: 22px; font-weight: 700; margin: 32px 0 10px; }
+  .ba-body :global(ul) { margin: 0 0 16px; padding-left: 22px; list-style: disc; }
+  .ba-body :global(li) { margin-bottom: 6px; }
+  .ba-body :global(a) { color: #fe5c13; font-weight: 600; }
+  .ba-body :global(.excerpt) { font-size: 19px; color: #4B5563; }
+
+  .ba-body :global(table) { width: 100%; border-collapse: collapse; margin: 0 0 20px; font-size: 16px; }
+  .ba-body :global(th), .ba-body :global(td) { text-align: left; padding: 10px 12px; border-bottom: 1px solid #E5E7EB; }
+  .ba-body :global(th) { font-weight: 600; background: #F3F4F6; }
+  .ba-body :global(td:last-child), .ba-body :global(th:last-child) { font-weight: 700; }
+
+  .ba-footer { margin-top: 36px; }
+  .ba-back { display: inline-block; padding: 10px 16px; background: #111827; color: #FAFAFA; border-radius: 6px; text-decoration: none; font-weight: 600; }
+
+  @media (max-width: 640px) {
+    .ba { margin: 24px auto; padding: 16px; }
+    .ba-title { font-size: 28px; }
+    .ba-photos { gap: 6px; }
+    .ba-body { font-size: 16px; }
+    .ba-body :global(th), .ba-body :global(td) { padding: 8px 6px; font-size: 14px; }
+  }
+</style>

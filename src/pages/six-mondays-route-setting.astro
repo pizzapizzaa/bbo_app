@@ -1,0 +1,38 @@
+---
+import BlogArticle from '../components/BlogArticle.astro';
+
+const photos = [
+  { src: '/assets/media/Blog_photos/Setting_02.webp', alt: 'A setter drilling a new hold onto the wall' },
+  { src: '/assets/media/Blog_photos/Setting_03.webp', alt: 'A setter on a ladder bolting holds under the overhang' },
+  { src: '/assets/media/Blog_photos/Setting_01.webp', alt: 'A setter fixing a large volume high on the wall' },
+];
+---
+
+<BlogArticle
+  title="Six Mondays, One Brand New Gym"
+  description="Every Monday we strip a wall and set it fresh. Give it six weeks and you're climbing in a whole new gym."
+  date="2026-09-28"
+  photos={photos}
+>
+  <p class="excerpt">Every Monday we strip a wall and set it fresh. Give it six weeks and you're climbing in a whole new gym.</p>
+
+  <p>Ever finished your project, felt amazing for about a day, and then wondered what's next? We've got you.</p>
+
+  <h2>How it works</h2>
+  <p>Every Monday is setting day at Boulder Box. Each week we take one wall, strip every hold off it, wash everything, and set it again from scratch. We have six walls, so every six weeks the whole gym has turned over. Nothing hangs around long enough to get boring.</p>
+
+  <h2>Why one wall at a time?</h2>
+  <p>We could close for a few days and reset everything at once, but then you'd get a flood of new problems followed by weeks of nothing. One wall a week means there's always something fresh to try, and the rest of the gym stays open while we work. It also gives our setters time to get each problem right instead of rushing through a whole gym.</p>
+
+  <h2>Who's behind the problems</h2>
+  <p>Our head setter Shingo has been climbing for over 20 years and setting for more than 11. His problems read well, move well, and cover every level from V0 up to V6. Whether you're on your first week or chasing your next grade, there'll be something new on the wall for you.</p>
+
+  <h2>Climbing on a Monday</h2>
+  <p>We set from 10AM to 7PM. The gym stays open the whole time, but one wall is closed while we work, and it can get a bit noisy with drills and holds coming off. To make up for it, Day Passes are discounted on setting days.</p>
+  <p>Our tip: come in after 7PM. The new wall is open by then, the problems are brand new, and you get first go before everyone else shows up on Tuesday.</p>
+
+  <h2>Keep an eye out</h2>
+  <p>We post each new wall on Instagram <a href="https://www.instagram.com/boulderbox.saigon/" target="_blank" rel="noopener noreferrer">@boulderbox.saigon</a> as soon as it's done. Come in and see if you can flash it before your friends do.</p>
+
+  <p>See you Monday.</p>
+</BlogArticle>

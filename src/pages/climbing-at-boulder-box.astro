@@ -1,0 +1,49 @@
+---
+import BlogArticle from '../components/BlogArticle.astro';
+import GoogleReviews from '../components/GoogleReviews.astro';
+
+const photos = [
+  { src: '/assets/media/Blog_photos/BoulderBox_vibe_01.webp', alt: 'Climbers and crew hanging out between the walls at Boulder Box' },
+  { src: '/assets/media/Blog_photos/BoulderBox_vibe_02.webp', alt: 'A climber reaching across the overhang' },
+  { src: '/assets/media/Blog_photos/BoulderBox_vibe_03.webp', alt: 'A climber pulling through a move on the steep wall' },
+];
+---
+
+<BlogArticle
+  title="What Is It Actually Like Climbing at Boulder Box?"
+  description="Small, clean, air-conditioned, and full of good people. We went through our Google reviews to see what you actually say about us."
+  date="2026-09-28"
+  photos={photos}
+>
+  <p class="excerpt">Small, clean, air-conditioned, and full of good people. We went through our Google reviews to see what you actually say about us.</p>
+
+  <p>We could tell you our gym is great, but you'd expect us to say that. So we went through our Google reviews to see what climbers really think. A few things kept coming up.</p>
+
+  <h2>It feels like home</h2>
+  <p>This one came up more than anything. We're a small gym, and we like it that way. Alexandre called us "human sized," which might be our new favourite description. Small means you get to know people fast, and people get to know you.</p>
+  <p>Dan came back to Vietnam after 25 years away and looked us up to check out the local climbing scene. He wrote that even as a stranger, we "treated me like family." Reading that made our whole week.</p>
+
+  <h2>The crew is on your side</h2>
+  <p>Our staff are climbers too, and they're there to help. Shen gave a shoutout to Ha at the front desk. Benedict spent a quiet Monday with our crew and said they made the whole experience more enjoyable. Dan mentioned the team helped him find his way around the problems and even gave him beta.</p>
+  <p>That's exactly what we want. Nobody should feel lost at Boulder Box.</p>
+
+  <h2>The setting is the real deal</h2>
+  <p>Dan said our problems "display the setters passion and attention to details." Shen loved the setting style. Joe had heard our setters are some of the best in the city, which we're not going to argue with.</p>
+  <p>Joe also noticed how much we fit into a small space: slab, overhangs, a cave, a problem that climbs between the two walls of our walkway, and an endurance traverse that goes all the way around the gym. And because we reset one wall every Monday, there's always something new to try.</p>
+
+  <h2>It's clean, and yes, there's air-con</h2>
+  <p>Clean came up in almost every review. Shen, Benedict and Dan all mentioned it. We also have air-con (a big deal in Saigon heat), toilets, showers, a warm-up area, and training gear like a hangboard and campus board.</p>
+
+  <h2>Not too busy, not too empty</h2>
+  <p>Joe came on a Tuesday evening with about seven other climbers around and called it "a perfect amount." Benedict came on a Monday morning and had the place almost to himself. If you like a quiet session, weekday daytimes are your friend.</p>
+
+  <h2>Easy to get to</h2>
+  <p>Dan pointed out that we're right next to shops and places to eat. Climb, then grab food. That's a pretty good afternoon.</p>
+
+  <h2>Here's what they said</h2>
+  <GoogleReviews />
+
+  <h2>Come see for yourself</h2>
+  <p>Reading reviews only gets you so far. Come climb with us at 96/114 Dang Thuy Tram, Binh Thanh. We're open every day from 10:30 AM to 10:00 PM. First time? We'll show you around with a <a href="/complimentary-onboarding">complimentary onboarding session</a>.</p>
+  <p>And if you've already climbed with us, thank you. Leaving a Google review really does help a small gym like ours.</p>
+</BlogArticle>

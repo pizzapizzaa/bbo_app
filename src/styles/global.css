@@ -499,6 +499,21 @@ input:focus, textarea:focus, select:focus {
   transition: transform 0.3s ease;
 }
 
+/* A post with no photo: a brand-orange panel with its headline in place of the image. */
+.blog-post-image-text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #fe5c13;
+  color: #ffffff;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.5px;
+  text-align: center;
+  padding: 0 20px;
+}
+
 .blog-post:hover .blog-image {
   transform: scale(1.05);
 }

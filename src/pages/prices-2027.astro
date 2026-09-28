@@ -1,0 +1,68 @@
+---
+import BlogArticle from '../components/BlogArticle.astro';
+import { CHECKIN_TYPES, PRICE_CHANGES } from '../lib/pricing';
+
+/**
+ * Built from src/lib/pricing.ts, the same table the till bills from, so this
+ * post can never announce a price the counter doesn't charge.
+ */
+const CHANGE = PRICE_CHANGES.find((c) => c.from === '2027-01-01')!;
+const vnd = (n: number) => `${n.toLocaleString('en-US')} VND`;
+
+/** [label shown, product name in pricing.ts] per row. */
+const rows = (items: [string, string][]) =>
+  items.map(([label, value]) => ({
+    label,
+    now: CHECKIN_TYPES.find((t) => t.value === value)!.price,
+    next: CHANGE.prices[value],
+  }));
+
+const tables = [
+  { heading: 'Day Passes', col: 'Pass', rows: rows([
+    ['Adult', 'Day Pass – Adult'], ['Student', 'Day Pass – Student'], ['Kid', 'Day Pass – Kid'],
+  ]) },
+  { heading: 'Memberships', col: 'Membership', rows: rows([
+    ['1 Month', 'Membership – 1 Month'], ['3 Months', 'Membership – 3 Months'],
+    ['6 Months', 'Membership – 6 Months'], ['12 Months', 'Membership – 12 Months'],
+  ]) },
+  { heading: 'Punch Cards', col: 'Punch card', rows: rows([
+    ['10 Punches Adult', '10 Punches – Adult'], ['10 Punches Student', '10 Punches – Student'],
+    ['10 Punches Kid', '10 Punches – Kid'], ['20 Punches Adult', '20 Punches – Adult'],
+  ]) },
+];
+---
+
+<BlogArticle
+  title="Our Prices Are Changing on 1 January 2027"
+  description="After a full year of frozen prices, we're making a small update from 1 January 2027. Here's what's changing and why."
+  date="2026-09-28"
+>
+  <p class="excerpt">After a full year of frozen prices, we're making a small update from 1 January 2027. Here's what's changing and why.</p>
+
+  <p>Last year we promised to keep prices the same for all of 2026, and we did. Thanks for sticking with us through it.</p>
+  <p>Running a small gym costs more every year. There's rent, electricity (that air-con isn't cheap), new holds, and keeping the place clean and safe for you. We've held off as long as we could, but from 1 January 2027 some of our prices will go up a little.</p>
+
+  {tables.map((t) => (
+    <>
+      <h2>{t.heading}</h2>
+      <table>
+        <thead><tr><th>{t.col}</th><th>Now</th><th>From 1 Jan 2027</th></tr></thead>
+        <tbody>
+          {t.rows.map((r) => <tr><td>{r.label}</td><td>{vnd(r.now)}</td><td>{vnd(r.next)}</td></tr>)}
+        </tbody>
+      </table>
+    </>
+  ))}
+
+  <h2>What's not changing</h2>
+  <p>Shoe and chalk rentals and drinks stay at the same prices. Our setting day and late entry Day Pass discounts are sticking around too, and so is our student discount for anyone 21 and under with a valid student ID.</p>
+
+  <h2>Want to lock in the current price?</h2>
+  <p>Any membership or punch card you buy before 1 January 2027 is at today's price. Punches you already have stay valid, and you won't pay anything extra for them. If you've been thinking about a longer membership or a new punch card, December is a good time to grab one.</p>
+
+  <h2>Why memberships went up the least</h2>
+  <p>Our members are the heart of this place. You're here week in, week out, and we wanted the change to hit you the least. That's why memberships only go up a little, while Day Passes and punch cards carry most of the increase.</p>
+
+  <p>Got questions? Ask anyone at the front desk. We're happy to help you work out which option makes the most sense for how often you climb.</p>
+  <p>Thanks for climbing with us. Here's to another year on the wall.</p>
+</BlogArticle>
