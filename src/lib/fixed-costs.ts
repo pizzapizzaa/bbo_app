@@ -14,6 +14,7 @@
 /** Hourly rate per part-timer. Names must match PART_TIMER_NAMES exactly. */
 export const PART_TIMER_RATES: Record<string, number> = {
   'Bao Anh':   35_000,
+  'Danny':     35_000,
   'Minh Chau': 35_000,
   'Kim An':    35_000,
   'Bich Van':  35_000,   // Van Nguyen

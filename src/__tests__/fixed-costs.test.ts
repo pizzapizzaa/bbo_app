@@ -65,7 +65,7 @@ describe('projectFixedCosts', () => {
     });
     expect(line(p, 'Le Nghia').amount).toBe(180_000);   // 4.5h × 40,000
     expect(line(p, 'Kim An').amount).toBe(70_000);      // 2h × 35,000
-    expect(p.lines.some(l => l.label === 'Danny')).toBe(false);
+    expect(line(p, 'Danny').amount).toBe(70_000);        // 2h × 35,000
   });
 
   it('adds a 35,000 meal allowance for each day worked over 5 hours', () => {
