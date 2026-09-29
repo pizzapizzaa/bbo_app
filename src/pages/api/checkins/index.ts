@@ -194,6 +194,7 @@ export const POST: APIRoute = async ({ request }) => {
     addons:       addonNames,
     discount:     effectiveDiscount,
     referral:     referralTerms,
+    payment_method,
   });
 
   // Staff may still bill a figure the price list would not produce — a goodwill

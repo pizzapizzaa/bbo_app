@@ -202,6 +202,17 @@ export function isKnownDiscount(id: string): boolean {
   return id === '' || id === 'referral' || DISCOUNT_BY_ID.has(id);
 }
 
+// ── Card surcharge ───────────────────────────────────────────────────────────
+
+/** Payment method that carries the card-processing surcharge. */
+export const INTERNATIONAL_CARD = 'International Card';
+
+/**
+ * % added on top of the bill when it is paid by international card, to cover
+ * the processor's fee. Applied after every discount, to the whole bill.
+ */
+export const INTERNATIONAL_CARD_FEE_PCT = 3;
+
 // ── The calculation ──────────────────────────────────────────────────────────
 
 export interface ReferralTerms {
@@ -219,6 +230,8 @@ export interface PriceInput {
   discount?: string;
   /** The verified code's terms when `discount` is 'referral'; null otherwise. */
   referral?: ReferralTerms | null;
+  /** How the bill is paid; an international card adds its surcharge. */
+  payment_method?: string;
 }
 
 export interface PriceBreakdown {
@@ -242,6 +255,10 @@ export interface PriceBreakdown {
   promo_bonus_punches: number;
   /** True when a hand-picked discount displaced a promo that was running. */
   promo_overridden: boolean;
+  /** % surcharge added for the payment method (international card); 0 otherwise. */
+  card_fee_pct: number;
+  /** The surcharge in VND, already included in `amount`. */
+  card_fee: number;
 }
 
 /** `n` reduced by `pct`, kept on integers until the final divide. */
@@ -264,6 +281,8 @@ function lessPct(n: number, pct: number): number {
  *
  * Retail add-ons are never cut by a percentage. The birthday discount is the one
  * exception to that: it comes off the bill as a whole, add-ons and all.
+ *
+ * An international card surcharge goes on last, over the discounted bill.
  */
 export function computeCheckinAmount(input: PriceInput): PriceBreakdown {
   const base = input.checkin_type ? checkinTypePrice(input.checkin_type, input.date) : 0;
@@ -299,10 +318,13 @@ export function computeCheckinAmount(input: PriceInput): PriceBreakdown {
     basePct = promoPct;
   }
 
-  const subtotal = lessPct(base, basePct) + retail + lessPct(rental, rentalPct);
+  const subtotal   = lessPct(base, basePct) + retail + lessPct(rental, rentalPct);
+  const discounted = Math.max(0, subtotal - flat);
+  const feePct     = input.payment_method === INTERNATIONAL_CARD ? INTERNATIONAL_CARD_FEE_PCT : 0;
+  const cardFee    = Math.round((discounted * feePct) / 100);
 
   return {
-    amount: Math.max(0, subtotal - flat),
+    amount: discounted + cardFee,
     base,
     retail_addons: retail,
     rental_addons: rental,
@@ -314,6 +336,8 @@ export function computeCheckinAmount(input: PriceInput): PriceBreakdown {
     promo_pct: promoPct,
     promo_bonus_punches: bonus,
     promo_overridden: !!promoPct && discountId !== '',
+    card_fee_pct: feePct,
+    card_fee: cardFee,
   };
 }
 
@@ -340,6 +364,10 @@ export function describeCheckinExtras(addons: string[], price: PriceBreakdown): 
     if (price.promo_pct && !price.promo_overridden) notes.push(`${price.promo_pct}% off`);
     if (price.promo_bonus_punches) notes.push(`+${price.promo_bonus_punches} bonus punches`);
     if (notes.length) parts.push(`Promo: ${price.promo.label} – ${notes.join(', ')}`);
+  }
+
+  if (price.card_fee) {
+    parts.push(`International card fee: ${price.card_fee_pct}% (${price.card_fee.toLocaleString('en-US')} ₫)`);
   }
 
   return parts.join(', ');

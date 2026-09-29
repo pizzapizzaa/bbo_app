@@ -3,6 +3,7 @@ import {
   CHECKIN_TYPES, ADDONS, MANUAL_DISCOUNTS, PRICE_CHANGES,
   checkinTypePrice, isKnownCheckinType, isKnownAddon, isKnownDiscount,
   computeCheckinAmount, describeCheckinExtras, parseCheckinExtras, grantsBalance,
+  INTERNATIONAL_CARD_FEE_PCT,
 } from '../lib/pricing';
 
 /** A day outside every promotion window, so the base rules show through. */
@@ -238,6 +239,50 @@ describe('computeCheckinAmount — arithmetic', () => {
       addons: ['Shoes Rental'],
     });
     expect(p.amount).toBe(0);
+  });
+});
+
+describe('computeCheckinAmount — international card surcharge', () => {
+  it('adds the surcharge to a bill paid by international card', () => {
+    const p = computeCheckinAmount({
+      date: ORDINARY, checkin_type: 'Day Pass – Adult', payment_method: 'International Card',
+    });
+    expect(INTERNATIONAL_CARD_FEE_PCT).toBe(3);
+    expect(p.amount).toBe(164_800);
+    expect(p.card_fee).toBe(4_800);
+    expect(p.card_fee_pct).toBe(3);
+  });
+
+  it.each(['Cash', 'Local Card', 'Local Bank Transfer', undefined])(
+    'adds nothing for %s', (payment_method) => {
+      const p = computeCheckinAmount({ date: ORDINARY, checkin_type: 'Day Pass – Adult', payment_method });
+      expect(p.amount).toBe(160_000);
+      expect(p.card_fee).toBe(0);
+    });
+
+  it('charges the surcharge on the discounted bill, add-ons included', () => {
+    const p = computeCheckinAmount({
+      date: ORDINARY, checkin_type: 'Day Pass – Adult', discount: 'day30',
+      addons: ['Shoes Rental'], payment_method: 'International Card',
+    });
+    // (112,000 + 20,000) × 1.03
+    expect(p.amount).toBe(135_960);
+  });
+
+  it('rounds the surcharge to whole dong', () => {
+    const p = computeCheckinAmount({ date: ORDINARY, addons: ['Pocari'], payment_method: 'International Card' });
+    expect(p.card_fee).toBe(540);
+    expect(Number.isInteger(p.amount)).toBe(true);
+  });
+
+  it('records the surcharge in the add-on trail, which still parses back to the add-ons', () => {
+    const p = computeCheckinAmount({
+      date: ORDINARY, checkin_type: 'Day Pass – Adult', addons: ['Shoes Rental'],
+      payment_method: 'International Card',
+    });
+    const trail = describeCheckinExtras(['Shoes Rental'], p);
+    expect(trail).toBe('Shoes Rental, International card fee: 3% (5,400 ₫)');
+    expect(parseCheckinExtras(trail)).toEqual(['Shoes Rental']);
   });
 });
 

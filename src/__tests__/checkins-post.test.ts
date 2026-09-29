@@ -714,6 +714,15 @@ describe('POST /api/checkins — server-side pricing', () => {
     expect(res.status).toBe(400);
   });
 
+  it('adds the international card surcharge and records it on the row', async () => {
+    const seen = trackInsert();
+    await POST({ request: makeReq({
+      ...validBody, checkin_type: 'Day Pass – Adult', payment_method: 'International Card',
+    }) } as any);
+    expect(seen.row.amount).toBe(164_800);
+    expect(seen.row.addons).toBe('International card fee: 3% (4,800 ₫)');
+  });
+
   it('honours an explicit override and records what the price list said', async () => {
     const seen = trackInsert();
     await POST({ request: makeReq({

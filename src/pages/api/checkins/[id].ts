@@ -246,6 +246,7 @@ export const PUT: APIRoute = async ({ params, request }) => {
     addons:       addonNames,
     discount:     effectiveDiscount,
     referral:     referralTerms,
+    payment_method,
   });
 
   const overrideAmount = amount_override === true && Number.isFinite(Number(amount))

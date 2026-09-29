@@ -1,7 +1,7 @@
 ---
 import MainLayout from '../../layouts/MainLayout.astro';
 import { PROMOTIONS } from '../../lib/promotions';
-import { CHECKIN_TYPES, ADDONS, MANUAL_DISCOUNTS, PRICE_CHANGES, type AddonDef } from '../../lib/pricing';
+import { CHECKIN_TYPES, ADDONS, MANUAL_DISCOUNTS, PRICE_CHANGES, INTERNATIONAL_CARD, INTERNATIONAL_CARD_FEE_PCT, type AddonDef } from '../../lib/pricing';
 
 /** Products grouped for the <optgroup>s, in the order pricing.ts lists them. */
 const TYPE_GROUPS: { group: string; items: typeof CHECKIN_TYPES }[] = [];
@@ -41,7 +41,10 @@ for (const a of ADDONS) {
 }
 
 /** Tables the inline preview prices against — the same ones the server bills from. */
-const PRICING_DATA = { checkin_types: CHECKIN_TYPES, addons: ADDONS, discounts: MANUAL_DISCOUNTS, price_changes: PRICE_CHANGES };
+const PRICING_DATA = {
+  checkin_types: CHECKIN_TYPES, addons: ADDONS, discounts: MANUAL_DISCOUNTS, price_changes: PRICE_CHANGES,
+  card_fee: { method: INTERNATIONAL_CARD, pct: INTERNATIONAL_CARD_FEE_PCT },
+};
 ---
 
 <MainLayout title="Daily Check-in" activePage="checkin">
@@ -301,7 +304,7 @@ const PRICING_DATA = { checkin_types: CHECKIN_TYPES, addons: ADDONS, discounts: 
             <option value="">— Select —</option>
             <option value="Cash">Cash</option>
             <option value="Local Card">Local Card</option>
-            <option value="International Card">International Card</option>
+            <option value={INTERNATIONAL_CARD}>International Card (+{INTERNATIONAL_CARD_FEE_PCT}%)</option>
             <option value="Local Bank Transfer">Local Bank Transfer</option>
             <option value="Complimentary">Complimentary</option>
             <option value="Punch Card">Punch Card</option>
@@ -783,6 +786,8 @@ const PRICING_DATA = { checkin_types: CHECKIN_TYPES, addons: ADDONS, discounts: 
       if (!isPunch) document.getElementById('f-punch-from').value = '';
       document.getElementById('pt-punch-from-row').classList.toggle('hidden', !isPTPunch);
       if (!isPTPunch) document.getElementById('f-pt-punch-from').value = '';
+      // An international card adds its surcharge, so the quote moves with it.
+      recalcAmount();
     });
 
     // ── Punch card: auto-select based on selected customer ───────────────────────
@@ -792,6 +797,7 @@ const PRICING_DATA = { checkin_types: CHECKIN_TYPES, addons: ADDONS, discounts: 
       var customer = allCustomers.find(function (c) { return c['Full Name'] === name; });
       if (!customer) return;
       var checkinDate = document.getElementById('f-checkin-date').value || new Date().toISOString().slice(0, 10);
+      var feeBefore   = _cardFeePct();
       // Membership takes priority
       if (customer._membership_type && customer._membership_end_date && customer._membership_end_date >= checkinDate) {
         document.getElementById('f-payment').value = 'Valid Membership';
@@ -802,6 +808,8 @@ const PRICING_DATA = { checkin_types: CHECKIN_TYPES, addons: ADDONS, discounts: 
         document.getElementById('punch-from-row').classList.remove('hidden');
         document.getElementById('f-punch-from').value = customer._id;
       }
+      // Switching away from an international card drops its surcharge.
+      if (_cardFeePct() !== feeBefore) recalcAmount();
     }
 
     // ── Customer picker: search-and-select combobox ───────────────────────────────
@@ -842,7 +850,9 @@ const PRICING_DATA = { checkin_types: CHECKIN_TYPES, addons: ADDONS, discounts: 
         clearBtn.classList.add('hidden');
         otherRow.classList.add('hidden');
         document.getElementById('f-other-name').value        = '';
+        var hadCardFee = _cardFeePct() > 0;
         document.getElementById('f-payment').value           = '';
+        if (hadCardFee) recalcAmount();
         document.getElementById('punch-from-row').classList.add('hidden');
         document.getElementById('f-punch-from').value        = '';
         document.getElementById('pt-punch-from-row').classList.add('hidden');
@@ -1164,8 +1174,17 @@ const PRICING_DATA = { checkin_types: CHECKIN_TYPES, addons: ADDONS, discounts: 
         basePct = _promoPct(document.getElementById('f-checkin-type').value);
       }
 
-      var subtotal = _lessPct(base, basePct) + addons.retail + _lessPct(addons.rental, rentalPct);
-      return Math.max(0, subtotal - flat);
+      var subtotal   = _lessPct(base, basePct) + addons.retail + _lessPct(addons.rental, rentalPct);
+      var discounted = Math.max(0, subtotal - flat);
+      // The card surcharge goes on last, over the discounted bill — as the server does.
+      var feePct = _cardFeePct();
+      return discounted + Math.round(discounted * feePct / 100);
+    }
+
+    /** The surcharge for the chosen payment method: only an international card has one. */
+    function _cardFeePct() {
+      var fee = PRICING.card_fee;
+      return fee && document.getElementById('f-payment').value === fee.method ? fee.pct : 0;
     }
 
     /**
