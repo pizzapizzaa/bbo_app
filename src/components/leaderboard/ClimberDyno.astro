@@ -5,49 +5,34 @@
  *
  * The holds are static SVG; the climber's limbs are solved every frame by
  * src/scripts/leaderboard/climber.ts so hands and feet stay on the holds.
- * Coordinates here and in climber.ts share one coordinate space (viewBox cropped to the problem) — move a hold
- * in one place and move it in the other.
+ * Coordinates here and in climber.ts share one space (the viewBox is cropped
+ * to the problem) — move a hold in one place and move it in the other.
  */
 const HOLD = {
   jug:   'M10 60C10 30 35 12 60 14C82 16 94 34 90 55C87 72 70 70 58 64C46 58 34 70 24 76C14 82 10 74 10 60Z',
   crimp: 'M8 54C8 41 22 36 50 36C78 36 92 41 92 54C92 63 80 67 50 67C20 67 8 63 8 54Z',
 };
-// [path, colour, centre x, centre y, size, rotation]
-const HOLDS: Array<[string, string, number, number, number, number]> = [
-  [HOLD.jug,   '#2563EB',  70, 153, 19, -10],   // start left
-  [HOLD.jug,   '#2563EB', 110, 153, 19,  12],   // start right
-  [HOLD.crimp, '#EAB308',  68, 231, 16,   6],   // foot left
-  [HOLD.crimp, '#EAB308', 112, 231, 16,  -8],   // foot right
-  [HOLD.jug,   '#EC4899', 115,  56, 30,   0],   // top jug
+// One route = one colour, so every hold on the problem is the same blue.
+const ROUTE = '#2563EB';
+// [path, centre x, centre y, size, rotation]
+const HOLDS: Array<[string, number, number, number, number]> = [
+  [HOLD.jug,    70, 153, 19, -10],   // start left
+  [HOLD.jug,   110, 153, 19,  12],   // start right
+  [HOLD.crimp,  68, 231, 16,   6],   // foot left
+  [HOLD.crimp, 112, 231, 16,  -8],   // foot right
+  [HOLD.jug,   115,  56, 30,   0],   // top jug
 ];
 ---
 
 <div class="climber-stage" data-climber-stage aria-hidden="true">
   <svg viewBox="22 26 160 244" preserveAspectRatio="xMidYMid meet">
-    {HOLDS.map(([d, color, cx, cy, size, rot]) => (
+    {HOLDS.map(([d, cx, cy, size, rot]) => (
       <g transform={`translate(${cx - size / 2} ${cy - size / 2}) rotate(${rot} ${size / 2} ${size / 2}) scale(${size / 100})`}>
-        <path d={d} fill={color} />
+        <path d={d} fill={ROUTE} />
         <path d={d} fill="url(#lbHoldShade)" />
         <circle cx="50" cy="52" r="6" fill="rgba(0,0,0,.45)" />
       </g>
     ))}
-
-    <!-- Start tape under the start holds, and the problem's hexagon tag -->
-    <path d="M64 162l6 13 6-13M104 162l6 13 6-13" fill="none" stroke="#F5C518" stroke-width="2.2" stroke-linejoin="bevel" />
-    <g transform="translate(36 140)">
-      <polygon points="9,0 18,5.2 18,15.6 9,20.8 0,15.6 0,5.2" fill="#2b2523" />
-      <polygon points="9,1.2 17,5.8 17,15 9,19.6 1,15 1,5.8" fill="#EF4444" />
-      <text x="9" y="13.4" text-anchor="middle" font-family="Barlow Condensed, Arial Narrow, sans-serif"
-            font-weight="800" font-size="8.5" fill="#fff">V5</text>
-    </g>
-    <!-- Top tape beside the finish jug -->
-    <g transform="translate(138 44) rotate(-4)">
-      <rect width="26" height="12" fill="#fff" />
-      <rect width="26" height="2" fill="#E5322D" />
-      <rect y="10" width="26" height="2" fill="#E5322D" />
-      <text x="13" y="9.6" text-anchor="middle" font-family="Barlow Condensed, Arial Narrow, sans-serif"
-            font-weight="800" font-size="8.5" fill="#1C1C1E">TOP</text>
-    </g>
 
     <!-- The climber; positions are set by climber.ts -->
     <g data-climber opacity="1">
