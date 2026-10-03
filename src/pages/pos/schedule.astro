@@ -18,6 +18,10 @@ import MainLayout from '../../layouts/MainLayout.astro';
       class="px-5 py-3 text-sm font-medium text-gray-400 border-b-2 border-transparent -mb-px hover:text-gray-600 transition">
       Monthly Hours
     </button>
+    <button id="page-tab-walls" type="button" onclick="switchPageTab('walls')"
+      class="px-5 py-3 text-sm font-medium text-gray-400 border-b-2 border-transparent -mb-px hover:text-gray-600 transition">
+      Wall Resets
+    </button>
   </div>
 
   <!-- ══ Tab 1: Staff Schedule ══ -->
@@ -767,6 +771,117 @@ import MainLayout from '../../layouts/MainLayout.astro';
       <p id="hours-empty" class="hidden py-10 text-center text-gray-400 text-sm">No schedule data for this month.</p>
     </div>
   </div><!-- end #page-panel-hours -->
+
+  <!-- ══ Tab 4: Wall Resets (leaderboard route limits) ══ -->
+  <div id="page-panel-walls" class="hidden">
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+
+      <!-- ── Record / edit a reset (admin only) ── -->
+      <div id="wr-form-card" class="xl:col-span-1 hidden">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h2 id="wr-form-title" class="font-semibold text-gray-800 mb-1">Record Wall Reset</h2>
+          <p class="text-xs text-gray-400 mb-4">
+            Sends on the old set stop counting when the wall closes. Nothing can be logged
+            on the wall until it reopens. You can enter a reset ahead of time.
+          </p>
+          <form id="wr-form" class="space-y-4" novalidate>
+
+            <div>
+              <label for="wr-wall" class="block text-sm font-medium text-gray-700 mb-1.5">Wall <span class="text-red-400">*</span></label>
+              <select id="wr-wall"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white
+                       focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"></select>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label for="wr-closes" class="block text-sm font-medium text-gray-700 mb-1.5">Wall closes <span class="text-red-400">*</span></label>
+                <input id="wr-closes" type="datetime-local"
+                  class="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm
+                         focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent" />
+              </div>
+              <div>
+                <label for="wr-opens" class="block text-sm font-medium text-gray-700 mb-1.5">Reopens <span class="text-red-400">*</span></label>
+                <input id="wr-opens" type="datetime-local"
+                  class="w-full border border-gray-300 rounded-lg px-2 py-2 text-sm
+                         focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent" />
+              </div>
+            </div>
+            <p class="text-xs text-gray-400 -mt-2">Gym time (Vietnam). Default: Sunday 19:00 → Tuesday 10:30.</p>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1.5">Routes in the new set <span class="text-red-400">*</span></label>
+              <div id="wr-grade-inputs" class="border border-gray-200 rounded-lg p-3 grid grid-cols-3 gap-x-3 gap-y-2.5"></div>
+              <p id="wr-total" class="text-xs text-gray-500 mt-1.5"></p>
+            </div>
+
+            <div>
+              <label for="wr-notes" class="block text-sm font-medium text-gray-700 mb-1.5">Notes</label>
+              <input id="wr-notes" type="text" placeholder="Optional…"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                       focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent" />
+            </div>
+
+            <div id="wr-form-error" class="hidden text-sm text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2"></div>
+
+            <div class="flex gap-2">
+              <button type="submit" id="wr-submit-btn"
+                class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold
+                       py-2.5 rounded-lg text-sm transition active:scale-[0.98]">
+                Save Reset
+              </button>
+              <button type="button" id="wr-cancel-btn" onclick="wrCancelEdit()"
+                class="hidden px-4 border border-gray-300 text-gray-700 font-medium py-2.5
+                       rounded-lg text-sm hover:bg-gray-50 transition">
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- ── Current sets + history ── -->
+      <div id="wr-main-col" class="xl:col-span-2 space-y-6">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <div>
+              <h2 class="font-semibold text-gray-800">Walls Now</h2>
+              <p class="text-xs text-gray-400 mt-0.5">The set each wall is on, and the route limits the leaderboard enforces.</p>
+            </div>
+            <button type="button" onclick="loadWallResets()"
+              class="px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition">
+              ↻ Refresh
+            </button>
+          </div>
+          <div id="wr-cards" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <p class="text-sm text-gray-400 py-6 text-center md:col-span-2">Loading…</p>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+          <h2 class="font-semibold text-gray-800 mb-4">Reset History</h2>
+          <div class="overflow-x-auto">
+            <table class="w-full border-collapse text-sm" style="min-width:640px">
+              <thead>
+                <tr class="border-b-2 border-gray-200">
+                  <th class="pb-3 pr-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Wall</th>
+                  <th class="pb-3 px-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Closed</th>
+                  <th class="pb-3 px-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Reopened</th>
+                  <th class="pb-3 px-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Routes</th>
+                  <th class="pb-3 px-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Notes</th>
+                  <th class="pb-3 pl-3"></th>
+                </tr>
+              </thead>
+              <tbody id="wr-history-body">
+                <tr><td colspan="6" class="py-10 text-center text-gray-400 text-sm">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div><!-- end #page-panel-walls -->
 
   <script is:inline>
     var scheduleData = [];
@@ -2073,17 +2188,21 @@ import MainLayout from '../../layouts/MainLayout.astro';
       var isStaff  = tab === 'staff';
       var isRoute  = tab === 'route';
       var isHours  = tab === 'hours';
+      var isWalls  = tab === 'walls';
       document.getElementById('page-panel-staff').classList.toggle('hidden', !isStaff);
       document.getElementById('page-panel-route').classList.toggle('hidden', !isRoute);
       document.getElementById('page-panel-hours').classList.toggle('hidden', !isHours);
+      document.getElementById('page-panel-walls').classList.toggle('hidden', !isWalls);
       document.getElementById('pt-summary-panel').classList.toggle('hidden', !isStaff);
       var activeClass   = 'px-5 py-3 text-sm font-semibold text-orange-500 border-b-2 border-orange-500 -mb-px transition';
       var inactiveClass = 'px-5 py-3 text-sm font-medium text-gray-400 border-b-2 border-transparent -mb-px hover:text-gray-600 transition';
       document.getElementById('page-tab-staff').className = isStaff ? activeClass : inactiveClass;
       document.getElementById('page-tab-route').className = isRoute ? activeClass : inactiveClass;
       document.getElementById('page-tab-hours').className = isHours ? activeClass : inactiveClass;
+      document.getElementById('page-tab-walls').className = isWalls ? activeClass : inactiveClass;
       if (isRoute && !rsDataLoaded) loadRSData();
       if (isHours) renderMonthlyHours();
+      if (isWalls && !wrLoaded) loadWallResets();
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -2465,5 +2584,382 @@ import MainLayout from '../../layouts/MainLayout.astro';
         })
         .catch(function (err) { showToast('Delete failed: ' + err.message, 'error'); });
     }
+  </script>
+
+  <script is:inline>
+    // ══════════════════════════════════════════════════════════════════════════
+    // ── Wall Resets ───────────────────────────────────────────────────────────
+    // Each reset starts a new set on one wall: sends count against it from
+    // closes_at, and the leaderboard blocks logging on the wall until opens_at.
+    // Times are entered and shown in gym time whatever the device's zone is.
+    // ══════════════════════════════════════════════════════════════════════════
+    var WR_WALLS = [
+      { code: 'W1', name: 'Overhang 20' },
+      { code: 'W2', name: 'Vertical' },
+      { code: 'W3', name: 'Overhang 10' },
+      { code: 'W4', name: 'Cave 60' },
+      { code: 'W5', name: 'Overhang 40' },
+      { code: 'W6', name: 'Slab' }
+    ];
+    // Mirrors GRADES in src/lib/leaderboard-grades.ts — the gym's hexagon tag colours.
+    // (WR_WALLS mirrors WALL_NAMES there too; this is:inline script cannot import.)
+    var WR_GRADES = [
+      { grade: 'V0', bg: '#FFFFFF', fg: '#000000' },
+      { grade: 'V1', bg: '#EAB308', fg: '#000000' },
+      { grade: 'V2', bg: '#F97316', fg: '#FFFFFF' },
+      { grade: 'V3', bg: '#22C55E', fg: '#FFFFFF' },
+      { grade: 'V4', bg: '#3B82F6', fg: '#FFFFFF' },
+      { grade: 'V5', bg: '#EF4444', fg: '#FFFFFF' },
+      { grade: 'V6', bg: '#EC4899', fg: '#FFFFFF' },
+      { grade: 'V7', bg: '#9CA3AF', fg: '#111827' },
+      { grade: 'V8', bg: '#111827', fg: '#FFFFFF' }
+    ];
+    var WR_TZ = 'Asia/Ho_Chi_Minh';
+
+    var wrResets    = [];    // every reset, newest close first
+    var wrCurrent   = {};    // wall → { resetId, sendsLogged }
+    var wrNowMs     = Date.now();
+    var wrLoaded    = false;
+    var wrEditingId = null;
+
+    function wrIsAdmin() { return readSessionRole() === 'admin'; }
+
+    function wrEsc(s) {
+      return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function wrWallName(code) {
+      var w = WR_WALLS.find(function (x) { return x.code === code; });
+      return w ? code + ' — ' + w.name : code;
+    }
+
+    /** Date parts of an instant, in gym time. */
+    function wrParts(date) {
+      var out = {};
+      new Intl.DateTimeFormat('en-GB', {
+        timeZone: WR_TZ, year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+      }).formatToParts(date).forEach(function (p) { out[p.type] = p.value; });
+      return out;
+    }
+
+    /** ISO instant → "YYYY-MM-DDTHH:MM" in gym time, for a datetime-local input. */
+    function wrToInput(iso) {
+      var p = wrParts(new Date(iso));
+      return p.year + '-' + p.month + '-' + p.day + 'T' + p.hour + ':' + p.minute;
+    }
+
+    /** ISO instant → "Sun 5 Oct, 19:00" in gym time. */
+    function wrFmt(iso) {
+      var p = {};
+      // en-US: newer ICU abbreviates September as "Sept" in en-GB.
+      new Intl.DateTimeFormat('en-US', {
+        timeZone: WR_TZ, weekday: 'short', day: 'numeric', month: 'short',
+        hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+      }).formatToParts(new Date(iso)).forEach(function (x) { p[x.type] = x.value; });
+      return p.weekday + ' ' + p.day + ' ' + p.month + ', ' + p.hour + ':' + p.minute;
+    }
+
+    /** "YYYY-MM-DD" plus n days. */
+    function wrAddDays(ymd, n) {
+      var d = new Date(ymd + 'T00:00:00Z');
+      d.setUTCDate(d.getUTCDate() + n);
+      return d.toISOString().slice(0, 10);
+    }
+
+    /** The usual reset: the coming Sunday 19:00, reopening Tuesday 10:30. */
+    function wrDefaultTimes() {
+      var p     = wrParts(new Date());
+      var today = p.year + '-' + p.month + '-' + p.day;
+      var dow   = new Date(today + 'T00:00:00Z').getUTCDay();   // 0 = Sunday
+      var sunday = wrAddDays(today, (7 - dow) % 7);
+      return { closes: sunday + 'T19:00', opens: wrAddDays(sunday, 2) + 'T10:30' };
+    }
+
+    function wrHex(grade, count, size) {
+      var g = WR_GRADES.find(function (x) { return x.grade === grade; });
+      var s = size || 30;
+      return '<span title="' + grade + '" style="display:inline-flex;align-items:center;justify-content:center;' +
+        'width:' + s + 'px;height:' + Math.round(s * 1.1) + 'px;background:' + g.bg + ';color:' + g.fg + ';' +
+        'clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);' +
+        'font-size:' + Math.round(s * 0.36) + 'px;font-weight:800;' +
+        (g.bg === '#FFFFFF' ? 'box-shadow:inset 0 0 0 2px #d1d5db;' : '') + '">' +
+        (count == null ? grade : count) + '</span>';
+    }
+
+    /** Small hexagons for the grades a set actually has. */
+    function wrGradeStrip(reset) {
+      var html = '';
+      WR_GRADES.forEach(function (g) {
+        var n = reset[g.grade.toLowerCase()];
+        if (n > 0) {
+          html += '<span class="inline-flex flex-col items-center mr-1.5">' + wrHex(g.grade, null, 22) +
+            '<span class="text-[11px] text-gray-500 tabular-nums mt-0.5">×' + n + '</span></span>';
+        }
+      });
+      return html || '<span class="text-xs text-gray-400">No routes</span>';
+    }
+
+    function wrTotal(reset) {
+      return WR_GRADES.reduce(function (s, g) { return s + (reset[g.grade.toLowerCase()] || 0); }, 0);
+    }
+
+    function wrCurrentReset(wall) {
+      var cur = wrCurrent[wall];
+      if (!cur || !cur.resetId) return null;
+      return wrResets.find(function (r) { return r.id === cur.resetId; }) || null;
+    }
+
+    // ── Load ─────────────────────────────────────────────────────────────────
+    function loadWallResets() {
+      wrLoaded = true;
+      apiFetch('/api/walls/resets')
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if (data.error) { showToast('Failed to load wall resets: ' + data.error, 'error'); return; }
+          wrResets = data.resets || [];
+          wrNowMs  = data.now ? new Date(data.now).getTime() : Date.now();
+          wrCurrent = {};
+          (data.current || []).forEach(function (c) { wrCurrent[c.wall] = c; });
+          renderWallCards();
+          renderWallHistory();
+          if (!wrEditingId) wrFillCountsFromCurrent();
+        })
+        .catch(function (err) { showToast('Failed to load wall resets: ' + err.message, 'error'); });
+    }
+
+    // ── Walls Now ────────────────────────────────────────────────────────────
+    function renderWallCards() {
+      // The wall whose set has been up longest is usually the next one to reset.
+      var oldestWall = null, oldestMs = Infinity;
+      WR_WALLS.forEach(function (w) {
+        var r = wrCurrentReset(w.code);
+        var ms = r ? new Date(r.closes_at).getTime() : -Infinity;
+        if (ms < oldestMs) { oldestMs = ms; oldestWall = w.code; }
+      });
+
+      var admin = wrIsAdmin();
+      var html = '';
+      WR_WALLS.forEach(function (w) {
+        var r = wrCurrentReset(w.code);
+        var upcoming = wrResets
+          .filter(function (x) { return x.wall === w.code && new Date(x.closes_at).getTime() > wrNowMs; })
+          .sort(function (a, b) { return a.closes_at < b.closes_at ? -1 : 1; })[0];
+
+        var status;
+        if (!r) {
+          status = '<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">No set recorded</span>';
+        } else if (new Date(r.opens_at).getTime() > wrNowMs) {
+          status = '<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Being reset · opens ' + wrEsc(wrFmt(r.opens_at)) + '</span>';
+        } else {
+          status = '<span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Open for logging</span>';
+        }
+
+        html += '<div class="border border-gray-200 rounded-lg p-4">' +
+          '<div class="flex items-start justify-between gap-2 mb-2">' +
+            '<div>' +
+              '<p class="font-semibold text-gray-800">' + wrEsc(wrWallName(w.code)) +
+                (w.code === oldestWall && r ? ' <span class="text-[11px] font-semibold text-purple-600 ml-1">oldest set</span>' : '') +
+              '</p>' +
+              (r ? '<p class="text-xs text-gray-400 mt-0.5">Set since ' + wrEsc(wrFmt(r.closes_at)) + '</p>' : '') +
+            '</div>' +
+            status +
+          '</div>';
+
+        if (r) {
+          html += '<div class="flex flex-wrap items-end mb-2">' + wrGradeStrip(r) + '</div>' +
+            '<p class="text-xs text-gray-500">' + wrTotal(r) + ' routes · ' +
+              (wrCurrent[w.code].sendsLogged || 0) + ' sends logged on this set</p>';
+        }
+        if (upcoming) {
+          html += '<p class="text-xs text-purple-600 mt-1.5">Next reset: closes ' + wrEsc(wrFmt(upcoming.closes_at)) + '</p>';
+        }
+        if (admin) {
+          html += '<button type="button" onclick="wrStartNew(\'' + w.code + '\')" ' +
+            'class="mt-3 text-xs font-semibold text-purple-600 hover:text-purple-800">+ Record reset</button>';
+        }
+        html += '</div>';
+      });
+      document.getElementById('wr-cards').innerHTML = html;
+    }
+
+    // ── History ──────────────────────────────────────────────────────────────
+    function renderWallHistory() {
+      var tbody = document.getElementById('wr-history-body');
+      if (!wrResets.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="py-10 text-center text-gray-400 text-sm">No resets recorded yet.</td></tr>';
+        return;
+      }
+      var admin = wrIsAdmin();
+      tbody.innerHTML = wrResets.map(function (r) {
+        var isCurrent = wrCurrent[r.wall] && wrCurrent[r.wall].resetId === r.id;
+        var isFuture  = new Date(r.closes_at).getTime() > wrNowMs;
+        var tag = isCurrent ? ' <span class="text-[11px] font-semibold text-green-600">current</span>'
+                : isFuture  ? ' <span class="text-[11px] font-semibold text-purple-600">scheduled</span>' : '';
+        return '<tr class="border-b border-gray-100 align-top">' +
+          '<td class="py-3 pr-3 font-semibold text-gray-800 whitespace-nowrap">' + wrEsc(r.wall) + tag + '</td>' +
+          '<td class="py-3 px-3 text-gray-600 whitespace-nowrap">' + wrEsc(wrFmt(r.closes_at)) + '</td>' +
+          '<td class="py-3 px-3 text-gray-600 whitespace-nowrap">' + wrEsc(wrFmt(r.opens_at)) + '</td>' +
+          '<td class="py-3 px-3"><div class="flex flex-wrap items-end">' + wrGradeStrip(r) + '</div></td>' +
+          '<td class="py-3 px-3 text-gray-500">' + wrEsc(r.notes) +
+            (r.created_by ? '<span class="block text-[11px] text-gray-400">by ' + wrEsc(r.created_by) + '</span>' : '') + '</td>' +
+          '<td class="py-3 pl-3 text-right whitespace-nowrap">' + (admin
+            ? '<button type="button" onclick="wrStartEdit(\'' + r.id + '\')" class="text-xs font-medium text-purple-600 hover:text-purple-800 mr-3">Edit</button>' +
+              '<button type="button" onclick="wrDelete(\'' + r.id + '\')" class="text-xs font-medium text-red-500 hover:text-red-700">Delete</button>'
+            : '') + '</td>' +
+        '</tr>';
+      }).join('');
+    }
+
+    // ── Form ─────────────────────────────────────────────────────────────────
+    function wrBuildForm() {
+      document.getElementById('wr-wall').innerHTML = WR_WALLS.map(function (w) {
+        return '<option value="' + w.code + '">' + wrEsc(w.code + ' — ' + w.name) + '</option>';
+      }).join('');
+      document.getElementById('wr-grade-inputs').innerHTML = WR_GRADES.map(function (g) {
+        return '<label class="flex items-center gap-2">' + wrHex(g.grade, null, 28) +
+          '<input type="number" min="0" max="50" step="1" inputmode="numeric" data-grade="' + g.grade + '" ' +
+          'class="wr-count w-full border border-gray-300 rounded-lg px-2 py-1 text-sm text-center ' +
+          'focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent" value="0" /></label>';
+      }).join('');
+      document.querySelectorAll('.wr-count').forEach(function (el) { el.addEventListener('input', wrUpdateTotal); });
+      document.getElementById('wr-wall').addEventListener('change', function () {
+        if (!wrEditingId) wrFillCountsFromCurrent();
+      });
+      document.getElementById('wr-form').addEventListener('submit', wrSubmit);
+      wrResetForm();
+    }
+
+    function wrSetCounts(reset) {
+      document.querySelectorAll('.wr-count').forEach(function (el) {
+        el.value = reset ? (reset[el.dataset.grade.toLowerCase()] || 0) : 0;
+      });
+      wrUpdateTotal();
+    }
+
+    /** A new set usually keeps the old grade mix, so start from it. */
+    function wrFillCountsFromCurrent() {
+      wrSetCounts(wrCurrentReset(document.getElementById('wr-wall').value));
+    }
+
+    function wrUpdateTotal() {
+      var total = 0;
+      document.querySelectorAll('.wr-count').forEach(function (el) { total += Math.max(0, parseInt(el.value, 10) || 0); });
+      document.getElementById('wr-total').textContent = total + ' route' + (total !== 1 ? 's' : '') + ' in this set';
+    }
+
+    function wrShowError(msg) {
+      var el = document.getElementById('wr-form-error');
+      el.textContent = msg || '';
+      el.classList.toggle('hidden', !msg);
+    }
+
+    function wrResetForm() {
+      wrEditingId = null;
+      var t = wrDefaultTimes();
+      document.getElementById('wr-closes').value = t.closes;
+      document.getElementById('wr-opens').value  = t.opens;
+      document.getElementById('wr-notes').value  = '';
+      document.getElementById('wr-wall').disabled = false;
+      document.getElementById('wr-form-title').textContent = 'Record Wall Reset';
+      document.getElementById('wr-submit-btn').textContent = 'Save Reset';
+      document.getElementById('wr-cancel-btn').classList.add('hidden');
+      wrShowError('');
+      wrFillCountsFromCurrent();
+    }
+
+    function wrStartNew(wall) {
+      wrResetForm();
+      document.getElementById('wr-wall').value = wall;
+      wrFillCountsFromCurrent();
+      document.getElementById('wr-form-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function wrStartEdit(id) {
+      var r = wrResets.find(function (x) { return x.id === id; });
+      if (!r) return;
+      wrEditingId = id;
+      document.getElementById('wr-wall').value   = r.wall;
+      document.getElementById('wr-closes').value = wrToInput(r.closes_at);
+      document.getElementById('wr-opens').value  = wrToInput(r.opens_at);
+      document.getElementById('wr-notes').value  = r.notes || '';
+      wrSetCounts(r);
+      document.getElementById('wr-form-title').textContent = 'Edit ' + r.wall + ' Reset';
+      document.getElementById('wr-submit-btn').textContent = 'Save Changes';
+      document.getElementById('wr-cancel-btn').classList.remove('hidden');
+      wrShowError('');
+      document.getElementById('wr-form-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function wrCancelEdit() { wrResetForm(); }
+
+    function wrSubmit(e) {
+      e.preventDefault();
+      var counts = {};
+      document.querySelectorAll('.wr-count').forEach(function (el) {
+        counts[el.dataset.grade] = el.value === '' ? 0 : Number(el.value);
+      });
+      var payload = {
+        wall:      document.getElementById('wr-wall').value,
+        closes_at: document.getElementById('wr-closes').value,
+        opens_at:  document.getElementById('wr-opens').value,
+        counts:    counts,
+        notes:     document.getElementById('wr-notes').value.trim()
+      };
+      if (!payload.closes_at || !payload.opens_at) { wrShowError('Enter when the wall closes and reopens.'); return; }
+      if (payload.opens_at < payload.closes_at)    { wrShowError('The wall must reopen after it closes.'); return; }
+      wrShowError('');
+
+      var btn = document.getElementById('wr-submit-btn');
+      var label = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+      var editing = wrEditingId;
+      apiFetch(editing ? '/api/walls/resets/' + editing : '/api/walls/resets', {
+        method: editing ? 'PATCH' : 'POST',
+        body: JSON.stringify(payload)
+      })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if (data.error) { wrShowError(data.error); return; }
+          showToast(editing ? 'Reset updated.' : payload.wall + ' reset saved.');
+          wrResetForm();
+          loadWallResets();
+        })
+        .catch(function (err) { wrShowError(err.message); })
+        .finally(function () {
+          btn.disabled = false;
+          // On success wrResetForm already relabelled the button.
+          if (btn.textContent === 'Saving…') btn.textContent = label;
+        });
+    }
+
+    function wrDelete(id) {
+      var r = wrResets.find(function (x) { return x.id === id; });
+      if (!r) return;
+      if (!confirm('Delete the ' + r.wall + ' reset closing ' + wrFmt(r.closes_at) + '?\n\n' +
+                   'Sends logged since then will count against the set before it.')) return;
+      apiFetch('/api/walls/resets/' + id, { method: 'DELETE' })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if (data.error) { showToast('Delete failed: ' + data.error, 'error'); return; }
+          if (wrEditingId === id) wrResetForm();
+          showToast('Reset deleted.', 'warning');
+          loadWallResets();
+        })
+        .catch(function (err) { showToast('Delete failed: ' + err.message, 'error'); });
+    }
+
+    $(document).ready(function () {
+      wrBuildForm();
+      // Part-timers see the walls; only admins record or change resets.
+      if (wrIsAdmin()) {
+        document.getElementById('wr-form-card').classList.remove('hidden');
+      } else {
+        document.getElementById('wr-main-col').classList.replace('xl:col-span-2', 'xl:col-span-3');
+      }
+    });
   </script>
 </MainLayout>

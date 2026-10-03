@@ -333,11 +333,10 @@ ALTER TABLE leaderboard_sends     ENABLE ROW LEVEL SECURITY;
 -- No anon-key policies → service key only (reads proxied through /api/public/leaderboard).
 
 -- ══════════════════════════════════════════════════════════════════════════════
--- Wall Route Configuration  (Leaderboard 2026)
--- One row per wall. next_reset is the next scheduled reset date; the current
--- period starts at (next_reset + floor((today − next_reset) / period_days) * period_days).
--- v0…v8 columns hold the number of routes of each grade available this period.
--- Update next_reset after each reset so the period window rolls forward.
+-- Wall Route Configuration  (Leaderboard 2026) — SUPERSEDED by wall_resets
+-- No longer read by the app. Kept because migration-wall-resets.sql seeds each
+-- wall's first reset from it; re-running this seed changes nothing the
+-- leaderboard uses.
 -- ══════════════════════════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS wall_configs (
   wall          TEXT        PRIMARY KEY,            -- 'W1'|'W2'|'W3'|'W4'|'W5'|'W6'
@@ -372,6 +371,55 @@ ON CONFLICT (wall) DO UPDATE SET
   v0=EXCLUDED.v0, v1=EXCLUDED.v1, v2=EXCLUDED.v2, v3=EXCLUDED.v3,
   v4=EXCLUDED.v4, v5=EXCLUDED.v5, v6=EXCLUDED.v6, v7=EXCLUDED.v7,
   v8=EXCLUDED.v8, updated_at=now();
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- Wall Resets  (Leaderboard 2026)
+-- One row per wall reset, entered on the POS Schedule page (Wall Resets tab).
+-- A wall's current set is its latest reset whose closes_at has passed; sends
+-- count against it from closes_at, and nothing can be logged on the wall until
+-- opens_at. See supabase/migration-wall-resets.sql for the full rationale.
+-- ══════════════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS wall_resets (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  wall        TEXT        NOT NULL CHECK (wall IN ('W1','W2','W3','W4','W5','W6')),
+  closes_at   TIMESTAMPTZ NOT NULL,
+  opens_at    TIMESTAMPTZ NOT NULL,
+  v0          INTEGER     NOT NULL DEFAULT 0,
+  v1          INTEGER     NOT NULL DEFAULT 0,
+  v2          INTEGER     NOT NULL DEFAULT 0,
+  v3          INTEGER     NOT NULL DEFAULT 0,
+  v4          INTEGER     NOT NULL DEFAULT 0,
+  v5          INTEGER     NOT NULL DEFAULT 0,
+  v6          INTEGER     NOT NULL DEFAULT 0,
+  v7          INTEGER     NOT NULL DEFAULT 0,
+  v8          INTEGER     NOT NULL DEFAULT 0,
+  notes       TEXT        NOT NULL DEFAULT '',
+  created_by  TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (opens_at >= closes_at),
+  CHECK (LEAST(v0,v1,v2,v3,v4,v5,v6,v7,v8) >= 0)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_wall_resets_wall_closes
+  ON wall_resets (wall, closes_at);
+
+ALTER TABLE wall_resets ENABLE ROW LEVEL SECURITY;
+-- No anon-key policies → service key only.
+
+-- First reset per wall, carried over from wall_configs (skipped once a wall has one).
+INSERT INTO wall_resets (wall, closes_at, opens_at, v0,v1,v2,v3,v4,v5,v6,v7,v8, notes, created_by)
+SELECT c.wall, p.start_at, p.start_at,
+       c.v0, c.v1, c.v2, c.v3, c.v4, c.v5, c.v6, c.v7, c.v8,
+       'Carried over from wall_configs', 'migration'
+FROM wall_configs c
+CROSS JOIN LATERAL (
+  SELECT (c.next_reset
+          + (floor((current_date - c.next_reset)::numeric / (c.period_weeks * 7))
+             * c.period_weeks * 7)::int
+         )::timestamp AT TIME ZONE 'UTC' AS start_at
+) p
+WHERE NOT EXISTS (SELECT 1 FROM wall_resets r WHERE r.wall = c.wall);
 
 -- ══════════════════════════════════════════════════════════════════════════════
 -- Staff Sign-Off  (Leaderboard 2026)
