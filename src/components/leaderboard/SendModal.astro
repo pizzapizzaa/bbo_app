@@ -1,0 +1,140 @@
+---
+/**
+ * "Log a Send" — a comp scorecard on a clipboard. Staff run it on their phone:
+ *   START  who is climbing (name + public nickname)
+ *   ZONE   which wall, and how many routes of each grade
+ *   TOP    staff sign-off
+ * Behaviour lives in src/scripts/leaderboard/send-modal.ts.
+ */
+import { WALL_NAMES } from '../../lib/leaderboard-grades';
+
+interface Props { staffNames: readonly string[] }
+const { staffNames } = Astro.props;
+---
+
+<div class="modal-overlay hidden" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div class="scorecard" id="modal-box">
+    <div class="scorecard__clip" aria-hidden="true"></div>
+
+    <div class="modal-header">
+      <h2 class="modal-title" id="modal-title">Log a Send</h2>
+      <button type="button" class="modal-close" id="modal-close" aria-label="Close">✕</button>
+    </div>
+
+    <ol class="steps" aria-label="Progress">
+      <li class="step active" id="step-ind-1"><span class="step__hold">1</span>Start</li>
+      <li class="step-line" aria-hidden="true"></li>
+      <li class="step" id="step-ind-2"><span class="step__hold">2</span>Zone</li>
+      <li class="step-line" aria-hidden="true"></li>
+      <li class="step" id="step-ind-3"><span class="step__hold">3</span>Top</li>
+    </ol>
+
+    <div class="alert error" id="modal-alert" role="alert"></div>
+
+    <!-- ── Step 1: who ───────────────────────────────────────────────────── -->
+    <div id="step-1">
+      <div class="field">
+        <label for="name-input">Climber's name <span class="req">*</span></label>
+        <div class="autocomplete-wrap">
+          <input id="name-input" type="text" placeholder="Type at least 2 letters…"
+                 autocomplete="off" autocapitalize="words" />
+          <div class="ac-list hidden" id="ac-list" role="listbox"></div>
+        </div>
+        <div class="field-hint">As registered at Boulder Box — pick it from the list.</div>
+      </div>
+
+      <div class="field">
+        <label for="nick-input">Public nickname <span class="req">*</span></label>
+        <input id="nick-input" type="text" placeholder="e.g. RockSlayer, CrimpQueen…"
+               maxlength="30" autocomplete="off" />
+        <div class="field-hint">Shown on the leaderboard. Up to 30 characters, starting with a letter or number. Changing it renames the climber's entry.</div>
+      </div>
+
+      <div class="modal-nav">
+        <button type="button" class="btn btn-primary" id="btn-step1-next">Next: pick the wall →</button>
+      </div>
+    </div>
+
+    <!-- ── Step 2: wall + routes ─────────────────────────────────────────── -->
+    <div id="step-2" hidden>
+      <fieldset class="field">
+        <legend class="field-label">Wall <span class="req">*</span></legend>
+        <div class="wall-picker" id="wall-picker">
+          {WALL_NAMES.map(w => (
+            <label class="wall-tile">
+              <input type="radio" name="wall" value={w.code} />
+              <span class="wall-tile__code">{w.code}</span>
+              <span class="wall-tile__name">{w.name}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      <div class="wall-prompt" id="wall-prompt">👆 Pick the wall first — routes are logged per wall.</div>
+
+      <div id="routes-block" hidden>
+        <div class="field">
+          <span class="field-label">Routes sent</span>
+          <div class="grade-grid" id="grade-grid"></div>
+        </div>
+
+        <div class="pts-preview">
+          <div>
+            <div class="label">Points to earn</div>
+            <div class="sends-summary" id="sends-summary">No sends selected</div>
+          </div>
+          <div class="pts-val" id="pts-preview-val">0</div>
+        </div>
+      </div>
+
+      <div class="modal-nav">
+        <button type="button" class="btn btn-ghost" id="btn-step2-back">← Back</button>
+        <button type="button" class="btn btn-primary" id="btn-step2-next">Next: sign off →</button>
+      </div>
+    </div>
+
+    <!-- ── Step 3: staff sign-off ────────────────────────────────────────── -->
+    <div id="step-3" hidden>
+      <div class="sign-summary" id="sign-summary"></div>
+
+      <div class="field">
+        <label for="staff-select">Staff member <span class="req">*</span></label>
+        <select id="staff-select">
+          <option value="">— Select staff member —</option>
+          {staffNames.map(name => <option value={name}>{name}</option>)}
+        </select>
+        <div class="field-hint">Staff confirm the sends and sign below.</div>
+      </div>
+
+      <div class="field">
+        <label for="sig-canvas">Staff signature <span class="req">*</span></label>
+        <div class="sig-pad" id="sig-pad">
+          <canvas id="sig-canvas" aria-label="Staff signature pad"></canvas>
+          <div class="sig-baseline"></div>
+          <div class="sig-placeholder">✍️ Sign here</div>
+        </div>
+        <div class="sig-actions">
+          <button type="button" class="sig-clear" id="btn-sig-clear">Clear signature</button>
+        </div>
+      </div>
+
+      <div class="modal-nav">
+        <button type="button" class="btn btn-ghost" id="btn-step3-back">← Back</button>
+        <button type="button" class="btn btn-primary" id="btn-step3-submit">Submit sends</button>
+      </div>
+    </div>
+
+    <!-- ── Step 4: sent ──────────────────────────────────────────────────── -->
+    <div id="step-4" hidden>
+      <div class="celebrate" id="celebrate">
+        <span class="tape sent-stamp" id="sent-stamp">Sent!</span>
+        <div class="pts-earned" id="pts-earned-val">+0 pts</div>
+        <p id="celebrate-msg">The leaderboard has been updated.</p>
+      </div>
+      <div class="modal-nav">
+        <button type="button" class="btn btn-ghost" id="btn-log-more">Log more</button>
+        <button type="button" class="btn btn-primary" id="btn-done">Done</button>
+      </div>
+    </div>
+  </div>
+</div>

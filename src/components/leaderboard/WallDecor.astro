@@ -1,0 +1,186 @@
+---
+/**
+ * Decoration on the leaderboard wall: angled panels, holds, black volumes,
+ * start tape, route-number tape and hexagon grade tags — laid out like the
+ * walls in the gym. Purely decorative; tapping a hold gives a chalk puff
+ * (see src/scripts/leaderboard/wall-fx.ts).
+ *
+ * Positions: `x` is % of the wall's width, `y` is rem from the top of the wall.
+ * Items marked `wide` sit beside the rankings and only show on wide screens,
+ * where there is margin for them. Items marked `desk` are hidden on phones,
+ * where the hero copy fills the width and they would sit on top of it.
+ */
+import { GRADES } from '../../lib/leaderboard-grades';
+
+type Shape = 'jug' | 'crimp' | 'sloper' | 'pinch' | 'edge';
+type Volume = 'tri' | 'diamond' | 'pent';
+
+interface Placed     { x: number; y: number; rot: number; wide?: boolean; desk?: boolean }
+interface HoldItem   extends Placed { kind: 'hold'; shape: Shape; color: string; size: number; tape?: string }
+interface VolumeItem extends Placed { kind: 'volume'; shape: Volume; size: number }
+interface HexItem    extends Placed { kind: 'hex'; grade: string }
+interface NumItem    extends Placed { kind: 'num'; label: string; color: string }
+type Item = HoldItem | VolumeItem | HexItem | NumItem;
+
+const ITEMS: Item[] = [
+  // ── Hero ──
+  { kind: 'hold',   shape: 'jug',    color: '#2563EB', x: 3,  y: 5.5, size: 3.4, rot: -18, tape: '#F5C518' },
+  { kind: 'hex',    grade: 'V4',     x: 3,  y: 10.5, rot: -4, desk: true },
+  { kind: 'hold',   shape: 'crimp',  color: '#EAB308', x: 4,  y: 16,  size: 2.1, rot: 14, desk: true },
+  { kind: 'num',    label: '07',     color: '#E5322D', x: 3,  y: 21.5, rot: 3, desk: true },
+  { kind: 'hold',   shape: 'pinch',  color: '#22C55E', x: 5,  y: 27,  size: 2.4, rot: -32, desk: true },
+  { kind: 'hold',   shape: 'edge',   color: '#A855F7', x: 44, y: 1.5, size: 2.2, rot: 24 },
+  { kind: 'hold',   shape: 'sloper', color: '#EC4899', x: 88, y: 2.5, size: 4.6, rot: 8 },
+  { kind: 'hex',    grade: 'V6',     x: 95, y: 9,   rot: 5 },
+  { kind: 'hold',   shape: 'crimp',  color: '#0EA5E9', x: 92, y: 15,  size: 2,   rot: -12, tape: '#E5322D' },
+  { kind: 'volume', shape: 'tri',    x: 90, y: 22,  size: 7,   rot: 10 },
+  { kind: 'num',    label: '24',     color: '#F5C518', x: 84, y: 31,  rot: -3 },
+  { kind: 'hold',   shape: 'jug',    color: '#EF4444', x: 52, y: 26,  size: 2.6, rot: 160, desk: true },
+
+  // ── Beside the rankings (wide screens) ──
+  { kind: 'volume', shape: 'diamond', x: 4,  y: 44,  size: 6,   rot: 0,   wide: true },
+  { kind: 'hold',   shape: 'sloper',  color: '#F97316', x: 93, y: 46, size: 3.8, rot: -14, wide: true },
+  { kind: 'hex',    grade: 'V2',      x: 95, y: 53,  rot: 4,   wide: true },
+  { kind: 'hold',   shape: 'jug',     color: '#14B8A6', x: 6,  y: 58,  size: 3, rot: 25, wide: true, tape: '#1F7A4D' },
+  { kind: 'hold',   shape: 'pinch',   color: '#EAB308', x: 91, y: 66,  size: 2.6, rot: 40, wide: true },
+  { kind: 'num',    label: '13',      color: '#1C1C1E', x: 3,  y: 70,  rot: -4, wide: true },
+  { kind: 'volume', shape: 'pent',    x: 92, y: 78,  size: 6.5, rot: -8, wide: true },
+  { kind: 'hold',   shape: 'crimp',   color: '#EC4899', x: 7,  y: 84,  size: 2.2, rot: -20, wide: true },
+  { kind: 'hex',    grade: 'V7',      x: 3.5, y: 92, rot: -6,  wide: true },
+  { kind: 'hold',   shape: 'jug',     color: '#3B82F6', x: 94, y: 98,  size: 3, rot: -35, wide: true },
+];
+
+// One path per hold shape, drawn in a 100×100 box with the bolt at the centre.
+const HOLD_PATHS: Record<Shape, string> = {
+  jug:    'M10 60C10 30 35 12 60 14C82 16 94 34 90 55C87 72 70 70 58 64C46 58 34 70 24 76C14 82 10 74 10 60Z',
+  crimp:  'M8 54C8 41 22 36 50 36C78 36 92 41 92 54C92 63 80 67 50 67C20 67 8 63 8 54Z',
+  sloper: 'M6 70C6 34 30 10 56 10C82 10 96 34 94 62C92 84 70 92 48 90C24 88 6 86 6 70Z',
+  pinch:  'M22 88C8 78 14 52 26 32C38 12 56 6 70 12C84 18 86 34 76 52C66 70 52 90 38 94C31 96 27 92 22 88Z',
+  edge:   'M10 82L48 14C51 9 55 9 58 14L92 76C95 82 92 87 85 87L16 89C10 89 7 87 10 82Z',
+};
+const VOLUME_PATHS: Record<Volume, string> = {
+  tri:     'M4 96L50 4L96 96Z',
+  diamond: 'M50 2L98 50L50 98L2 50Z',
+  pent:    'M50 3L97 37L79 96H21L3 37Z',
+};
+const gradeOf = (g: string) => GRADES.find(x => x.grade === g)!;
+---
+
+<div class="decor" aria-hidden="true">
+  <!-- Shared shading, referenced by every hold on the page (climber included) -->
+  <svg width="0" height="0" style="position:absolute">
+    <defs>
+      <linearGradient id="lbHoldShade" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#fff" stop-opacity=".38" />
+        <stop offset=".45" stop-color="#fff" stop-opacity="0" />
+        <stop offset="1" stop-color="#000" stop-opacity=".32" />
+      </linearGradient>
+      <radialGradient id="lbVolumeShade" cx=".3" cy=".25" r=".9">
+        <stop offset="0" stop-color="#4a4a52" />
+        <stop offset=".6" stop-color="#1c1c1e" />
+        <stop offset="1" stop-color="#111113" />
+      </radialGradient>
+    </defs>
+  </svg>
+
+  <!-- Angled plywood panels in the hero, like the overhang facets in the gym -->
+  <svg class="decor__facets" viewBox="0 0 100 100" preserveAspectRatio="none">
+    <polygon points="58,0 100,0 100,78 72,100 52,62" fill="rgba(110,45,15,.10)" />
+    <polyline points="58,0 52,62 72,100" fill="none" stroke="rgba(90,35,10,.22)" stroke-width=".25" vector-effect="non-scaling-stroke" />
+    <polygon points="0,58 22,40 30,100 0,100" fill="rgba(255,255,255,.07)" />
+    <polyline points="0,58 22,40 30,100" fill="none" stroke="rgba(90,35,10,.18)" stroke-width=".25" vector-effect="non-scaling-stroke" />
+  </svg>
+
+  {ITEMS.map(item => {
+    const pos = `left:${item.x}%;top:${item.y}rem;--rot:${item.rot}deg`;
+    const wide = (item.wide ? ' decor__item--wide' : '') + (item.desk ? ' decor__item--desk' : '');
+
+    if (item.kind === 'hold') {
+      return (
+        <div class={`decor__item hold${wide}`} style={`${pos};width:${item.size}rem;height:${item.size}rem`}>
+          <svg viewBox="0 0 100 100">
+            <path d={HOLD_PATHS[item.shape]} fill={item.color} />
+            <path d={HOLD_PATHS[item.shape]} fill="url(#lbHoldShade)" />
+            <ellipse cx="42" cy="38" rx="16" ry="7" fill="#fff" opacity=".22" />
+            <circle cx="50" cy="52" r="6" fill="rgba(0,0,0,.5)" />
+            <circle cx="49" cy="51" r="2.4" fill="rgba(255,255,255,.18)" />
+          </svg>
+          {item.tape && (
+            <svg class="hold__tape" viewBox="0 0 20 24">
+              <path d="M2 2L10 22L18 2" fill="none" stroke={item.tape} stroke-width="3.2" stroke-linejoin="bevel" />
+            </svg>
+          )}
+        </div>
+      );
+    }
+    if (item.kind === 'volume') {
+      return (
+        <div class={`decor__item volume${wide}`} style={`${pos};width:${item.size}rem;height:${item.size}rem`}>
+          <svg viewBox="0 0 100 100">
+            <path d={VOLUME_PATHS[item.shape]} fill="url(#lbVolumeShade)" />
+            <ellipse cx="44" cy="58" rx="20" ry="9" fill="#fff" opacity=".08" transform="rotate(-20 44 58)" />
+            <ellipse cx="58" cy="70" rx="12" ry="5" fill="#fff" opacity=".06" />
+            <circle cx="50" cy="60" r="2.6" fill="#000" />
+          </svg>
+        </div>
+      );
+    }
+    if (item.kind === 'hex') {
+      const g = gradeOf(item.grade);
+      return (
+        <div class={`decor__item decor__hex${wide}`} style={pos}>
+          <span class="hex-tag hex-tag--sm" style={`--hex-bg:${g.bg};--hex-fg:${g.fg}`}>
+            <span class="hex-tag__face">{g.grade}</span>
+          </span>
+        </div>
+      );
+    }
+    return (
+      <div class={`decor__item decor__num${wide}`} style={pos}>
+        <span class="tape" style={`--tape-color:${item.color}`}>{item.label}</span>
+      </div>
+    );
+  })}
+</div>
+
+<style>
+  .decor {
+    position: absolute; inset: 0; z-index: 1;
+    pointer-events: none;
+  }
+  .decor__facets {
+    position: absolute; left: 0; top: 0; width: 100%; height: 38rem;
+  }
+  .decor__item {
+    position: absolute;
+    transform: translate(-50%, 0) rotate(var(--rot));
+  }
+  .decor__item svg { display: block; width: 100%; height: 100%; overflow: visible; }
+  .hold {
+    pointer-events: auto; cursor: pointer;
+    filter: drop-shadow(0 .18rem .12rem rgba(70,25,5,.35));
+    -webkit-tap-highlight-color: transparent;
+  }
+  .hold.is-wobbling { animation: wobble .5s ease; }
+  @keyframes wobble {
+    0%, 100% { transform: translate(-50%, 0) rotate(var(--rot)); }
+    25% { transform: translate(-50%, 0) rotate(calc(var(--rot) - 7deg)); }
+    60% { transform: translate(-50%, 0) rotate(calc(var(--rot) + 4deg)); }
+  }
+  .hold__tape {
+    position: absolute; left: 50%; top: 92%;
+    width: 45% !important; height: 55% !important; transform: translateX(-50%);
+  }
+  .volume { filter: drop-shadow(0 .3rem .25rem rgba(60,20,5,.35)); }
+  .decor__num :global(.tape) { font-size: 1.05rem; padding: .1em .35em 0; }
+
+  @media (max-width: 639px) {
+    .decor__item { scale: .8; }
+    .decor__item--desk { display: none; }
+  }
+  .decor__item--wide { display: none; }
+  @media (min-width: 1200px) {
+    .decor__item--wide { display: block; }
+  }
+  :global(.board-mode) .decor__item--wide { display: none; }
+</style>

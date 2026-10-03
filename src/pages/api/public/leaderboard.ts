@@ -6,6 +6,8 @@ import { db } from '../../../lib/db';
 import { escapeLike, namesMatch, MAX_NAME } from '../../../lib/validate';
 import { getWallAvailability } from '../../../lib/wall-config';
 import { isKnownStaff } from '../../../lib/staff';
+import { fetchAllPages } from '../../../lib/paginate';
+import { nicknameError } from '../../../lib/nickname';
 import {
   SIG_VERSION,
   hashSignatureImage,
@@ -19,8 +21,8 @@ const GRADE_POINTS: Record<string, number> = {
   V0: 10, V1: 15, V2: 20, V3: 25, V4: 40,
   V5: 60, V6: 80, V7: 100, V8: 130,
 };
-const MAX_NICKNAME         = 30;
 const MAX_SENDS_PER_SUBMIT = 50;
+const NICKNAME_TAKEN = 'That nickname is already taken by another climber. Choose a different one.';
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {
@@ -28,16 +30,73 @@ const json = (data: unknown, status = 200) =>
     headers: { 'Content-Type': 'application/json' },
   });
 
-// ── GET /api/public/leaderboard ─────────────────────────────────────────────
-// Returns ranked leaderboard.
-// Optional ?lookup=<customer_name> appends that customer's existing nickname.
-export const GET: APIRoute = async ({ url }) => {
-  const lookupName = (url.searchParams.get('lookup') ?? '').trim();
+/** The customer with exactly this name (case-insensitive), or null. */
+async function findCustomer(name: string): Promise<{ id: string; full_name: string } | null> {
+  if (!name || name.length > MAX_NAME) return null;
+  const safe = name.replace(/[^\x20-\x7E]/g, '');
+  if (!safe) return null;
+  const { data } = await db
+    .from('customers')
+    .select('id, full_name')
+    .ilike('full_name', escapeLike(safe))
+    .limit(1)
+    .single();
+  // Exact (case-insensitive) match required — otherwise a pattern match could
+  // act on a different climber's account.
+  return data && namesMatch(data.full_name, safe) ? data : null;
+}
 
-  // Fetch all sends and all nicknames in parallel
+/** True when another customer already holds this nickname (case-insensitive). */
+async function nicknameTakenByOther(nickname: string, customerId: string | null): Promise<boolean> {
+  const { data: taken } = await db
+    .from('leaderboard_nicknames')
+    .select('customer_id')
+    .ilike('nickname', escapeLike(nickname))
+    .limit(1)
+    .single();
+  return !!taken && (taken as any).customer_id !== customerId;
+}
+
+// ── GET /api/public/leaderboard ─────────────────────────────────────────────
+// Returns the ranked leaderboard.
+//
+// With ?lookup=<customer_name>[&nickname=<nickname>] it instead checks step 1
+// of the Log My Send flow, before staff are asked to sign:
+//   { customerFound, existingNickname, nicknameError }
+// nicknameError is null when the nickname is valid and free for this customer.
+export const GET: APIRoute = async ({ url }) => {
+  if (url.searchParams.has('lookup')) {
+    const customer = await findCustomer((url.searchParams.get('lookup') ?? '').trim());
+
+    let existingNickname: string | null = null;
+    if (customer) {
+      const { data } = await db
+        .from('leaderboard_nicknames')
+        .select('nickname')
+        .eq('customer_id', customer.id)
+        .maybeSingle();
+      existingNickname = (data as any)?.nickname ?? null;
+    }
+
+    let nickError: string | null = null;
+    if (url.searchParams.has('nickname')) {
+      const nickname = (url.searchParams.get('nickname') ?? '').trim();
+      nickError = nicknameError(nickname);
+      if (!nickError && await nicknameTakenByOther(nickname, customer?.id ?? null)) {
+        nickError = NICKNAME_TAKEN;
+      }
+    }
+
+    return json({ customerFound: !!customer, existingNickname, nicknameError: nickError });
+  }
+
+  // Page through both tables: a single select stops at Supabase's 1000-row cap,
+  // which would silently drop sends from the totals once the season passes it.
   const [sendsResult, nicknamesResult] = await Promise.all([
-    db.from('leaderboard_sends').select('customer_id, points, submission_id'),
-    db.from('leaderboard_nicknames').select('customer_id, nickname'),
+    fetchAllPages((from, to) =>
+      db.from('leaderboard_sends').select('customer_id, points, submission_id').order('id').range(from, to)),
+    fetchAllPages((from, to) =>
+      db.from('leaderboard_nicknames').select('customer_id, nickname').order('customer_id').range(from, to)),
   ]);
 
   if (sendsResult.error || nicknamesResult.error) {
@@ -69,29 +128,17 @@ export const GET: APIRoute = async ({ url }) => {
     if (row.submission_id) totals[row.customer_id].signed += 1;
   }
 
-  const leaderboard = Object.values(totals)
+  // Equal points share a rank (1, 2, 2, 4); names only order the display.
+  const sorted = Object.values(totals)
     .sort((a, b) => b.total - a.total || a.nickname.localeCompare(b.nickname))
-    .slice(0, 100)
-    .map((entry, i) => ({ rank: i + 1, ...entry }));
+    .slice(0, 100);
+  let rank = 0;
+  const leaderboard = sorted.map((entry, i) => {
+    if (i === 0 || entry.total !== sorted[i - 1].total) rank = i + 1;
+    return { rank, ...entry };
+  });
 
-  // Optional: resolve the requesting customer's existing nickname
-  let existingNickname: string | null = null;
-  if (lookupName.length >= 2 && lookupName.length <= MAX_NAME) {
-    const safe = lookupName.replace(/[^\x20-\x7E]/g, '');
-    if (safe) {
-      const { data: cust } = await db
-        .from('customers')
-        .select('id, full_name')
-        .ilike('full_name', escapeLike(safe))
-        .limit(1)
-        .single();
-      if (cust && namesMatch(cust.full_name, safe)) {
-        existingNickname = nicknameMap[cust.id] ?? null;
-      }
-    }
-  }
-
-  return json({ leaderboard, existingNickname });
+  return json({ leaderboard });
 };
 
 // ── POST /api/public/leaderboard ────────────────────────────────────────────
@@ -119,13 +166,8 @@ export const POST: APIRoute = async ({ request }) => {
   // ── Input validation ──────────────────────────────────────────────────────
   if (!customerName) return json({ error: 'Customer name is required.' }, 400);
   if (customerName.length > MAX_NAME) return json({ error: 'Name too long.' }, 400);
-  if (!nickname)     return json({ error: 'A public nickname is required.' }, 400);
-  if (nickname.length > MAX_NICKNAME)
-    return json({ error: `Nickname must be ${MAX_NICKNAME} characters or fewer.` }, 400);
-  if (!/^[\x20-\x7E]+$/.test(nickname))
-    return json({ error: 'Nickname must contain printable characters only.' }, 400);
-  if (!/^\w/.test(nickname) || /^\s*$/.test(nickname))
-    return json({ error: 'Nickname must start with a letter or number.' }, 400);
+  const invalidNickname = nicknameError(nickname);
+  if (invalidNickname) return json({ error: invalidNickname }, 400);
   if (!VALID_WALLS.includes(wall as typeof VALID_WALLS[number]))
     return json({ error: `Wall must be one of: ${VALID_WALLS.join(', ')}.` }, 400);
   if (typeof gradesRaw !== 'object' || gradesRaw === null || Array.isArray(gradesRaw))
@@ -161,30 +203,23 @@ export const POST: APIRoute = async ({ request }) => {
   if (rows.length === 0) return json({ error: 'No valid sends to log.' }, 400);
 
   // ── Look up customer ──────────────────────────────────────────────────────
-  const safe = customerName.replace(/[^\x20-\x7E]/g, '');
-  if (!safe) return json({ error: 'Customer name must contain printable characters.' }, 400);
-  const { data: customer } = await db
-    .from('customers')
-    .select('id, full_name')
-    .ilike('full_name', escapeLike(safe))
-    .limit(1)
-    .single();
-
-  // Exact (case-insensitive) match required — otherwise a pattern match could
-  // log sends onto a different climber's account.
-  if (!customer || !namesMatch(customer.full_name, safe)) {
+  const customer = await findCustomer(customerName);
+  if (!customer) {
     return json({ error: 'Customer not found. Please check your name.' }, 404);
   }
 
-  const customerId = customer.id as string;
+  const customerId = customer.id;
 
   // ── Wall route-limit validation ───────────────────────────────────────────
-  // Compute how many of each grade this customer has already sent on this wall
-  // in the current reset period, then reject if the submission would exceed the
-  // configured per-grade route count.
+  // Compute how many of each grade this customer has already sent on this
+  // wall's current set, then reject if the submission would exceed the
+  // per-grade route count recorded for that set.
   const availability = await getWallAvailability(customerId, wall);
   if (!availability) {
     return json({ error: 'Wall configuration not found. Please contact staff.' }, 404);
+  }
+  if (availability.resetting) {
+    return json({ error: `${wall} is being reset — logging opens ${availability.opensLabel}.` }, 409);
   }
 
   // Count submitted grades
@@ -209,26 +244,10 @@ export const POST: APIRoute = async ({ request }) => {
 
   // ── Nickname uniqueness check ─────────────────────────────────────────────
   // Reject if another customer already holds this nickname (case-insensitive).
-  const { data: taken } = await db
-    .from('leaderboard_nicknames')
-    .select('customer_id')
-    .ilike('nickname', escapeLike(nickname))
-    .limit(1)
-    .single();
-
-  if (taken && (taken as any).customer_id !== customerId) {
-    return json({ error: 'That nickname is already taken by another climber. Choose a different one.' }, 409);
+  // Step 1 already checked this, but the nickname can be claimed in between.
+  if (await nicknameTakenByOther(nickname, customerId)) {
+    return json({ error: NICKNAME_TAKEN }, 409);
   }
-
-  // ── Upsert nickname ───────────────────────────────────────────────────────
-  const { error: nickError } = await db
-    .from('leaderboard_nicknames')
-    .upsert(
-      { customer_id: customerId, nickname, updated_at: new Date().toISOString() },
-      { onConflict: 'customer_id' },
-    );
-
-  if (nickError) return json({ error: nickError.message }, 500);
 
   // ── Seal and record the signed submission ─────────────────────────────────
   // The signature covers the facts below, so none of them can be altered later
@@ -282,6 +301,24 @@ export const POST: APIRoute = async ({ request }) => {
     // submission cascades to the image, so no orphan signature is left behind.
     await db.from('leaderboard_submissions').delete().eq('id', submissionId);
     return json({ error: insertError.message }, 500);
+  }
+
+  // ── Upsert nickname ───────────────────────────────────────────────────────
+  // Last, so a submission that fails earlier leaves the climber's nickname as
+  // it was. If this step fails, the submission is undone too: without a
+  // nickname a first-time climber's sends would never show on the board.
+  const { error: nickError } = await db
+    .from('leaderboard_nicknames')
+    .upsert(
+      { customer_id: customerId, nickname, updated_at: new Date().toISOString() },
+      { onConflict: 'customer_id' },
+    );
+  if (nickError) {
+    // Cascades to the sends and the signature image.
+    await db.from('leaderboard_submissions').delete().eq('id', submissionId);
+    // 23505: someone claimed the nickname after the check above.
+    if (nickError.code === '23505') return json({ error: NICKNAME_TAKEN }, 409);
+    return json({ error: nickError.message }, 500);
   }
 
   return json({
