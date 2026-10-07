@@ -142,23 +142,22 @@ import MainLayout from '../../layouts/MainLayout.astro';
   }
 
   async function createLabeledQrImage(video: BetaVideo): Promise<string> {
-    const outputWidth = 900;
+    const outputWidth = 720;
     const qrSize = 720;
-    const horizontalPadding = 48;
+    const horizontalPadding = 20;
     const measureCanvas = document.createElement('canvas');
     const measureContext = measureCanvas.getContext('2d');
     if (!measureContext) throw new Error('Could not prepare the QR image.');
 
-    measureContext.font = '700 34px Arial, sans-serif';
+    measureContext.font = '700 58px Arial, sans-serif';
     const titleLines = wrapCanvasText(measureContext, video.title, outputWidth - horizontalPadding * 2);
-    measureContext.font = '600 22px Arial, sans-serif';
-    const wallLines = wrapCanvasText(measureContext, `Wall: ${video.wall}`, outputWidth - horizontalPadding * 2);
+    measureContext.font = '700 48px Arial, sans-serif';
+    const wallLines = wrapCanvasText(measureContext, video.wall, outputWidth - horizontalPadding * 2);
 
-    const headerTop = 38;
-    const eyebrowHeight = 28;
-    const titleLineHeight = 42;
-    const wallLineHeight = 30;
-    const qrTop = headerTop + eyebrowHeight + 14 + titleLines.length * titleLineHeight + 8 + wallLines.length * wallLineHeight + 30;
+    const headerTop = 24;
+    const titleLineHeight = 68;
+    const wallLineHeight = 58;
+    const qrTop = headerTop + titleLines.length * titleLineHeight + 12 + wallLines.length * wallLineHeight + 24;
     const canvas = document.createElement('canvas');
     canvas.width = outputWidth;
     canvas.height = qrTop + qrSize + 48;
@@ -169,13 +168,9 @@ import MainLayout from '../../layouts/MainLayout.astro';
     context.fillRect(0, 0, canvas.width, canvas.height);
     context.textAlign = 'center';
     context.textBaseline = 'top';
-    context.fillStyle = '#ea580c';
-    context.font = '700 15px Arial, sans-serif';
-    context.fillText('BOULDERING BETA', outputWidth / 2, headerTop);
-
-    let textTop = headerTop + eyebrowHeight + 14;
+    let textTop = headerTop;
     context.fillStyle = '#1f2937';
-    context.font = '700 34px Arial, sans-serif';
+    context.font = '700 58px Arial, sans-serif';
     for (const line of titleLines) {
       context.fillText(line, outputWidth / 2, textTop);
       textTop += titleLineHeight;
@@ -183,7 +178,7 @@ import MainLayout from '../../layouts/MainLayout.astro';
 
     textTop += 8;
     context.fillStyle = '#4b5563';
-    context.font = '600 22px Arial, sans-serif';
+    context.font = '700 48px Arial, sans-serif';
     for (const line of wallLines) {
       context.fillText(line, outputWidth / 2, textTop);
       textTop += wallLineHeight;
