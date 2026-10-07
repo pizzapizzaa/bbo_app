@@ -1,0 +1,290 @@
+---
+import MainLayout from '../../layouts/MainLayout.astro';
+---
+
+<MainLayout title="Bouldering Beta Videos" activePage="beta-videos">
+  <section class="mb-6 flex flex-wrap items-end justify-between gap-4">
+    <div>
+      <h2 class="text-xl font-semibold text-gray-900">Bouldering Beta Videos</h2>
+      <p class="mt-1 text-sm text-gray-500">Manage wall and route video QR codes.</p>
+    </div>
+    <button id="new-video" type="button"
+      class="inline-flex items-center gap-2 rounded-md bg-orange-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2">
+      <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+      </svg>
+      Generate New QR Code
+    </button>
+  </section>
+
+  <div class="mb-4 flex flex-wrap items-center gap-3">
+    <div class="inline-flex overflow-hidden rounded-md border border-gray-200 bg-white" role="group" aria-label="Filter QR codes">
+      <button type="button" data-filter="active" aria-pressed="true" class="filter-button border-r border-gray-200 bg-gray-900 px-3 py-2 text-sm font-medium text-white">Active</button>
+      <button type="button" data-filter="archived" aria-pressed="false" class="filter-button border-r border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">Archived</button>
+      <button type="button" data-filter="all" aria-pressed="false" class="filter-button px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">All</button>
+    </div>
+    <span id="video-count" class="ml-auto text-sm text-gray-500" aria-live="polite"></span>
+  </div>
+
+  <div id="page-status" class="mb-4 hidden rounded-md border px-4 py-3 text-sm" role="status" aria-live="polite"></div>
+  <div id="video-list" class="grid grid-cols-1 gap-4 xl:grid-cols-2" aria-live="polite">
+    <p class="text-sm text-gray-500">Loading beta videos...</p>
+  </div>
+
+  <div id="video-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 p-4" role="presentation">
+    <section class="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-lg bg-white shadow-xl" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <header class="flex items-center justify-between border-b border-gray-200 px-5 py-4">
+        <h2 id="modal-title" class="text-lg font-semibold text-gray-900">Generate New QR Code</h2>
+        <button id="close-modal" type="button" class="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-900" aria-label="Close">
+          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12" /></svg>
+        </button>
+      </header>
+      <form id="video-form" class="space-y-4 px-5 py-5">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <label class="block text-sm font-medium text-gray-700">Title
+            <input name="title" required maxlength="100" placeholder="e.g. The Arete"
+              class="mt-1.5 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100" />
+          </label>
+          <label class="block text-sm font-medium text-gray-700">Wall
+            <input name="wall" required maxlength="80" placeholder="e.g. Cave"
+              class="mt-1.5 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100" />
+          </label>
+        </div>
+        <label class="block text-sm font-medium text-gray-700">Route
+          <input name="route" required maxlength="120" placeholder="e.g. Blue V4"
+            class="mt-1.5 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100" />
+        </label>
+        <label class="block text-sm font-medium text-gray-700">Description
+          <textarea name="description" required maxlength="500" rows="3" placeholder="Optional beta notes for this route"
+            class="mt-1.5 w-full resize-y rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100"></textarea>
+        </label>
+        <label class="block text-sm font-medium text-gray-700">Video URL
+          <input name="video_url" type="url" required maxlength="2048" inputmode="url" placeholder="https://www.youtube.com/watch?v=..."
+            class="mt-1.5 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-100" />
+          <span class="mt-1 block text-xs font-normal text-gray-500">Use an HTTPS link. The printed QR will keep working when this URL changes.</span>
+        </label>
+        <div id="form-error" class="hidden rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert"></div>
+        <footer class="flex justify-end gap-2 border-t border-gray-100 pt-4">
+          <button id="cancel-modal" type="button" class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
+          <button id="save-video" type="submit" class="rounded-md bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700">Save and Generate QR</button>
+        </footer>
+      </form>
+    </section>
+  </div>
+</MainLayout>
+
+<script>
+  import QRCode from 'qrcode';
+
+  interface BetaVideo {
+    id: string;
+    title: string;
+    wall: string;
+    route: string;
+    description: string;
+    video_url: string;
+    is_active: boolean;
+  }
+
+  const list = document.querySelector<HTMLDivElement>('#video-list')!;
+  const statusBox = document.querySelector<HTMLDivElement>('#page-status')!;
+  const count = document.querySelector<HTMLSpanElement>('#video-count')!;
+  const modal = document.querySelector<HTMLDivElement>('#video-modal')!;
+  const form = document.querySelector<HTMLFormElement>('#video-form')!;
+  const formError = document.querySelector<HTMLDivElement>('#form-error')!;
+  const saveButton = document.querySelector<HTMLButtonElement>('#save-video')!;
+  let videos: BetaVideo[] = [];
+  let filter: 'active' | 'archived' | 'all' = 'active';
+  let editingId: string | null = null;
+
+  function escapeHtml(value: string): string {
+    return value.replace(/[&<>"']/g, (char) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    })[char]!);
+  }
+
+  function setStatus(message: string, isError = false): void {
+    statusBox.textContent = message;
+    statusBox.className = `mb-4 rounded-md border px-4 py-3 text-sm ${isError
+      ? 'border-red-200 bg-red-50 text-red-700'
+      : 'border-green-200 bg-green-50 text-green-800'}`;
+  }
+
+  async function api(url: string, method = 'GET', body?: Record<string, unknown>): Promise<Response> {
+    const token = localStorage.getItem('bbo_token') || '';
+    return fetch(url, {
+      method,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+  }
+
+  function qrUrl(video: BetaVideo): string {
+    return `${window.location.origin}/beta/${video.id}`;
+  }
+
+  function render(): void {
+    const visible = videos.filter((video) => filter === 'all' || video.is_active === (filter === 'active'));
+    count.textContent = `${visible.length} ${visible.length === 1 ? 'QR code' : 'QR codes'}`;
+
+    if (!visible.length) {
+      list.innerHTML = `<div class="col-span-full border-y border-gray-200 py-14 text-center text-sm text-gray-500">
+        ${filter === 'archived' ? 'No archived QR codes.' : 'No beta videos yet. Generate a QR code to get started.'}</div>`;
+      return;
+    }
+
+    list.innerHTML = visible.map((video) => `
+      <article class="grid grid-cols-[minmax(0,1fr)_152px] gap-4 border-b border-gray-200 bg-white p-4 sm:p-5">
+        <div class="min-w-0">
+          <div class="flex flex-wrap items-center gap-2">
+            <h3 class="break-words text-base font-semibold text-gray-900">${escapeHtml(video.title)}</h3>
+            <span class="rounded px-2 py-0.5 text-xs font-medium ${video.is_active ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-600'}">${video.is_active ? 'Active' : 'Archived'}</span>
+          </div>
+          <p class="mt-1 text-sm font-medium text-gray-700">${escapeHtml(video.wall)} <span class="text-gray-400">/</span> ${escapeHtml(video.route)}</p>
+          <p class="mt-2 whitespace-pre-wrap break-words text-sm text-gray-600">${escapeHtml(video.description)}</p>
+          <a class="mt-2 inline-block max-w-full truncate text-sm text-orange-700 underline decoration-orange-200 underline-offset-2 hover:text-orange-900" href="${escapeHtml(video.video_url)}" target="_blank" rel="noopener noreferrer">Open video</a>
+          <p class="mt-2 break-all font-mono text-[11px] text-gray-400">${escapeHtml(qrUrl(video))}</p>
+          <div class="mt-4 flex flex-wrap gap-2">
+            <button type="button" data-action="edit" data-id="${video.id}" class="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">Edit</button>
+            <button type="button" data-action="download" data-id="${video.id}" class="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50">Download QR</button>
+            <button type="button" data-action="${video.is_active ? 'archive' : 'restore'}" data-id="${video.id}" class="rounded-md px-3 py-1.5 text-xs font-medium ${video.is_active ? 'text-red-700 hover:bg-red-50' : 'text-green-700 hover:bg-green-50'}">${video.is_active ? 'Archive' : 'Restore'}</button>
+          </div>
+        </div>
+        <div class="flex flex-col items-center gap-2 self-start">
+          <canvas id="qr-${video.id}" class="h-36 w-36 max-w-full" role="img" aria-label="QR code for ${escapeHtml(video.title)}"></canvas>
+          <span class="text-center text-[11px] font-medium text-gray-500">Scan for beta video</span>
+        </div>
+      </article>`).join('');
+
+    for (const video of visible) {
+      const canvas = document.querySelector<HTMLCanvasElement>(`#qr-${video.id}`);
+      if (canvas) QRCode.toCanvas(canvas, qrUrl(video), { width: 144, margin: 2, errorCorrectionLevel: 'H' });
+    }
+  }
+
+  async function loadVideos(): Promise<void> {
+    list.innerHTML = '<p class="text-sm text-gray-500">Loading beta videos...</p>';
+    try {
+      const response = await api('/api/beta-videos');
+      if (response.status === 401) {
+        window.location.replace('/pos');
+        return;
+      }
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Could not load beta videos.');
+      videos = result.videos || [];
+      render();
+    } catch (error) {
+      list.innerHTML = '';
+      setStatus(error instanceof Error ? error.message : 'Could not load beta videos.', true);
+    }
+  }
+
+  function openModal(video?: BetaVideo): void {
+    editingId = video?.id ?? null;
+    form.reset();
+    formError.classList.add('hidden');
+    (document.querySelector('#modal-title') as HTMLElement).textContent = video ? 'Edit Beta Video QR' : 'Generate New QR Code';
+    saveButton.textContent = video ? 'Save Changes' : 'Save and Generate QR';
+    if (video) {
+      for (const key of ['title', 'wall', 'route', 'description', 'video_url'] as const) {
+        (form.elements.namedItem(key) as HTMLInputElement | HTMLTextAreaElement).value = video[key];
+      }
+    }
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    (form.elements.namedItem('title') as HTMLInputElement).focus();
+  }
+
+  function closeModal(): void {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    editingId = null;
+  }
+
+  document.querySelector('#new-video')!.addEventListener('click', () => openModal());
+  document.querySelector('#close-modal')!.addEventListener('click', closeModal);
+  document.querySelector('#cancel-modal')!.addEventListener('click', closeModal);
+  modal.addEventListener('click', (event) => { if (event.target === modal) closeModal(); });
+
+  document.querySelectorAll<HTMLButtonElement>('.filter-button').forEach((button) => {
+    button.addEventListener('click', () => {
+      filter = button.dataset.filter as typeof filter;
+      document.querySelectorAll<HTMLButtonElement>('.filter-button').forEach((item) => {
+        const selected = item === button;
+        item.setAttribute('aria-pressed', String(selected));
+        item.className = `filter-button px-3 py-2 text-sm font-medium ${selected
+          ? 'bg-gray-900 text-white'
+          : 'text-gray-600 hover:bg-gray-50'} ${item.dataset.filter !== 'all' ? 'border-r border-gray-200' : ''}`;
+      });
+      render();
+    });
+  });
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    formError.classList.add('hidden');
+    const wasEditing = editingId !== null;
+    saveButton.disabled = true;
+    saveButton.textContent = 'Saving...';
+    const fields = Object.fromEntries(new FormData(form).entries()) as Record<string, string>;
+    try {
+      const response = await api(editingId ? `/api/beta-videos/${editingId}` : '/api/beta-videos', editingId ? 'PATCH' : 'POST', fields);
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Could not save beta video.');
+      closeModal();
+      await loadVideos();
+      setStatus(wasEditing ? 'Beta video updated. The existing QR now opens the new video.' : 'QR code generated and saved. Download it for printing.');
+    } catch (error) {
+      formError.textContent = error instanceof Error ? error.message : 'Could not save beta video.';
+      formError.classList.remove('hidden');
+    } finally {
+      saveButton.disabled = false;
+      saveButton.textContent = wasEditing ? 'Save Changes' : 'Save and Generate QR';
+    }
+  });
+
+  list.addEventListener('click', async (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-action]');
+    if (!button) return;
+    const video = videos.find((item) => item.id === button.dataset.id);
+    if (!video) return;
+
+    if (button.dataset.action === 'edit') {
+      openModal(video);
+      return;
+    }
+    if (button.dataset.action === 'archive' || button.dataset.action === 'restore') {
+      const active = button.dataset.action === 'restore';
+      if (!active && !window.confirm('Archive this QR code? Scanning it will show an unavailable message.')) return;
+      button.disabled = true;
+      try {
+        const response = await api(`/api/beta-videos/${video.id}`, 'PATCH', { is_active: active });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Could not update QR code.');
+        await loadVideos();
+        setStatus(active ? 'QR code restored.' : 'QR code archived.');
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : 'Could not update QR code.', true);
+      }
+      return;
+    }
+    if (button.dataset.action === 'download') {
+      try {
+        const image = await QRCode.toDataURL(qrUrl(video), { width: 720, margin: 3, errorCorrectionLevel: 'H' });
+        const link = document.createElement('a');
+        const name = `${video.wall}-${video.route}-${video.title}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        link.href = image;
+        link.download = `bbo-beta-${name || video.id}.png`;
+        link.click();
+      } catch {
+        setStatus('Could not generate the QR image. Please try again.', true);
+      }
+    }
+  });
+
+  loadVideos();
+</script>

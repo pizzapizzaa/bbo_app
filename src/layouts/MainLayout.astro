@@ -336,6 +336,18 @@ const GATED_PAGES = ['customers', 'promo-codes', 'expenses'];
         Staff Schedule
       </a>
 
+      <a href="/pos/beta-videos"
+         class={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
+           ${activePage === 'beta-videos'
+             ? 'bg-orange-500 text-white'
+             : 'text-gray-400 hover:bg-gray-700/60 hover:text-white'}`}>
+        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zm4 0h2v6h-2zm-4 4h2v2h-2z"/>
+        </svg>
+        Beta Videos
+      </a>
+
       <a href="/events"
          class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors
            text-gray-400 hover:bg-gray-700/60 hover:text-white">

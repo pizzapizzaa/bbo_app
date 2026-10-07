@@ -137,6 +137,25 @@ CREATE TABLE IF NOT EXISTS routesetting_entries (
 CREATE INDEX IF NOT EXISTS idx_routesetting_date ON routesetting_entries (date);
 ALTER TABLE routesetting_entries ENABLE ROW LEVEL SECURITY;
 
+-- ── Bouldering Beta Videos ───────────────────────────────────────────────────
+-- Stable QR identities redirect to the current video destination. Staff can
+-- update the route/video without replacing a QR already posted on the wall.
+CREATE TABLE IF NOT EXISTS beta_videos (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  title       TEXT        NOT NULL,
+  wall        TEXT        NOT NULL,
+  route       TEXT        NOT NULL,
+  description TEXT        NOT NULL DEFAULT '',
+  video_url   TEXT        NOT NULL,
+  is_active   BOOLEAN     NOT NULL DEFAULT true,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_by  TEXT        NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_beta_videos_wall_route ON beta_videos (wall, route);
+ALTER TABLE beta_videos ENABLE ROW LEVEL SECURITY;
+
 -- ── Migration: PT Punch support ─────────────────────────────────────────────
 -- Run these ALTER statements in Supabase SQL Editor if the tables already exist.
 ALTER TABLE customers ADD COLUMN IF NOT EXISTS pt_punches_remaining INTEGER NOT NULL DEFAULT 0;
