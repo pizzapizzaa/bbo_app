@@ -95,6 +95,7 @@ import MainLayout from '../../layouts/MainLayout.astro';
   let videos: BetaVideo[] = [];
   let filter: 'active' | 'archived' | 'all' = 'active';
   let editingId: string | null = null;
+  let createSuccessTimeout: number | undefined;
 
   function escapeHtml(value: string): string {
     return value.replace(/[&<>"']/g, (char) => ({
@@ -248,6 +249,7 @@ import MainLayout from '../../layouts/MainLayout.astro';
   }
 
   function openModal(video?: BetaVideo): void {
+    window.clearTimeout(createSuccessTimeout);
     editingId = video?.id ?? null;
     form.reset();
     formError.classList.add('hidden');
@@ -264,6 +266,7 @@ import MainLayout from '../../layouts/MainLayout.astro';
   }
 
   function closeModal(): void {
+    window.clearTimeout(createSuccessTimeout);
     modal.classList.add('hidden');
     modal.classList.remove('flex');
     editingId = null;
@@ -305,9 +308,10 @@ import MainLayout from '../../layouts/MainLayout.astro';
       await loadVideos();
       formError.textContent = wasEditing
         ? 'Beta video updated. The existing QR now opens the new video.'
-        : 'Saved. This QR remains available in the list; close this dialog when you are done.';
+        : 'Saved. This QR is now available in the list.';
       formError.className = 'rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800';
       formError.setAttribute('role', 'status');
+      if (!wasEditing) createSuccessTimeout = window.setTimeout(closeModal, 2000);
     } catch (error) {
       formError.textContent = error instanceof Error ? error.message : 'Could not save beta video.';
       formError.className = 'rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700';
