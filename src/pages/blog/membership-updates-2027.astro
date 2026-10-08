@@ -1,6 +1,6 @@
 ---
-import BlogArticle from '../components/BlogArticle.astro';
-import { CHECKIN_TYPES, PRICE_CHANGES } from '../lib/pricing';
+import BlogArticle from '../../components/BlogArticle.astro';
+import { CHECKIN_TYPES, PRICE_CHANGES } from '../../lib/pricing';
 
 const CHANGE = PRICE_CHANGES.find((change) => change.from === '2027-01-01')!;
 const memberships = [
