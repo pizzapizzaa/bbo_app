@@ -1,0 +1,107 @@
+---
+import WallDecor from '../components/leaderboard/WallDecor.astro';
+import ClimberDyno from '../components/leaderboard/ClimberDyno.astro';
+import '../styles/leaderboard.css';
+
+const LIGHTS = [18, 50, 82];
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#141518" />
+    <meta name="description" content="This page isn't on the wall. Find your way back to Boulder Box." />
+    <link rel="icon" type="image/png" href="/assets/Favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <title>404: Off Route | Boulder Box</title>
+  </head>
+  <body>
+    <header class="ceiling">
+      <a href="/" aria-label="Boulder Box home">
+        <img class="ceiling__logo" src="/assets/bobo_logo_rectangle.png" alt="Boulder Box" width="1220" height="320" />
+      </a>
+      {LIGHTS.map((x) => <span class="track-light" style={`left:${x}%`} aria-hidden="true"></span>)}
+    </header>
+
+    <div class="wall" id="wall">
+      {LIGHTS.map((x) => <span class="light-cone" style={`left:${x}%`} aria-hidden="true"></span>)}
+      <WallDecor />
+
+      <main class="page">
+        <section class="hero not-found" aria-labelledby="page-title">
+          <div class="hero__copy not-found__copy">
+            <p class="kicker"><span class="tape tape--dark">Boulder Box · Route check</span></p>
+            <h1 class="title" id="page-title"><span class="tape">404</span></h1>
+            <p class="tagline">Looks like you climbed off route.</p>
+            <p class="not-found__message">This page isn't on the wall. It may have moved, or the route may have been reset.</p>
+
+            <nav class="cta-row not-found__links" aria-label="Where to go next">
+              <a class="btn-send" href="/">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z" />
+                </svg>
+                Back to Boulder Box
+              </a>
+              <a class="btn-chalk" href="/blog">Explore the blog</a>
+            </nav>
+          </div>
+
+          <div class="hero__stage not-found__stage">
+            <ClimberDyno />
+          </div>
+        </section>
+      </main>
+
+      <footer class="mat">
+        Boulder Box · <a href="/">bbo.fitness</a>
+      </footer>
+    </div>
+
+    <script>
+      import { startClimber } from '../scripts/leaderboard/climber';
+      import { initWallFx } from '../scripts/leaderboard/wall-fx';
+
+      const stage = document.querySelector<HTMLElement>('[data-climber-stage]');
+      const wall = document.getElementById('wall');
+      if (stage) startClimber(stage);
+      if (wall) initWallFx(wall, { parallax: true });
+    </script>
+  </body>
+</html>
+
+<style>
+  .not-found {
+    min-height: min(46rem, calc(100vh - 8rem));
+    align-content: center;
+    padding-top: 2rem;
+    padding-bottom: 2.5rem;
+  }
+
+  .not-found__copy { max-width: 36rem; }
+  .not-found__message {
+    max-width: 30rem;
+    margin-top: .85rem;
+    color: var(--ink-soft);
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+  .not-found__links { margin-bottom: 0; }
+  .not-found__links a { text-decoration: none; }
+  .not-found__stage { align-self: center; }
+
+  @media (max-width: 899px) {
+    .not-found { min-height: auto; padding-top: 2.5rem; }
+    .not-found__stage { height: 17rem; margin-top: .5rem; }
+    .not-found__links { gap: .65rem; }
+    .not-found__links .btn-send { padding-inline: 1rem; font-size: 1.15rem; }
+    .not-found__links .btn-chalk { padding-inline: .85rem; font-size: 1rem; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .not-found__links .btn-send { transition: none; }
+  }
+</style>
