@@ -1,0 +1,51 @@
+---
+import BlogArticle from '../components/BlogArticle.astro';
+import { CHECKIN_TYPES, PRICE_CHANGES } from '../lib/pricing';
+
+const CHANGE = PRICE_CHANGES.find((change) => change.from === '2027-01-01')!;
+const memberships = [
+  ['1 Month', 'Membership – 1 Month'],
+  ['3 Months', 'Membership – 3 Months'],
+  ['6 Months', 'Membership – 6 Months'],
+  ['12 Months', 'Membership – 12 Months'],
+].map(([label, value]) => ({
+  label,
+  now: CHECKIN_TYPES.find((type) => type.value === value)!.price,
+  next: CHANGE.prices[value],
+}));
+const vnd = (amount: number) => `${amount.toLocaleString('en-US')} VND`;
+---
+
+<BlogArticle
+  title="A Membership Update for 2027"
+  description="See the new membership prices from 1 January 2027 and learn about early self check-in for active members."
+  date="2026-10-08"
+>
+  <p class="excerpt">Memberships get a small price update and a new early self check-in option from January 2027. Here's what current and future members need to know.</p>
+
+  <p>If Boulder Box is part of your regular routine, thank you for making this little gym part of your week. We know membership prices matter, so we want to give you plenty of notice before they change.</p>
+  <p>From 1 January 2027, the price of each membership term will increase slightly:</p>
+
+  <table>
+    <thead><tr><th>Membership</th><th>Until 31 Dec 2026</th><th>From 1 Jan 2027</th></tr></thead>
+    <tbody>
+      {memberships.map((membership) => (
+        <tr><td>{membership.label}</td><td>{vnd(membership.now)}</td><td>{vnd(membership.next)}</td></tr>
+      ))}
+    </tbody>
+  </table>
+
+  <h2>Why are prices changing?</h2>
+  <p>Keeping a small climbing gym running costs more each year, from rent and electricity to new holds and keeping the space clean and safe. We've held our prices through 2026, and this is a modest update to help us keep looking after the gym.</p>
+  <p>We wanted the change to be smallest for the people who climb with us most often. Memberships are going up by around 3%, less than our Day Passes and punch cards.</p>
+
+  <h2>Early self check-in for members</h2>
+  <p>From January 2027, everyone with an active Boulder Box membership will receive a self check-in password, so you can climb early between 6:00 AM and 10:00 AM.</p>
+  <p>Fans will be available during those early hours. The air-conditioning will be switched on from 10:00 AM onwards.</p>
+
+  <h2>Want the current price?</h2>
+  <p>Buy your membership before 1 January 2027 and you'll pay the current price shown above. If you were already thinking about renewing or choosing a longer term, December is a good time to do it.</p>
+
+  <p>Got a question about which term suits your climbing routine? Ask us at the front desk and we'll be happy to help.</p>
+  <p>Thanks for being part of Boulder Box. See you on the wall.</p>
+</BlogArticle>
