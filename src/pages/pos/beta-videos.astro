@@ -23,6 +23,24 @@ import MainLayout from '../../layouts/MainLayout.astro';
       <button type="button" data-filter="archived" aria-pressed="false" class="filter-button border-r border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">Archived</button>
       <button type="button" data-filter="all" aria-pressed="false" class="filter-button px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">All</button>
     </div>
+    <label class="flex items-center gap-2 text-sm font-medium text-gray-700">Sort
+      <select id="video-sort" class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500">
+        <option value="asc">Name A-Z</option>
+        <option value="desc">Name Z-A</option>
+      </select>
+    </label>
+    <details id="wall-filter" class="relative w-full sm:w-auto">
+      <summary class="w-fit cursor-pointer rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-500">
+        <span id="wall-filter-label">All walls</span>
+      </summary>
+      <div class="absolute left-0 z-20 mt-2 w-72 max-w-[calc(100vw-3rem)] rounded-md border border-gray-200 bg-white p-2 shadow-lg">
+        <label class="flex cursor-pointer items-center gap-2 rounded px-2 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+          <input id="all-walls" type="checkbox" checked class="h-4 w-4 shrink-0 accent-orange-600" />
+          All walls
+        </label>
+        <div id="wall-options" class="max-h-60 overflow-y-auto border-t border-gray-100" role="group" aria-label="Filter by wall"></div>
+      </div>
+    </details>
     <span id="video-count" class="ml-auto text-sm text-gray-500" aria-live="polite"></span>
   </div>
 
@@ -92,6 +110,13 @@ import MainLayout from '../../layouts/MainLayout.astro';
   const form = document.querySelector<HTMLFormElement>('#video-form')!;
   const formError = document.querySelector<HTMLDivElement>('#form-error')!;
   const saveButton = document.querySelector<HTMLButtonElement>('#save-video')!;
+  const sortSelect = document.querySelector<HTMLSelectElement>('#video-sort')!;
+  const wallFilter = document.querySelector<HTMLDetailsElement>('#wall-filter')!;
+  const wallFilterLabel = document.querySelector<HTMLSpanElement>('#wall-filter-label')!;
+  const wallOptions = document.querySelector<HTMLDivElement>('#wall-options')!;
+  const allWalls = document.querySelector<HTMLInputElement>('#all-walls')!;
+  const selectedWalls = new Set<string>();
+  const nameCollator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
   let videos: BetaVideo[] = [];
   let filter: 'active' | 'archived' | 'all' = 'active';
   let editingId: string | null = null;
@@ -191,13 +216,40 @@ import MainLayout from '../../layouts/MainLayout.astro';
     return canvas.toDataURL('image/png');
   }
 
+  function updateWallFilter(): void {
+    allWalls.checked = selectedWalls.size === 0;
+    wallFilterLabel.textContent = selectedWalls.size === 0
+      ? 'All walls'
+      : `${selectedWalls.size} ${selectedWalls.size === 1 ? 'wall' : 'walls'} selected`;
+    wallOptions.querySelectorAll<HTMLInputElement>('input').forEach((checkbox) => {
+      checkbox.checked = selectedWalls.has(checkbox.value);
+    });
+  }
+
+  function populateWallOptions(): void {
+    const walls = [...new Set(videos.map((video) => video.wall))].sort(nameCollator.compare);
+    for (const wall of selectedWalls) {
+      if (!walls.includes(wall)) selectedWalls.delete(wall);
+    }
+    wallOptions.innerHTML = walls.map((wall) => `
+      <label class="flex cursor-pointer items-start gap-2 rounded px-2 py-2 text-sm text-gray-700 hover:bg-gray-50">
+        <input type="checkbox" value="${escapeHtml(wall)}" class="mt-0.5 h-4 w-4 shrink-0 accent-orange-600" />
+        <span class="min-w-0 break-words">${escapeHtml(wall)}</span>
+      </label>`).join('');
+    updateWallFilter();
+  }
+
   function render(): void {
-    const visible = videos.filter((video) => filter === 'all' || video.is_active === (filter === 'active'));
+    const direction = sortSelect.value === 'desc' ? -1 : 1;
+    const visible = videos.filter((video) =>
+      (filter === 'all' || video.is_active === (filter === 'active'))
+      && (selectedWalls.size === 0 || selectedWalls.has(video.wall)))
+      .sort((first, second) => direction * nameCollator.compare(first.title, second.title));
     count.textContent = `${visible.length} ${visible.length === 1 ? 'QR code' : 'QR codes'}`;
 
     if (!visible.length) {
       list.innerHTML = `<div class="col-span-full border-y border-gray-200 py-14 text-center text-sm text-gray-500">
-        ${filter === 'archived' ? 'No archived QR codes.' : 'No beta videos yet. Generate a QR code to get started.'}</div>`;
+        ${selectedWalls.size > 0 ? 'No QR codes match the selected walls.' : filter === 'archived' ? 'No archived QR codes.' : 'No beta videos yet. Generate a QR code to get started.'}</div>`;
       return;
     }
 
@@ -241,6 +293,7 @@ import MainLayout from '../../layouts/MainLayout.astro';
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Could not load beta videos.');
       videos = result.videos || [];
+      populateWallOptions();
       render();
     } catch (error) {
       list.innerHTML = '';
@@ -274,6 +327,29 @@ import MainLayout from '../../layouts/MainLayout.astro';
 
   document.querySelector('#new-video')!.addEventListener('click', () => openModal());
   document.querySelector('#close-modal')!.addEventListener('click', closeModal);
+
+  sortSelect.addEventListener('change', render);
+  allWalls.addEventListener('change', () => {
+    selectedWalls.clear();
+    updateWallFilter();
+    render();
+  });
+  wallOptions.addEventListener('change', (event) => {
+    const checkbox = event.target as HTMLInputElement;
+    if (checkbox.checked) selectedWalls.add(checkbox.value);
+    else selectedWalls.delete(checkbox.value);
+    updateWallFilter();
+    render();
+  });
+  document.addEventListener('click', (event) => {
+    if (!wallFilter.contains(event.target as Node)) wallFilter.open = false;
+  });
+  wallFilter.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      wallFilter.open = false;
+      wallFilter.querySelector('summary')!.focus();
+    }
+  });
 
   document.querySelectorAll<HTMLButtonElement>('.filter-button').forEach((button) => {
     button.addEventListener('click', () => {
