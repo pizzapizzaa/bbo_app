@@ -315,14 +315,23 @@ const PRICING_DATA = {
 
         <!-- Use punch from (shown only when Punch Card is selected) -->
         <div id="punch-from-row" class="hidden lg:flex-1 lg:min-w-[200px]">
-          <label class="block text-sm font-medium text-gray-300 mb-1.5">
+          <label id="punch-from-label" class="block text-sm font-medium text-gray-300 mb-1.5">
             Use punch from <span class="text-red-400">*</span>
           </label>
-          <select
-            id="f-punch-from"
-            class="w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm
-                   focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
-          >
+          <div id="f-punch-from-picker" class="relative">
+            <button id="f-punch-from-toggle" type="button" aria-labelledby="punch-from-label f-punch-from-text" aria-expanded="false" aria-controls="f-punch-from-panel" class="w-full flex items-center justify-between gap-2 bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm text-left focus:outline-none focus:ring-2 focus:ring-orange-400">
+              <span id="f-punch-from-text" class="min-w-0 break-words">— Select punch card holder —</span>
+              <span aria-hidden="true">&#9662;</span>
+            </button>
+            <div id="f-punch-from-panel" class="hidden absolute left-0 right-0 top-full mt-1 z-30 bg-gray-800 border border-gray-600 rounded-lg shadow-lg overflow-hidden">
+              <div class="p-2 border-b border-gray-700">
+                <input id="f-punch-from-search" type="search" placeholder="Search customer name…" aria-label="Search punch card holders" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="f-punch-from-results" autocomplete="off" class="w-full min-w-0 bg-gray-900 border border-gray-600 text-white rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+              </div>
+              <div id="f-punch-from-results" role="listbox" aria-label="Punch card holders" class="max-h-60 overflow-y-auto"></div>
+              <p id="f-punch-from-empty" role="status" class="hidden px-3 py-2 text-sm text-gray-400">No matching customers.</p>
+            </div>
+          </div>
+          <select id="f-punch-from" class="hidden" aria-hidden="true" tabindex="-1">
             <option value="">— Select punch card holder —</option>
           </select>
           <p id="punch-from-hint" class="hidden text-xs text-yellow-400 mt-1">No punch card holders with remaining punches found.</p>
@@ -330,14 +339,23 @@ const PRICING_DATA = {
 
         <!-- Use PT punch from (shown only when PT Punch is selected) -->
         <div id="pt-punch-from-row" class="hidden lg:flex-1 lg:min-w-[200px]">
-          <label class="block text-sm font-medium text-gray-300 mb-1.5">
+          <label id="pt-punch-from-label" class="block text-sm font-medium text-gray-300 mb-1.5">
             Use PT punch from <span class="text-red-400">*</span>
           </label>
-          <select
-            id="f-pt-punch-from"
-            class="w-full bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm
-                   focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
-          >
+          <div id="f-pt-punch-from-picker" class="relative">
+            <button id="f-pt-punch-from-toggle" type="button" aria-labelledby="pt-punch-from-label f-pt-punch-from-text" aria-expanded="false" aria-controls="f-pt-punch-from-panel" class="w-full flex items-center justify-between gap-2 bg-gray-800 border border-gray-600 text-white rounded-lg px-3 py-2 text-sm text-left focus:outline-none focus:ring-2 focus:ring-indigo-400">
+              <span id="f-pt-punch-from-text" class="min-w-0 break-words">— Select PT punch holder —</span>
+              <span aria-hidden="true">&#9662;</span>
+            </button>
+            <div id="f-pt-punch-from-panel" class="hidden absolute left-0 right-0 top-full mt-1 z-30 bg-gray-800 border border-gray-600 rounded-lg shadow-lg overflow-hidden">
+              <div class="p-2 border-b border-gray-700">
+                <input id="f-pt-punch-from-search" type="search" placeholder="Search customer name…" aria-label="Search PT punch holders" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="f-pt-punch-from-results" autocomplete="off" class="w-full min-w-0 bg-gray-900 border border-gray-600 text-white rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+              </div>
+              <div id="f-pt-punch-from-results" role="listbox" aria-label="PT punch holders" class="max-h-60 overflow-y-auto"></div>
+              <p id="f-pt-punch-from-empty" role="status" class="hidden px-3 py-2 text-sm text-gray-400">No matching customers.</p>
+            </div>
+          </div>
+          <select id="f-pt-punch-from" class="hidden" aria-hidden="true" tabindex="-1">
             <option value="">— Select PT punch holder —</option>
           </select>
           <p id="pt-punch-from-hint" class="hidden text-xs text-yellow-400 mt-1">No customers with remaining PT punches found.</p>
@@ -605,6 +623,7 @@ const PRICING_DATA = {
         select.appendChild(opt);
       });
       hint.classList.toggle('hidden', holders.length > 0);
+      syncPunchPickers();
     }
 
     function buildPTPunchDropdown(customers) {
@@ -622,7 +641,135 @@ const PRICING_DATA = {
         select.appendChild(opt);
       });
       hint.classList.toggle('hidden', holders.length > 0);
+      syncPunchPickers();
     }
+
+    function foldName(value) {
+      return String(value || '')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[\u0111\u0110]/g, 'd')
+        .toLowerCase();
+    }
+
+    function nameMatches(name, terms) {
+      var folded = foldName(name);
+      return terms.every(function (term) { return folded.indexOf(term) !== -1; });
+    }
+
+    var punchPickers = [];
+
+    function syncPunchPickers(reset) {
+      punchPickers.forEach(function (picker) { picker.sync(reset); });
+    }
+
+    ['f-punch-from', 'f-pt-punch-from'].forEach(function (id) {
+      var select = document.getElementById(id);
+      var root = document.getElementById(id + '-picker');
+      var toggle = document.getElementById(id + '-toggle');
+      var text = document.getElementById(id + '-text');
+      var panel = document.getElementById(id + '-panel');
+      var search = document.getElementById(id + '-search');
+      var results = document.getElementById(id + '-results');
+      var empty = document.getElementById(id + '-empty');
+      var activeIndex = -1;
+
+      function close() {
+        panel.classList.add('hidden');
+        toggle.setAttribute('aria-expanded', 'false');
+        search.setAttribute('aria-expanded', 'false');
+        search.removeAttribute('aria-activedescendant');
+      }
+
+      function sync(reset) {
+        text.textContent = select.options[select.selectedIndex].textContent;
+        if (reset) {
+          search.value = '';
+          close();
+        }
+        if (!panel.classList.contains('hidden')) render();
+      }
+
+      function choose(value) {
+        select.value = value;
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+        close();
+        toggle.focus();
+      }
+
+      function render() {
+        var terms = foldName(search.value).split(/\s+/).filter(Boolean);
+        results.innerHTML = '';
+        activeIndex = -1;
+        search.removeAttribute('aria-activedescendant');
+        var matches = 0;
+        Array.from(select.options).forEach(function (option, index) {
+          if (option.value && !nameMatches(option.dataset.holderName, terms)) return;
+          if (!option.value && terms.length) return;
+          if (option.value) matches++;
+          var item = document.createElement('button');
+          item.type = 'button';
+          item.id = id + '-option-' + index;
+          item.setAttribute('role', 'option');
+          item.setAttribute('aria-selected', String(option.value === select.value));
+          item.tabIndex = -1;
+          item.className = 'block w-full px-3 py-2 text-left text-sm text-gray-200 break-words hover:bg-gray-700 focus:bg-gray-700';
+          item.textContent = option.textContent;
+          if (option.value === select.value) item.classList.add('text-orange-400');
+          item.addEventListener('click', function () { choose(option.value); });
+          results.appendChild(item);
+        });
+        empty.textContent = terms.length ? 'No matching customers.' : 'No holders with remaining punches.';
+        empty.classList.toggle('hidden', matches > 0);
+      }
+
+      function open() {
+        syncPunchPickers(true);
+        search.value = '';
+        render();
+        panel.classList.remove('hidden');
+        toggle.setAttribute('aria-expanded', 'true');
+        search.setAttribute('aria-expanded', 'true');
+        search.focus();
+      }
+
+      toggle.addEventListener('click', function () {
+        if (panel.classList.contains('hidden')) open(); else close();
+      });
+      toggle.addEventListener('keydown', function (event) {
+        if (event.key === 'ArrowDown') { event.preventDefault(); open(); }
+      });
+      search.addEventListener('input', render);
+      search.addEventListener('search', render);
+      search.addEventListener('keydown', function (event) {
+        var items = results.querySelectorAll('[role="option"]');
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+          event.preventDefault();
+          if (!items.length) return;
+          activeIndex = event.key === 'ArrowDown'
+            ? Math.min(activeIndex + 1, items.length - 1)
+            : Math.max(activeIndex - 1, 0);
+          items.forEach(function (item, index) {
+            item.classList.toggle('bg-gray-700', index === activeIndex);
+          });
+          search.setAttribute('aria-activedescendant', items[activeIndex].id);
+          items[activeIndex].scrollIntoView({ block: 'nearest' });
+        } else if (event.key === 'Enter') {
+          event.preventDefault();
+          if (activeIndex >= 0) items[activeIndex].click();
+        }
+      });
+      root.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') { event.preventDefault(); close(); toggle.focus(); }
+      });
+      root.addEventListener('focusout', function (event) {
+        if (!root.contains(event.relatedTarget)) close();
+      });
+      document.addEventListener('click', function (event) {
+        if (!root.contains(event.target)) close();
+      });
+      select.addEventListener('change', function () { sync(); });
+      punchPickers.push({ sync: sync });
+    });
 
     function loadCheckinsForRange(from, to) {
       var qs = (from === to)
@@ -786,6 +933,7 @@ const PRICING_DATA = {
       if (!isPunch) document.getElementById('f-punch-from').value = '';
       document.getElementById('pt-punch-from-row').classList.toggle('hidden', !isPTPunch);
       if (!isPTPunch) document.getElementById('f-pt-punch-from').value = '';
+      syncPunchPickers(true);
       // An international card adds its surcharge, so the quote moves with it.
       recalcAmount();
     });
@@ -809,6 +957,7 @@ const PRICING_DATA = {
         document.getElementById('f-punch-from').value = customer._id;
       }
       // Switching away from an international card drops its surcharge.
+      syncPunchPickers(true);
       if (_cardFeePct() !== feeBefore) recalcAmount();
     }
 
@@ -857,6 +1006,7 @@ const PRICING_DATA = {
         document.getElementById('f-punch-from').value        = '';
         document.getElementById('pt-punch-from-row').classList.add('hidden');
         document.getElementById('f-pt-punch-from').value     = '';
+        syncPunchPickers(true);
         // Reset the referral entry along with the rest of the form
         document.getElementById('f-referral-code').value = '';
         document.getElementById('referral-code-row').classList.add('hidden');
@@ -866,28 +1016,6 @@ const PRICING_DATA = {
         closeDropdown();
         searchInput.focus();
       };
-
-      /**
-       * Fold a name down to plain lowercase ASCII so what staff can type on the
-       * desk keyboard matches what is stored: "Huyen" finds "Huy\u1ec1n".
-       */
-      function foldName(s) {
-        return String(s || '')
-          .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-          .replace(/[\u0111\u0110]/g, 'd')
-          .toLowerCase();
-      }
-
-      /**
-       * Match each typed word independently, anywhere in the name, in any
-       * order — staff recall the parts of a name, not the order it was entered
-       * in. A single substring test would find "Nguyen Thu Huyen" from "thu
-       * huyen" but not from "nguyen huyen"; this finds it from either.
-       */
-      function nameMatches(name, terms) {
-        var hay = foldName(name);
-        return terms.every(function (t) { return hay.indexOf(t) !== -1; });
-      }
 
       function renderDropdown(q) {
         var terms    = foldName(q).split(/\s+/).filter(Boolean);
@@ -1631,6 +1759,7 @@ const PRICING_DATA = {
         ensureHolderOption('f-pt-punch-from', c.pt_punch_holder_id, c.pt_punch_holder_name);
         document.getElementById('f-pt-punch-from').value = c.pt_punch_holder_id;
       }
+      syncPunchPickers(true);
 
       // An "Other" check-in folds the unregistered name into notes on save.
       // Unfold it, so re-saving does not prefix it a second time.
