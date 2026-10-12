@@ -23,7 +23,9 @@ CREATE TABLE IF NOT EXISTS customers (
   pt_punches_remaining  INTEGER     NOT NULL DEFAULT 0,
   referral_code         TEXT        NOT NULL DEFAULT '',   -- '' = no affiliated code; stored uppercase
   referral_discount_pct INTEGER     NOT NULL DEFAULT 0,    -- 1..100, discount given to whoever uses the code
-  created_at            TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+  registration_source   TEXT NOT NULL DEFAULT 'unknown'
+                        CHECK (registration_source IN ('unknown', 'self', 'staff', 'import'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_customers_full_name ON customers (full_name);

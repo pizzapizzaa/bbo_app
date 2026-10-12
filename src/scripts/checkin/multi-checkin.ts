@@ -1,14 +1,38 @@
 import { ADDONS, MANUAL_DISCOUNTS, checkinTypePrice, computeCheckinAmount, type ReferralTerms } from '../../lib/pricing';
-import { isValidDate, isValidTime, MAX_NAME, MAX_TEXT } from '../../lib/validate';
+import { gymToday, isValidDate, isValidTime, MAX_NAME, MAX_TEXT } from '../../lib/validate';
+import { startCustomerRefresh } from '../customers/refresh';
+import { initAddonQuantities, selectedAddonNames } from './addon-quantities';
 
 export interface Customer {
 	_id: string;
+	_created_at?: string;
+	_registration_source?: string;
 	'Full Name': string;
 	_membership_type?: string;
 	_membership_end_date?: string;
 	_is_punch_card_holder?: boolean;
 	_punches_remaining?: number;
 	_pt_punches_remaining?: number;
+}
+
+function foldedName(name: string) {
+	return name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[\u0111\u0110]/g, 'd').toLowerCase();
+}
+
+export function customerGroups(customers: Customer[], query = '', today = gymToday()) {
+	const terms = foldedName(query.trim()).split(/\s+/).filter(Boolean);
+	const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' });
+	const newlyRegistered: Customer[] = [];
+	const others: Customer[] = [];
+	for (const customer of customers) {
+		if (!terms.every((term) => foldedName(customer['Full Name']).includes(term))) continue;
+		const created = customer._created_at ? new Date(customer._created_at) : null;
+		const isNew = customer._registration_source === 'self' && created && Number.isFinite(created.getTime()) && formatter.format(created) === today;
+		(isNew ? newlyRegistered : others).push(customer);
+	}
+	newlyRegistered.sort((first, second) => Date.parse(second._created_at!) - Date.parse(first._created_at!) || first._id.localeCompare(second._id));
+	others.sort((first, second) => Number(!foldedName(first['Full Name']).startsWith(foldedName(query.trim()))) - Number(!foldedName(second['Full Name']).startsWith(foldedName(query.trim()))) || first['Full Name'].localeCompare(second['Full Name']));
+	return { newlyRegistered, others };
 }
 
 type SaveState = 'draft' | 'saved' | 'uncertain';
@@ -80,7 +104,7 @@ function initMultiCheckin() {
 	const api = window as unknown as {
 		apiFetch: (url: string, options?: RequestInit) => Promise<Response>;
 		allCustomers: Customer[];
-		buildCustomerDatalist: () => Promise<void>;
+		buildCustomerDatalist: () => Promise<boolean>;
 		loadCheckinsForRange: (from: string, to: string) => void;
 		activeFrom: string;
 		activeTo: string;
@@ -89,6 +113,8 @@ function initMultiCheckin() {
 	let customers: Customer[] = api.allCustomers ?? [];
 	let sequence = 0;
 	let busy = false;
+	let visibleLimit = 50;
+	const refresh = startCustomerRefresh(() => busy ? Promise.resolve(false) : api.buildCustomerDatalist());
 	const now = new Date();
 	date.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 	time.value = now.toTimeString().slice(0, 5);
@@ -96,7 +122,7 @@ function initMultiCheckin() {
 	const control = <ElementType extends HTMLElement>(card: Card, id: string) => card.root.querySelector(`[data-field="${id}"]`) as ElementType;
 	const value = (card: Card, id: string) => control<HTMLInputElement>(card, id).value;
 	const discount = (card: Card) => card.root.querySelector<HTMLInputElement>('.batch-discount:checked')?.value ?? '';
-	const addons = (card: Card) => Array.from(card.root.querySelectorAll<HTMLInputElement>('.batch-addon:checked')).map((checkbox) => checkbox.dataset.name!);
+	const addons = (card: Card) => selectedAddonNames(card.root, '.batch-addon');
 	const quote = (card: Card, discountId = discount(card)) => computeCheckinAmount({ date: date.value, checkin_type: value(card, 'f-checkin-type'), payment_method: value(card, 'f-payment'), addons: addons(card), discount: discountId, referral: card.referral });
 
 	function summary() {
@@ -325,6 +351,7 @@ function initMultiCheckin() {
 			if (!label.querySelector('input') && input?.id) label.htmlFor = input.id;
 		});
 		for (const id of ['f-punch-from', 'f-pt-punch-from']) initHolderPicker(card, id);
+			initAddonQuantities(card.root, '.batch-addon', () => reprice(card));
 		cardFields.addEventListener('change', (event) => {
 			const target = event.target as HTMLInputElement;
 			if (target.dataset.field === 'f-payment') { card.manualPayment = true; paymentRows(card); }
@@ -378,17 +405,28 @@ function initMultiCheckin() {
 
 	function closePicker() { panel.classList.add('hidden'); search.setAttribute('aria-expanded', 'false'); }
 	function renderResults() {
+		const focusedId = (document.activeElement as HTMLElement)?.dataset.customerId;
+		const focusedCommand = (document.activeElement as HTMLElement)?.dataset.customerCommand;
+		const scrollTop = results.scrollTop;
 		results.replaceChildren();
-		const terms = search.value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\u0111/g, 'd').split(/\s+/).filter(Boolean);
-		const matches = customers.filter((customer) => {
-			const name = customer['Full Name'].normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\u0111/g, 'd');
-			return terms.every((term) => name.includes(term));
-		}).sort((first, second) => Number(!first['Full Name'].toLowerCase().startsWith(search.value.toLowerCase())) - Number(!second['Full Name'].toLowerCase().startsWith(search.value.toLowerCase())));
-		for (const customer of matches.slice(0, 50)) {
+		const groups = customerGroups(customers, search.value);
+		const matches = [...groups.newlyRegistered, ...groups.others];
+		const focusedIndex = matches.findIndex((customer) => customer._id === focusedId);
+		if (focusedIndex >= visibleLimit) visibleLimit = Math.ceil((focusedIndex + 1) / 50) * 50;
+		let rendered = 0;
+		for (const [title, group] of [['Newly Registered Customers', groups.newlyRegistered], ['All Other Customers', groups.others]] as const) {
+			const visible = group.slice(0, Math.max(0, visibleLimit - rendered));
+			if (!visible.length) continue;
+			const heading = document.createElement('p');
+			heading.className = 'px-3 py-2 text-xs font-semibold text-orange-300 border-b border-gray-700';
+			heading.textContent = title;
+			results.append(heading);
+			for (const customer of visible) {
 			const label = document.createElement('label');
 			label.className = 'flex items-center gap-3 px-3 py-3 text-sm text-gray-200 hover:bg-gray-700 cursor-pointer';
 			const checkbox = document.createElement('input');
 			checkbox.type = 'checkbox';
+			checkbox.dataset.customerId = customer._id;
 			checkbox.className = 'accent-orange-500 w-4 h-4 shrink-0';
 			checkbox.checked = cards.has(customer._id);
 			checkbox.disabled = busy || (cards.get(customer._id)?.state !== undefined && cards.get(customer._id)?.state !== 'draft');
@@ -402,18 +440,33 @@ function initMultiCheckin() {
 			text.textContent = customer['Full Name'];
 			label.append(checkbox, text);
 			results.append(label);
+			}
+			rendered += visible.length;
 		}
 		if (!matches.length) { const empty = document.createElement('p'); empty.className = 'px-3 py-3 text-sm text-gray-400'; empty.textContent = 'No matching customers.'; results.append(empty); }
+		if (rendered < matches.length) {
+			const more = document.createElement('button');
+			more.type = 'button';
+			more.dataset.customerCommand = 'more';
+			more.className = 'w-full text-left px-3 py-3 text-sm text-orange-300 hover:bg-gray-700';
+			more.textContent = `Show more customers (${matches.length - rendered} remaining)`;
+			more.addEventListener('click', () => { visibleLimit += 50; renderResults(); });
+			results.append(more);
+		}
 		const other = document.createElement('button');
 		other.type = 'button';
+		other.dataset.customerCommand = 'other';
 		other.className = 'w-full text-left px-3 py-3 border-t border-gray-600 text-sm text-gray-300 hover:bg-gray-700';
 		other.textContent = 'Add unregistered customer';
 		other.addEventListener('click', () => { const key = `other-${++sequence}`; addCard({ _id: key, 'Full Name': 'Other' }, key); summary(); });
 		results.append(other);
+		if (focusedId) Array.from(results.querySelectorAll<HTMLInputElement>('[data-customer-id]')).find((checkbox) => checkbox.dataset.customerId === focusedId)?.focus({ preventScroll: true });
+		if (focusedCommand) Array.from(results.querySelectorAll<HTMLButtonElement>('[data-customer-command]')).find((button) => button.dataset.customerCommand === focusedCommand)?.focus({ preventScroll: true });
+		results.scrollTop = scrollTop;
 	}
-	const openPicker = () => { renderResults(); panel.classList.remove('hidden'); search.setAttribute('aria-expanded', 'true'); };
+	const openPicker = () => { renderResults(); panel.classList.remove('hidden'); search.setAttribute('aria-expanded', 'true'); void refresh.refreshIfStale(); };
 	search.addEventListener('focus', openPicker);
-	search.addEventListener('input', openPicker);
+	search.addEventListener('input', () => { visibleLimit = 50; results.scrollTop = 0; openPicker(); });
 	byId('multi-customer-done').addEventListener('click', () => { closePicker(); search.focus(); closePicker(); });
 	byId('multi-customer-picker').addEventListener('keydown', (event) => {
 		if (event.key === 'Escape') { closePicker(); search.focus(); closePicker(); }
@@ -429,11 +482,11 @@ function initMultiCheckin() {
 	document.addEventListener('click', (event) => { if (!byId('multi-customer-picker').contains(event.target as Node)) closePicker(); });
 	document.addEventListener('checkin-customers', (event) => {
 		customers = (event as CustomEvent<Customer[]>).detail;
-		for (const card of cards.values()) if (card.state === 'draft') { holderOptions(card); defaultPayment(card); reprice(card); }
+		for (const card of cards.values()) if (card.state === 'draft' && !card.root.contains(document.activeElement)) holderOptions(card);
 		renderResults();
 		summary();
 	});
-	document.addEventListener('checkin-customers-error', () => { byId('multi-customer-status').textContent = 'Could not load customers. Reload to try again.'; });
+	document.addEventListener('checkin-customers-error', () => { byId('multi-customer-status').textContent = 'Customer refresh failed. Retrying automatically.'; });
 	date.addEventListener('change', () => { for (const card of cards.values()) { defaultPayment(card); reprice(card); } });
 
 	function payload(card: Card): Payload {
@@ -472,6 +525,7 @@ function initMultiCheckin() {
 			else if (data.payment_method === 'Punch Card' && !data.punch_card_holder_id) message = 'Choose a punch card holder.';
 			else if (data.payment_method === 'PT Punch' && !data.pt_punch_holder_id) message = 'Choose a PT punch holder.';
 			else if (discount(card) === 'referral' && !card.referral) message = 'Enter and verify a valid referral or promo code.';
+			else if (card.fields.querySelector('[data-addon-quantity-input]:enabled:invalid')) message = 'Enter a whole beverage quantity from 1 to 999.';
 			else if (!Number.isFinite(Number(value(card, 'f-amount'))) || Number(value(card, 'f-amount')) < 0) message = 'Enter a valid non-negative amount.';
 			else if (data.notes.length > MAX_TEXT || data.customer_name.length > MAX_NAME) message = 'Customer name or notes exceed the maximum length.';
 			control(card, 'error').textContent = message;

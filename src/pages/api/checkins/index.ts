@@ -12,7 +12,7 @@ import {
 import { lookupReferralCode } from '../../../lib/referral';
 import {
   computeCheckinAmount, describeCheckinExtras,
-  isKnownCheckinType, isKnownAddon, isKnownDiscount,
+  isKnownCheckinType, isKnownAddon, isKnownDiscount, areAddonQuantitiesValid,
 } from '../../../lib/pricing';
 
 /** GET /api/checkins?date=YYYY-MM-DD          — single date
@@ -122,6 +122,9 @@ export const POST: APIRoute = async ({ request }) => {
   const unknownAddon = addonNames.find((a) => !isKnownAddon(a));
   if (unknownAddon) {
     return new Response(JSON.stringify({ error: `Unknown add-on: ${unknownAddon}` }), { status: 400 });
+  }
+  if (!areAddonQuantitiesValid(addonNames)) {
+    return new Response(JSON.stringify({ error: 'Beverage quantities cannot exceed 999 per product.' }), { status: 400 });
   }
   if (checkin_type && !isKnownCheckinType(checkin_type)) {
     return new Response(JSON.stringify({ error: `Unknown check-in type: ${checkin_type}` }), { status: 400 });

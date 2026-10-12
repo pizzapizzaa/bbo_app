@@ -488,6 +488,11 @@ import MainLayout from '../../layouts/MainLayout.astro';
   </div>
 
   <script is:inline src="https://cdn.jsdelivr.net/npm/apexcharts@3.54.1/dist/apexcharts.min.js"></script>
+  <script>
+    import { startCustomerRefresh } from '../../scripts/customers/refresh';
+    const api = window as unknown as { loadCustomers: (background?: boolean) => Promise<boolean> };
+    startCustomerRefresh(() => api.loadCustomers(true));
+  </script>
   <script is:inline>
     // ═══════════════════════════════════════════════════════════════════════
     // ── Stats Panel ─────────────────────────────────────────────────────────
@@ -1333,34 +1338,56 @@ import MainLayout from '../../layouts/MainLayout.astro';
     });
 
     // ── Load customers from API ──
-    function loadCustomers() {
-      document.getElementById('table-loading').classList.remove('hidden');
-      document.getElementById('no-data-msg').classList.add('hidden');
-      document.getElementById('table-wrapper').classList.add('hidden');
-      apiFetch('/api/customers')
-        .then(function (res) { return res.json(); })
+    var customerLoadPromise = null;
+    function customerEditorOpen() {
+      return ['import-confirm-modal', 'add-customer-modal', 'edit-membership-modal', 'edit-punch-modal', 'edit-pt-punch-modal', 'edit-referral-modal'].some(function (id) {
+        return !document.getElementById(id).classList.contains('hidden');
+      });
+    }
+    function loadCustomers(background) {
+      if (customerLoadPromise) return customerLoadPromise;
+      if (background && customerEditorOpen()) return Promise.resolve(false);
+      var previousRows = JSON.stringify(customerRows);
+      if (!background) {
+        document.getElementById('table-loading').classList.remove('hidden');
+        document.getElementById('no-data-msg').classList.add('hidden');
+        document.getElementById('table-wrapper').classList.add('hidden');
+      }
+      customerLoadPromise = apiFetch('/api/customers', { cache: 'no-store' })
+        .then(function (res) {
+          if (!res.ok) throw new Error('Could not load customers.');
+          return res.json();
+        })
         .then(function (data) {
+          if (data.error || !Array.isArray(data.rows)) throw new Error(data.error || 'Invalid customer response.');
+          if (background && (customerEditorOpen() || JSON.stringify(customerRows) !== previousRows)) return false;
+          if (background && JSON.stringify(data.rows) === previousRows) return true;
           document.getElementById('upload-status').classList.add('hidden');
           document.getElementById('table-loading').classList.add('hidden');
-          if (data.error) {
-            showStatus(data.error, 'error');
-            document.getElementById('no-data-msg').classList.remove('hidden');
-            return;
-          }
           customerHeaders = data.headers || [];
           customerRows    = data.rows    || [];
-          if (customerRows.length) {
+          if (background && customerTable) {
+            customerTable.clear();
+            customerTable.rows.add(customerRows).draw(false);
+          } else if (customerRows.length) {
             renderTable();
           } else {
             document.getElementById('no-data-msg').classList.remove('hidden');
           }
           updateCount();
+          if (background) fetchNewCustomerStat();
+          return true;
         })
         .catch(function (err) {
-          document.getElementById('table-loading').classList.add('hidden');
-          document.getElementById('no-data-msg').classList.remove('hidden');
-          showStatus('Failed to load customers: ' + err.message, 'error');
-        });
+          if (!background) {
+            document.getElementById('table-loading').classList.add('hidden');
+            document.getElementById('no-data-msg').classList.remove('hidden');
+            showStatus('Failed to load customers: ' + err.message, 'error');
+          }
+          return false;
+        })
+        .finally(function () { customerLoadPromise = null; });
+      return customerLoadPromise;
     }
 
     // ── CSV Parsing (client-side read only) ──

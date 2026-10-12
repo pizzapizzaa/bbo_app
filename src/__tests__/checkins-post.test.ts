@@ -630,6 +630,20 @@ describe('POST /api/checkins — server-side pricing', () => {
     expect(seen.row.amount).toBe(120_000 + 20_000 + 18_000);
   });
 
+  it('bills and records multiple beverages without trusting the preview amount', async () => {
+    const seen = trackInsert();
+    const response = await POST({ request: makeReq({ ...validBody, addons: ['Pocari', 'Pocari', 'Pocari', 'Ionlife'], amount: 1 }) } as any);
+    expect(response.status).toBe(200);
+    expect(seen.row).toMatchObject({ amount: 64_000, addons: 'Pocari x3, Ionlife' });
+  });
+
+  it('rejects beverage quantities beyond the edit control limit', async () => {
+    const seen = trackInsert();
+    const response = await POST({ request: makeReq({ ...validBody, addons: Array.from({ length: 1000 }, () => 'Pocari') }) } as any);
+    expect(response.status).toBe(400);
+    expect(seen.row).toBeNull();
+  });
+
   it('applies a hand-picked discount server-side', async () => {
     const seen = trackInsert();
     await POST({ request: makeReq({

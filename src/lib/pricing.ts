@@ -93,6 +93,7 @@ export interface AddonDef {
   rental: boolean;
   /** Column heading on the check-in form. Groups render in first-seen order. */
   group: AddonGroup;
+  quantity?: boolean;
   /**
    * Tiered products are one choice on the form, not several checkboxes: the
    * whole set shares a stepper and only the selected tier is ever submitted.
@@ -102,6 +103,7 @@ export interface AddonDef {
 }
 
 export type AddonGroup = 'Climbing' | 'Food & Drinks';
+export const MAX_ADDON_QUANTITY = 999;
 
 /**
  * Chalk bags are hired per group rather than per bag, so the three rates are
@@ -116,10 +118,10 @@ export const ADDONS: AddonDef[] = [
   { name: 'Chalk Bag Rental (3+ people)',  price: 25_000, rental: true,  group: 'Climbing', tier: { of: 'Chalk Bag Rental', label: '3+ people' } },
   { name: 'Chalk Block',                   price: 65_000, rental: false, group: 'Climbing' },
   { name: 'Socks',                         price: 10_000, rental: false, group: 'Climbing' },
-  { name: 'Vitani Dasani',                 price:  8_000, rental: false, group: 'Food & Drinks' },
-  { name: 'Ionlife',                       price: 10_000, rental: false, group: 'Food & Drinks' },
-  { name: 'Pocari',                        price: 18_000, rental: false, group: 'Food & Drinks' },
-  { name: 'Apple',                         price: 33_000, rental: false, group: 'Food & Drinks' },
+  { name: 'Vitani Dasani',                 price:  8_000, rental: false, group: 'Food & Drinks', quantity: true },
+  { name: 'Ionlife',                       price: 10_000, rental: false, group: 'Food & Drinks', quantity: true },
+  { name: 'Pocari',                        price: 18_000, rental: false, group: 'Food & Drinks', quantity: true },
+  { name: 'Apple',                         price: 33_000, rental: false, group: 'Food & Drinks', quantity: true },
 ];
 
 const CHECKIN_TYPE_BY_VALUE = new Map(CHECKIN_TYPES.map((t) => [t.value, t]));
@@ -146,6 +148,16 @@ export function isKnownCheckinType(value: string): boolean {
 }
 export function isKnownAddon(name: string): boolean {
   return ADDON_BY_NAME.has(name);
+}
+export function areAddonQuantitiesValid(names: string[]): boolean {
+  const counts = new Map<string, number>();
+  for (const name of names) {
+    if (!ADDON_BY_NAME.get(name)?.quantity) continue;
+    const count = (counts.get(name) ?? 0) + 1;
+    if (count > MAX_ADDON_QUANTITY) return false;
+    counts.set(name, count);
+  }
+  return true;
 }
 
 /**
@@ -347,7 +359,11 @@ export function computeCheckinAmount(input: PriceInput): PriceBreakdown {
  * than in the browser so a stored row always explains its own amount.
  */
 export function describeCheckinExtras(addons: string[], price: PriceBreakdown): string {
-  const parts = addons.filter(isKnownAddon);
+  const counts = new Map<string, number>();
+  for (const name of addons.filter(isKnownAddon)) counts.set(name, (counts.get(name) ?? 0) + 1);
+  const parts = Array.from(counts).flatMap(([name, count]) =>
+    ADDON_BY_NAME.get(name)?.quantity && count > 1 ? [`${name} x${count}`] : Array.from({ length: count }, () => name),
+  );
 
   const manual = DISCOUNT_BY_ID.get(price.discount);
   if (manual) parts.push(`Discount: ${manual.label}`);
@@ -386,5 +402,12 @@ export function parseCheckinExtras(trail: string): string[] {
   return String(trail ?? '')
     .split(',')
     .map((part) => part.trim())
-    .filter(isKnownAddon);
+    .flatMap((part) => {
+      if (isKnownAddon(part)) return [part];
+      const match = /^(.*) x([1-9]\d*)$/.exec(part);
+      if (!match || !ADDON_BY_NAME.get(match[1])?.quantity) return [];
+      const count = Number(match[2]);
+      if (!Number.isSafeInteger(count) || count > MAX_ADDON_QUANTITY) return [];
+      return Array.from({ length: count }, () => match[1]);
+    });
 }

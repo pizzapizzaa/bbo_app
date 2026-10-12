@@ -68,6 +68,7 @@ export const POST: APIRoute = async ({ request }) => {
     emergency_contact: (body.emergency_contact ?? '').trim(),
     note,
     waiver_form:       'Signed (Online)',
+    registration_source: 'self',
   });
 
   if (error) {

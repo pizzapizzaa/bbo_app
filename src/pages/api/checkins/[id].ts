@@ -11,7 +11,7 @@ import {
 import { lookupReferralCode } from '../../../lib/referral';
 import {
   computeCheckinAmount, describeCheckinExtras,
-  isKnownCheckinType, isKnownAddon, isKnownDiscount, grantsBalance,
+  isKnownCheckinType, isKnownAddon, isKnownDiscount, grantsBalance, areAddonQuantitiesValid,
 } from '../../../lib/pricing';
 
 const badRequest = (error: string) =>
@@ -149,6 +149,7 @@ export const PUT: APIRoute = async ({ params, request }) => {
   const addonNames = Array.isArray(addons) ? addons.map(String) : [];
   const unknownAddon = addonNames.find((a) => !isKnownAddon(a));
   if (unknownAddon) return badRequest(`Unknown add-on: ${unknownAddon}`);
+  if (!areAddonQuantitiesValid(addonNames)) return badRequest('Beverage quantities cannot exceed 999 per product.');
   if (checkin_type && !isKnownCheckinType(checkin_type)) {
     return badRequest(`Unknown check-in type: ${checkin_type}`);
   }

@@ -25,7 +25,7 @@ export const GET: APIRoute = async () => {
   try {
   const { data, error } = await fetchAllPages((from, to) =>
     db.from('customers')
-      .select('id, full_name, dob, email, telephone, emergency_contact, note, waiver_form, is_punch_card_holder, punches_remaining, pt_punches_remaining, membership_type, membership_start_date, membership_end_date')
+      .select('id, full_name, dob, email, telephone, emergency_contact, note, waiver_form, is_punch_card_holder, punches_remaining, pt_punches_remaining, membership_type, membership_start_date, membership_end_date, created_at, registration_source')
       .order('full_name')
       .range(from, to)
   );
@@ -64,6 +64,8 @@ export const GET: APIRoute = async () => {
   // Map DB rows back to the original CSV-style header names for the frontend
   const rows = data.map((r: any) => ({
     _id:                  r.id,
+    _created_at:          r.created_at ?? '',
+    _registration_source: r.registration_source ?? 'unknown',
     'Full Name':          r.full_name,
     'DOB':                r.dob,
     'Email':              r.email,
@@ -87,7 +89,9 @@ export const GET: APIRoute = async () => {
     _referral_codes:        codesByOwner.get(r.id) ?? [],
   }));
 
-  return ok({ headers: DISPLAY_HEADERS, rows, total });
+  const response = ok({ headers: DISPLAY_HEADERS, rows, total });
+  response.headers.set('Cache-Control', 'private, no-store');
+  return response;
   } catch (e: any) { return serverError(e?.message ?? String(e)); }
 };
 
@@ -142,6 +146,7 @@ export const POST: APIRoute = async ({ request }) => {
       emergency_contact: r['Emergency contact'] ?? '',
       note:              r['Note']              ?? '',
       waiver_form:       r['Waiver form (old)'] ?? '',
+      registration_source: 'import',
     }));
     const { error } = await db.from('customers').insert(batch);
     if (error) return serverError(error.message);
@@ -197,19 +202,22 @@ export const PUT: APIRoute = async ({ request }) => {
       emergency_contact:    r['Emergency contact'] ?? '',
       note:                 r['Note']              ?? '',
       waiver_form:          r['Waiver form (old)'] ?? '',
+      registration_source:  'staff',
       is_punch_card_holder:  false,
       punches_remaining:     0,
       membership_type:       '',
       membership_start_date: null,
       membership_end_date:   null,
     })
-    .select('id, full_name, dob, email, telephone, emergency_contact, note, waiver_form, is_punch_card_holder, punches_remaining, membership_type, membership_start_date, membership_end_date')
+    .select('id, full_name, dob, email, telephone, emergency_contact, note, waiver_form, is_punch_card_holder, punches_remaining, membership_type, membership_start_date, membership_end_date, created_at, registration_source')
     .single();
 
   if (error) return serverError(error.message);
 
   const newRow = {
     _id:                    data.id,
+    _created_at:            data.created_at ?? '',
+    _registration_source:   data.registration_source ?? 'staff',
     'Full Name':            data.full_name,
     'DOB':                  data.dob,
     'Email':                data.email,

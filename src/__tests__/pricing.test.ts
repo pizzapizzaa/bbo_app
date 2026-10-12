@@ -4,12 +4,44 @@ import {
   checkinTypePrice, isKnownCheckinType, isKnownAddon, isKnownDiscount,
   computeCheckinAmount, describeCheckinExtras, parseCheckinExtras, grantsBalance,
   INTERNATIONAL_CARD_FEE_PCT,
+  areAddonQuantitiesValid, MAX_ADDON_QUANTITY,
 } from '../lib/pricing';
 
 /** A day outside every promotion window, so the base rules show through. */
 const ORDINARY = '2026-06-15';
 /** Inside the National Day window (2026-08-30 → 2026-09-03). */
 const PROMO_DAY = '2026-09-01';
+
+describe('beverage quantities', () => {
+  it('prices every drink while keeping rental discounts off beverages', () => {
+    const price = computeCheckinAmount({ date: ORDINARY, addons: ['Pocari', 'Pocari', 'Pocari', 'Shoes Rental'], discount: 'referral', referral: { discount_pct: 20, rental_discount_pct: 50 } });
+    expect(price.amount).toBe(64_000);
+    expect(price.retail_addons).toBe(54_000);
+  });
+
+  it('records quantities compactly and restores the original billable items', () => {
+    const addons = ['Pocari', 'Pocari', 'Pocari', 'Ionlife', 'Ionlife'];
+    const price = computeCheckinAmount({ date: ORDINARY, addons, payment_method: 'International Card' });
+    expect(price.amount).toBe(76_220);
+    const trail = describeCheckinExtras(addons, price);
+    expect(trail).toContain('Pocari x3, Ionlife x2');
+    expect(parseCheckinExtras(trail)).toEqual(addons);
+  });
+
+  it('keeps single drinks and older repeated-name records compatible', () => {
+    const price = computeCheckinAmount({ date: ORDINARY, addons: ['Pocari'] });
+    expect(describeCheckinExtras(['Pocari'], price)).toBe('Pocari');
+    expect(parseCheckinExtras('Pocari, Pocari, Shoes Rental')).toEqual(['Pocari', 'Pocari', 'Shoes Rental']);
+    expect(parseCheckinExtras('Pocari x0, Pocari x100000000, Unknown x2')).toEqual([]);
+  });
+
+  it('keeps the server quantity limit consistent with saved-trail parsing', () => {
+    const addons = Array.from({ length: MAX_ADDON_QUANTITY }, () => 'Pocari');
+    expect(areAddonQuantitiesValid(addons)).toBe(true);
+    expect(parseCheckinExtras(`Pocari x${MAX_ADDON_QUANTITY}`)).toEqual(addons);
+    expect(areAddonQuantitiesValid([...addons, 'Pocari'])).toBe(false);
+  });
+});
 
 describe('the price list', () => {
   it('prices every product it lists, and nothing it does not', () => {

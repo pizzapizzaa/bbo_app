@@ -1,7 +1,7 @@
 ---
 import MainLayout from '../../layouts/MainLayout.astro';
 import { PROMOTIONS } from '../../lib/promotions';
-import { CHECKIN_TYPES, ADDONS, MANUAL_DISCOUNTS, PRICE_CHANGES, INTERNATIONAL_CARD, INTERNATIONAL_CARD_FEE_PCT, type AddonDef } from '../../lib/pricing';
+import { CHECKIN_TYPES, ADDONS, MANUAL_DISCOUNTS, PRICE_CHANGES, INTERNATIONAL_CARD, INTERNATIONAL_CARD_FEE_PCT, MAX_ADDON_QUANTITY, type AddonDef } from '../../lib/pricing';
 
 /** Products grouped for the <optgroup>s, in the order pricing.ts lists them. */
 const TYPE_GROUPS: { group: string; items: typeof CHECKIN_TYPES }[] = [];
@@ -226,12 +226,25 @@ const PRICING_DATA = {
                   <p class="text-xs text-gray-500 uppercase tracking-wide">{g.group}</p>
 
                   {g.entries.map((e) => e.kind === 'single' ? (
-                    <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                      <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer"
-                             data-name={e.addon.name} data-price={e.addon.price}
-                             data-rental={e.addon.rental ? '1' : null} />
-                      <span>{e.addon.name} <span class="text-gray-500 text-xs">{vnd(e.addon.price)} ₫</span></span>
-                    </label>
+                    <div data-addon-item>
+                      <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                        <input type="checkbox" class="addon-cb accent-orange-500 w-4 h-4 cursor-pointer"
+                               data-name={e.addon.name} data-price={e.addon.price}
+                               data-quantity={e.addon.quantity ? '1' : null}
+                               data-rental={e.addon.rental ? '1' : null} />
+                        <span>{e.addon.name} <span class="text-gray-500 text-xs">{vnd(e.addon.price)} ₫{e.addon.quantity ? ' each' : ''}</span></span>
+                      </label>
+                      {e.addon.quantity && (
+                        <div data-addon-quantity-controls class="hidden mt-2 ml-6 flex items-center gap-2">
+                          <button data-addon-decrease type="button" aria-label={`Fewer ${e.addon.name}`} title={`Fewer ${e.addon.name}`}
+                                  class="w-8 h-8 shrink-0 rounded bg-gray-700 text-gray-200 hover:bg-gray-600 disabled:opacity-40 focus:ring-2 focus:ring-orange-400">-</button>
+                          <input data-addon-quantity-input type="number" min="1" max={MAX_ADDON_QUANTITY} step="1" value="1" required disabled aria-label={`${e.addon.name} quantity`}
+                                 class="w-16 h-8 rounded bg-gray-900 border border-gray-600 text-white text-sm text-center focus:ring-2 focus:ring-orange-400" />
+                          <button data-addon-increase type="button" aria-label={`More ${e.addon.name}`} title={`More ${e.addon.name}`}
+                                  class="w-8 h-8 shrink-0 rounded bg-gray-700 text-gray-200 hover:bg-gray-600 disabled:opacity-40 focus:ring-2 focus:ring-orange-400">+</button>
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <!-- A tier set: one checkbox, one stepper. syncAddonTier()
                          writes the chosen tier's product name and price onto the
@@ -578,6 +591,9 @@ const PRICING_DATA = {
 
   <script>
     import '../../scripts/checkin/multi-checkin';
+    import { initAddonQuantities } from '../../scripts/checkin/addon-quantities';
+    const api = window as unknown as { recalcAmount: () => void };
+    initAddonQuantities(document.getElementById('checkin-form')!, '.addon-cb', () => api.recalcAmount());
   </script>
 
   <script is:inline>
@@ -630,20 +646,31 @@ const PRICING_DATA = {
       }
     }
 
+    var customerLoadPromise = null;
     function buildCustomerDatalist() {
-      return apiFetch('/api/customers')
-        .then(function (res) { return res.json(); })
+      if (customerLoadPromise) return customerLoadPromise;
+      customerLoadPromise = apiFetch('/api/customers', { cache: 'no-store' })
+        .then(function (res) {
+          if (!res.ok) throw new Error('Could not load customers.');
+          return res.json();
+        })
         .then(function (data) {
+          if (data.error || !Array.isArray(data.rows)) throw new Error(data.error || 'Invalid customer response.');
           var rows = data.rows || [];
           allCustomers = rows;
           if (rows.length) {
             document.getElementById('customer-hint').classList.add('hidden');
           }
-          buildPunchCardDropdown(rows);
-          buildPTPunchDropdown(rows);
+          if (!_editingId && !document.getElementById('single-checkin-editor').contains(document.activeElement)) {
+            buildPunchCardDropdown(rows);
+            buildPTPunchDropdown(rows);
+          }
           document.dispatchEvent(new CustomEvent('checkin-customers', { detail: rows }));
+          return true;
         })
-        .catch(function () { document.dispatchEvent(new CustomEvent('checkin-customers-error')); });
+        .catch(function () { document.dispatchEvent(new CustomEvent('checkin-customers-error')); return false; })
+        .finally(function () { customerLoadPromise = null; });
+      return customerLoadPromise;
     }
 
     function buildPunchCardDropdown(customers) {
@@ -1305,7 +1332,7 @@ const PRICING_DATA = {
     function _addonTotals() {
       var retail = 0, rental = 0;
       document.querySelectorAll('.addon-cb:checked').forEach(function (cb) {
-        var price = parseInt(cb.dataset.price || '0') || 0;
+        var price = (parseInt(cb.dataset.price || '0') || 0) * Number(cb.dataset.quantity || 1);
         if (cb.dataset.rental === '1') rental += price; else retail += price;
       });
       return { retail: retail, rental: rental };
@@ -1545,7 +1572,13 @@ const PRICING_DATA = {
       // the promo note are written by the server from the same figures it prices
       // with, so a stored row can never claim a discount it was not given.
       var addonsArr      = [];
-      document.querySelectorAll('.addon-cb:checked').forEach(function (cb) { addonsArr.push(cb.dataset.name); });
+      document.querySelectorAll('.addon-cb:checked').forEach(function (cb) {
+        for (var count = 0; count < Number(cb.dataset.quantity || 1); count++) addonsArr.push(cb.dataset.name);
+      });
+      if (document.getElementById('checkin-form').querySelector('[data-addon-quantity-input]:enabled:invalid')) {
+        errEl.textContent = 'Enter a whole beverage quantity from 1 to 999.';
+        errEl.classList.remove('hidden'); return;
+      }
       var discountRbSub  = document.querySelector('.discount-rb:checked');
       var discountValSub = discountRbSub ? discountRbSub.value : '';
 
@@ -1670,7 +1703,10 @@ const PRICING_DATA = {
     function resetFormFields() {
       clearCustomerSelection();
       document.getElementById('f-checkin-type').value = '';
-      document.querySelectorAll('.addon-cb').forEach(function (cb) { cb.checked = false; });
+      document.querySelectorAll('.addon-cb').forEach(function (cb) {
+        cb.checked = false;
+        if (cb.dataset.quantity) { cb.dataset.quantity = '1'; cb.dispatchEvent(new Event('change')); }
+      });
       resetAddonTiers();
       var noDiscRb = document.querySelector('.discount-rb[value=""]');
       if (noDiscRb) noDiscRb.checked = true;
@@ -1701,7 +1737,12 @@ const PRICING_DATA = {
      * comma, so the segments naming a real add-on are exactly what was submitted.
      */
     function addonsFromTrail(trail) {
-      return trailParts(trail).filter(function (p) { return ADDON_NAMES[p]; });
+      return trailParts(trail).flatMap(function (part) {
+        if (ADDON_NAMES[part]) return [part];
+        var match = /^(.*) x([1-9]\d*)$/.exec(part);
+        if (!match || Number(match[2]) > 999 || !(PRICING.addons || []).some(function (addon) { return addon.name === match[1] && addon.quantity; })) return [];
+        return Array.from({ length: Number(match[2]) }, function () { return match[1]; });
+      });
     }
 
     /** The discount behind a stored row: its referral column, else the trail label. */
@@ -1786,7 +1827,11 @@ const PRICING_DATA = {
       addonsFromTrail(c.addons).forEach(function (name) {
         if (restoreAddonTier(name)) return;
         var cb = document.querySelector('.addon-cb[data-name="' + name + '"]');
-        if (cb) cb.checked = true;
+        if (cb) {
+          if (cb.dataset.quantity) cb.dataset.quantity = String(cb.checked ? Number(cb.dataset.quantity) + 1 : 1);
+          cb.checked = true;
+          if (cb.dataset.quantity) cb.dispatchEvent(new Event('change'));
+        }
       });
 
       var discountId = discountFromRow(c);
