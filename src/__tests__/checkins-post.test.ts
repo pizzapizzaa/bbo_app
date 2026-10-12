@@ -3,9 +3,10 @@ import { makeBuilder } from './_utils';
 
 // ── Mock src/lib/db before importing the handler ──────────────────────────────
 const mockFromFn = vi.hoisted(() => vi.fn());
+const mockRpcFn = vi.hoisted(() => vi.fn());
 
 vi.mock('../lib/db', () => ({
-  db: { from: mockFromFn },
+  db: { from: mockFromFn, rpc: mockRpcFn },
 }));
 
 import { POST } from '../pages/api/checkins/index';
@@ -48,6 +49,7 @@ const mockCheckin = {
 
 beforeEach(() => {
   mockFromFn.mockReset();
+  mockRpcFn.mockReset();
   // Sensible defaults: all DB calls succeed with empty/null data
   mockFromFn.mockImplementation(() =>
     makeBuilder({ data: null, error: null })
@@ -236,23 +238,9 @@ describe('POST /api/checkins — successful insert', () => {
     expect(customersInsertCalled).toBe(true);
   });
 
-  it('deducts one punch from the punch card holder when using Punch Card payment', async () => {
+  it('records and deducts a punch through the atomic database function', async () => {
     const holderId = 'bbbb0000-0000-0000-0000-000000000002';
-    let punchDeducted = false;
-
-    mockFromFn.mockImplementation((table: string) => {
-      if (table === 'checkins') return makeBuilder({ data: { ...mockCheckin, payment_method: 'Punch Card', punch_card_holder_id: holderId, punch_card_holder_name: 'Alice Nguyen' }, error: null });
-
-      if (table === 'customers') {
-        const builder = makeBuilder({ data: { id: holderId, punches_remaining: 5 }, error: null });
-        builder.update = vi.fn().mockImplementation(() => {
-          punchDeducted = true;
-          return makeBuilder({ data: null, error: null });
-        });
-        return builder;
-      }
-      return makeBuilder({ data: null, error: null });
-    });
+    mockRpcFn.mockResolvedValue({ data: mockCheckin, error: null });
 
     const body = {
       ...validBody,
@@ -262,7 +250,38 @@ describe('POST /api/checkins — successful insert', () => {
     };
     const res = await POST({ request: makeReq(body) } as any);
     expect(res.status).toBe(200);
-    expect(punchDeducted).toBe(true);
+    expect(mockRpcFn).toHaveBeenCalledWith('record_punch_checkin', {
+      p_checkin: expect.objectContaining({ payment_method: 'Punch Card', punch_card_holder_id: holderId }),
+    });
+    expect(mockFromFn).not.toHaveBeenCalledWith('checkins');
+  });
+
+  it('rejects an exhausted shared punch holder without inserting another visit', async () => {
+    mockRpcFn.mockResolvedValue({ data: null, error: { code: 'P0001', message: 'Punch card holder has no punches remaining.' } });
+    const res = await POST({ request: makeReq({ ...validBody, payment_method: 'Punch Card', punch_card_holder_id: 'holder-1' }) } as any);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error: 'Punch card holder has no punches remaining.' });
+    expect(mockFromFn).not.toHaveBeenCalled();
+  });
+
+  it('requires the atomic function instead of silently skipping punch deductions', async () => {
+    mockRpcFn.mockResolvedValue({ data: null, error: { code: 'PGRST202', message: 'Function missing' } });
+    const res = await POST({ request: makeReq({ ...validBody, payment_method: 'PT Punch', pt_punch_holder_id: 'holder-1' }) } as any);
+    expect(res.status).toBe(503);
+    expect(mockFromFn).not.toHaveBeenCalled();
+  });
+
+  it('requires a holder matching the payment method', async () => {
+    for (const body of [
+      { ...validBody, payment_method: 'Punch Card' },
+      { ...validBody, payment_method: 'PT Punch' },
+      { ...validBody, punch_card_holder_id: 'holder-1' },
+      { ...validBody, payment_method: 'PT Punch', pt_punch_holder_id: 'holder-1', punch_card_holder_id: 'holder-1' },
+    ]) {
+      const res = await POST({ request: makeReq(body) } as any);
+      expect(res.status).toBe(400);
+    }
+    expect(mockRpcFn).not.toHaveBeenCalled();
   });
 
   it('returns 500 when the checkin DB insert fails', async () => {

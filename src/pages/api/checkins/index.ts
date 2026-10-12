@@ -99,6 +99,14 @@ export const POST: APIRoute = async ({ request }) => {
   if ((notes ?? '').length > MAX_TEXT) {
     return new Response(JSON.stringify({ error: 'notes exceeds maximum length' }), { status: 400 });
   }
+  if ((payment_method === 'Punch Card' && !punch_card_holder_id) ||
+      (payment_method === 'PT Punch' && !pt_punch_holder_id)) {
+    return new Response(JSON.stringify({ error: 'Select a punch card holder.' }), { status: 400 });
+  }
+  if ((punch_card_holder_id && payment_method !== 'Punch Card') ||
+      (pt_punch_holder_id && payment_method !== 'PT Punch')) {
+    return new Response(JSON.stringify({ error: 'Punch holder must match the payment method.' }), { status: 400 });
+  }
 
   // ── Priceable inputs ──
   // A client that predates server-side pricing sends `addons` as the joined
@@ -209,7 +217,7 @@ export const POST: APIRoute = async ({ request }) => {
     ? [extras, `Manual amount (price list: ${price.amount.toLocaleString('en-US')} ₫)`].filter(Boolean).join(', ')
     : extras;
 
-  const { data, error } = await insertOwned('checkins', {
+  const row = {
     customer_name,
     date,
     time,
@@ -226,9 +234,22 @@ export const POST: APIRoute = async ({ request }) => {
     referred_by_id:        referredById,
     referred_by_name:      referredByName,
     referral_discount_pct: referralCode ? price.base_discount_pct : 0,
-  }, await authFromRequest(request));
+  };
+  const auth = await authFromRequest(request);
+  const usesPunch = payment_method === 'Punch Card' || payment_method === 'PT Punch';
+  const { data, error } = usesPunch
+    ? await db.rpc('record_punch_checkin', { p_checkin: { ...row, created_by: auth?.username ?? '' } })
+    : await insertOwned('checkins', row, auth);
 
-  if (error) return serverError(error.message);
+  if (error) {
+    if (usesPunch && error.code === 'P0001') {
+      return new Response(JSON.stringify({ error: error.message }), { status: 400 });
+    }
+    if (usesPunch && error.code === 'PGRST202') {
+      return new Response(JSON.stringify({ error: 'Punch check-ins require migration-multi-checkin.sql to be applied in Supabase.', not_saved: true }), { status: 503 });
+    }
+    return serverError(error.message);
+  }
 
   // Auto-create a customer record if this name doesn't exist yet
   // Skip placeholder names that are not real customers
@@ -316,38 +337,6 @@ export const POST: APIRoute = async ({ request }) => {
           membership_end_date:   endDate.toISOString().slice(0, 10),
         }).eq('id', cust.id);
       }
-    }
-  }
-
-  // Deduct one punch from the punch card holder
-  if (punch_card_holder_id) {
-    const { data: holder } = await db
-      .from('customers')
-      .select('punches_remaining')
-      .eq('id', punch_card_holder_id)
-      .single();
-
-    if (holder && holder.punches_remaining > 0) {
-      await db
-        .from('customers')
-        .update({ punches_remaining: holder.punches_remaining - 1 })
-        .eq('id', punch_card_holder_id);
-    }
-  }
-
-  // Deduct one PT punch from the PT punch holder
-  if (pt_punch_holder_id) {
-    const { data: ptHolder } = await db
-      .from('customers')
-      .select('pt_punches_remaining')
-      .eq('id', pt_punch_holder_id)
-      .single();
-
-    if (ptHolder && ptHolder.pt_punches_remaining > 0) {
-      await db
-        .from('customers')
-        .update({ pt_punches_remaining: ptHolder.pt_punches_remaining - 1 })
-        .eq('id', pt_punch_holder_id);
     }
   }
 
