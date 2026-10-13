@@ -25,7 +25,8 @@ export function customerGroups(customers: Customer[], query = '', today = gymTod
 	const newlyRegistered: Customer[] = [];
 	const others: Customer[] = [];
 	for (const customer of customers) {
-		if (!terms.every((term) => foldedName(customer['Full Name']).includes(term))) continue;
+		const words = foldedName(customer['Full Name']).split(/\s+/);
+		if (!terms.every((term) => words.some((word) => word.startsWith(term)))) continue;
 		const created = customer._created_at ? new Date(customer._created_at) : null;
 		const isNew = customer._registration_source === 'self' && created && Number.isFinite(created.getTime()) && formatter.format(created) === today;
 		(isNew ? newlyRegistered : others).push(customer);
@@ -578,6 +579,8 @@ function initMultiCheckin() {
 			fields.disabled = false;
 			const remaining = Array.from(cards.values()).filter((card) => card.state === 'draft').length;
 			byId('multi-save-status').textContent = `${saved} check-in${saved === 1 ? '' : 's'} recorded.${remaining ? ` ${remaining} remaining; review errors before retrying.` : ''}`;
+			Array.from(cards.values()).filter((card) => card.state === 'saved').forEach(removeCard);
+			if (!cards.size) search.value = '';
 			renderResults();
 			summary();
 		}

@@ -52,6 +52,26 @@ describe('newly registered customer groups', () => {
     expect(customerGroups(entries, 'late', '2026-10-12').newlyRegistered[0]._id).toBe('self-late');
   });
 
+  it('matches each keyword at the start of a name word', () => {
+    const matches = customerGroups([
+      { _id: 'target', 'Full Name': 'Ha Anh Nguyen' },
+      { _id: 'substring-1', 'Full Name': 'Minh Thanh' },
+      { _id: 'substring-2', 'Full Name': 'Nguyen Chanh Hieu' },
+    ], 'Ha Anh', '2026-10-13');
+    expect(matches.others.map((customer) => customer._id)).toEqual(['target']);
+  });
+
+  it('searches customers beyond the initial 50 visible results', () => {
+    const allCustomers: Customer[] = Array.from({ length: 75 }, (_, index) => ({
+      _id: `customer-${index}`,
+      'Full Name': `Customer ${index}`,
+    }));
+    allCustomers[74] = { _id: 'last-customer', 'Full Name': 'Zelda Target' };
+
+    const matches = customerGroups(allCustomers, 'Zelda Target', '2026-10-13');
+    expect(matches.others.map((customer) => customer._id)).toEqual(['last-customer']);
+  });
+
   it('moves the group into other customers when the gym day changes', () => {
     expect(customerGroups(entries, '', '2026-10-13').newlyRegistered).toEqual([]);
   });
