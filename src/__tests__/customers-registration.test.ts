@@ -36,6 +36,18 @@ describe('customer registration metadata', () => {
     expect(response.headers.get('Cache-Control')).toBe('private, no-store');
   });
 
+  it('allows the POS check-in form to load the customer list without an admin session', async () => {
+    mockFrom.mockImplementation((table: string) => makeBuilder({ data: table === 'customers' ? [
+      { id: 'customer-1', full_name: 'Alice Nguyen' },
+      { id: 'customer-2', full_name: 'Bao Tran' },
+    ] : [], error: null }));
+
+    const response = await getCustomers({ request: new Request('http://localhost/api/customers') } as any);
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.rows.map((row: any) => row['Full Name'])).toEqual(['Alice Nguyen', 'Bao Tran']);
+  });
+
   it('tags staff-created customers even if the input claims self-registration', async () => {
     const row = { id: 'staff', full_name: 'Staff Added', created_at: '2026-10-12T03:00:00Z', registration_source: 'staff' };
     const inserted = vi.fn(() => makeBuilder({ data: row, error: null }));
