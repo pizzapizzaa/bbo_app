@@ -1765,14 +1765,20 @@ import MainLayout from '../../layouts/MainLayout.astro';
       }
       _ramId = id;
 
-      // Position menu below the button
-      var rect = btn.getBoundingClientRect();
-      var menuW = 176; // min-w-44
-      var left  = rect.right - menuW + window.scrollX;
-      if (left < 4) left = rect.left + window.scrollX;
-      menu.style.top  = (rect.bottom + window.scrollY + 4) + 'px';
-      menu.style.left = Math.max(4, left) + 'px';
       menu.classList.remove('hidden');
+      var rect = btn.getBoundingClientRect();
+      var menuRect = menu.getBoundingClientRect();
+      var margin = 8;
+      var menuW = menuRect.width || 176;
+      var menuH = menuRect.height;
+      var maxLeft = Math.max(margin, window.innerWidth - menuW - margin);
+      var left = Math.min(maxLeft, Math.max(margin, rect.right - menuW));
+      var maxTop = Math.max(margin, window.innerHeight - menuH - margin);
+      var top = window.innerHeight - rect.bottom >= menuH + margin
+        ? rect.bottom + 4
+        : rect.top >= menuH + margin ? rect.top - menuH - 4 : maxTop;
+      menu.style.top = Math.min(maxTop, Math.max(margin, top)) + 'px';
+      menu.style.left = left + 'px';
     }
 
     function closeRowActionsMenu() {
@@ -1796,7 +1802,7 @@ import MainLayout from '../../layouts/MainLayout.astro';
 
   <!-- Row Actions Context Menu -->
   <div id="row-actions-menu"
-       class="hidden fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl py-1.5 min-w-44"
+      class="hidden fixed z-50 max-h-[calc(100vh-1rem)] overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-xl py-1.5 min-w-44"
        style="min-width:176px">
     <button onclick="ramAction(openEditMembership)"
       class="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-teal-600 hover:bg-teal-50 transition text-left">
