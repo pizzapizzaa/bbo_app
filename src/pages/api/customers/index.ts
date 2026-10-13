@@ -20,7 +20,9 @@ const COL_MAP: Record<string, string> = {
 // DB column → display header (inverse map)
 const DISPLAY_HEADERS = ['Full Name', 'DOB', 'Email', 'Telephone no', 'Emergency contact', 'Note', 'Waiver form (old)', 'Punches', 'PT Punches', 'Membership', 'Member Until', 'Referral Codes'];
 
-/** GET /api/customers — return all customers */
+/** GET /api/customers — return all customers.
+ *  This is used by the POS check-in dropdown, so read access must remain
+ *  available without admin auth. Only mutating routes gate on adminOnly(). */
 export const GET: APIRoute = async () => {
   try {
   const { data, error } = await fetchAllPages((from, to) =>
