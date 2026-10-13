@@ -18,6 +18,7 @@ import {
   authFromRequest,
   requireAdmin,
 } from '../lib/auth';
+import { tokenExpiryFromToken } from '../scripts/auth/session-refresh';
 
 beforeEach(() => {
   mockFromFn.mockReset();
@@ -52,6 +53,20 @@ describe('signToken', () => {
 
   it('produces distinct tokens for different usernames', () => {
     expect(signToken('user-a', 'admin')).not.toBe(signToken('user-b', 'admin'));
+  });
+});
+
+describe('client session token expiry', () => {
+  it('reads the expiry claim from the current signed JSON token format', () => {
+    const token = signToken('alice', 'admin');
+    const [payload] = token.split('.');
+    const { e } = JSON.parse(Buffer.from(payload, 'base64url').toString('utf-8'));
+
+    expect(tokenExpiryFromToken(token)).toBe(e);
+  });
+
+  it('returns zero for malformed tokens', () => {
+    expect(tokenExpiryFromToken('not-a-token')).toBe(0);
   });
 });
 

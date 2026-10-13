@@ -203,46 +203,12 @@ const GATED_PAGES = ['customers', 'promo-codes', 'expenses'];
       document.addEventListener('DOMContentLoaded', function () {
         document.body.style.display = '';
       });
-
-      // ── Auto-refresh: silently renew the token when within 7 days of expiry ──
-      function tryDecodeTokenExp(token) {
-        try {
-          var decoded = atob(token.replace(/-/g, '+').replace(/_/g, '/'));
-          var parts = decoded.split('.');
-          // format: username.exp.sig — exp is second-to-last segment
-          return parseInt(parts[parts.length - 2], 10) || 0;
-        } catch (_) { return 0; }
-      }
-
-      function maybeRefreshToken() {
-        var token = localStorage.getItem('bbo_token');
-        if (!token) return;
-        var exp = tryDecodeTokenExp(token);
-        if (!exp) return;
-        var now = Date.now();
-        // Expired — force logout
-        if (now >= exp) {
-          localStorage.removeItem('bbo_auth');
-          localStorage.removeItem('bbo_token');
-          localStorage.removeItem('bbo_admin');
-          window.location.replace('/pos');
-          return;
-        }
-        // Within 7 days of expiry — refresh silently
-        if (exp - now < 7 * 24 * 60 * 60 * 1000) {
-          fetch('/api/auth/refresh', {
-            method: 'POST',
-            headers: { 'Authorization': 'Bearer ' + token }
-          })
-            .then(function (r) { return r.json(); })
-            .then(function (d) { if (d.token) localStorage.setItem('bbo_token', d.token); })
-            .catch(function () {});
-        }
-      }
-
-      maybeRefreshToken();
-      setInterval(maybeRefreshToken, 60 * 60 * 1000); // re-check every hour
     })();
+  </script>
+
+  <script>
+    import { startSessionRefresh } from '../scripts/auth/session-refresh';
+    startSessionRefresh();
   </script>
 </head>
 
