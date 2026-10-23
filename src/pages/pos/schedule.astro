@@ -445,14 +445,14 @@ import MainLayout from '../../layouts/MainLayout.astro';
        onclick="if(event.target===this)closeEditModal()">
     <div class="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-6">
       <h3 class="font-semibold text-gray-800 text-base mb-4">
-        Edit Schedule Entry
+        <span id="edit-title">Edit Schedule Entry</span>
         <span id="e-type-badge"
               class="hidden ml-1.5 align-middle px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[11px] font-bold">
           Part-time
         </span>
       </h3>
       <div class="space-y-4">
-        <div>
+        <div id="e-staff-field">
           <label class="block text-sm font-medium text-gray-700 mb-1.5">
             Staff Name <span id="e-staff-required" class="text-red-400">*</span>
           </label>
@@ -473,7 +473,7 @@ import MainLayout from '../../layouts/MainLayout.astro';
                    focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
           />
         </div>
-        <div>
+        <div id="e-date-field">
           <label class="block text-sm font-medium text-gray-700 mb-1.5">Date <span class="text-red-400">*</span></label>
           <input id="e-date" type="date"
             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
@@ -493,7 +493,7 @@ import MainLayout from '../../layouts/MainLayout.astro';
                      focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent" />
           </div>
         </div>
-        <div>
+        <div id="e-notes-field">
           <label class="block text-sm font-medium text-gray-700 mb-1.5">Notes</label>
           <input id="e-notes" type="text" placeholder="Optional…"
             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
@@ -897,8 +897,8 @@ import MainLayout from '../../layouts/MainLayout.astro';
 
     // ── Who is looking at this page ───────────────────────────────────────────
     // All part-timers share one login, so the session *role* — not the username —
-    // decides what the page offers: an admin posts and edits shifts, the shared
-    // part-time account only claims open ones and releases what it claimed.
+    // decides what the page offers: an admin manages shifts, while the shared
+    // part-time account claims, releases, and adjusts the hours it claimed.
     // The server enforces the same split; this just hides what wouldn't work.
     var isAdmin = false;
 
@@ -992,6 +992,12 @@ import MainLayout from '../../layouts/MainLayout.astro';
       if (!isPartTime(entry) || !entry.staff_name) return false;
       if (isAdmin) return true;
       return entry.date >= fmtDate(new Date());
+    }
+
+    /** Staff may edit hours only on a claimed part-time shift that has not passed. */
+    function canEditHours(entry) {
+      return isPartTime(entry) && !!entry.staff_name &&
+        (isAdmin || entry.date >= fmtDate(new Date()));
     }
 
     // ── Segmented shift-type controls ─────────────────────────────────────────
@@ -1246,6 +1252,8 @@ import MainLayout from '../../layouts/MainLayout.astro';
       if (isAdmin) {
         btns += iconBtn('openEditModal', safeId, 'Edit entry',   ICON_EDIT);
         btns += iconBtn('deleteEntry',   safeId, 'Delete entry', ICON_DELETE);
+      } else if (canEditHours(entry)) {
+        btns += iconBtn('openEditModal', safeId, 'Edit shift hours', ICON_EDIT);
       }
       if (canRelease(entry)) {
         btns += iconBtn('releaseShift', safeId, 'Give this shift back', ICON_RELEASE);
@@ -1736,16 +1744,22 @@ import MainLayout from '../../layouts/MainLayout.astro';
 
     function openEditModal(id) {
       var entry = scheduleData.filter(function (s) { return String(s.id) === String(id); })[0];
-      if (!entry) return;
+      if (!entry || (!isAdmin && !canEditHours(entry))) return;
       editingId        = id;
       editingShiftType = isPartTime(entry) ? 'part_time' : 'assigned';
+      var staffEditingHours = !isAdmin;
 
       // A part-time slot may legitimately have nobody on it, so the name stops
       // being required and clearing it becomes the way to reopen the slot.
       var open = editingShiftType === 'part_time';
+      document.getElementById('edit-title').textContent =
+        staffEditingHours ? 'Edit Your Shift Hours' : 'Edit Schedule Entry';
       document.getElementById('e-type-badge').classList.toggle('hidden', !open);
       document.getElementById('e-open-hint').classList.toggle('hidden', !open);
       document.getElementById('e-staff-required').classList.toggle('hidden', open);
+      document.getElementById('e-staff-field').classList.toggle('hidden', staffEditingHours);
+      document.getElementById('e-date-field').classList.toggle('hidden', staffEditingHours);
+      document.getElementById('e-notes-field').classList.toggle('hidden', staffEditingHours);
 
       var staffName = entry.staff_name || '';
       var eStaffSel = document.getElementById('e-staff');
@@ -1769,7 +1783,7 @@ import MainLayout from '../../layouts/MainLayout.astro';
       document.getElementById('e-notes').value = entry.notes || '';
       document.getElementById('edit-error').classList.add('hidden');
       document.getElementById('edit-save-btn').disabled = false;
-      document.getElementById('edit-save-btn').textContent = 'Save Changes';
+      document.getElementById('edit-save-btn').textContent = staffEditingHours ? 'Update Hours' : 'Save Changes';
       document.getElementById('edit-modal').classList.remove('hidden');
     }
 
@@ -1781,14 +1795,15 @@ import MainLayout from '../../layouts/MainLayout.astro';
     function submitEdit() {
       var errEl = document.getElementById('edit-error');
       errEl.classList.add('hidden');
-      var staff = resolveStaffName('e-staff', 'e-staff-temp');
-      var date  = document.getElementById('e-date').value;
+      var staffEditingHours = !isAdmin;
+      var staff = staffEditingHours ? '' : resolveStaffName('e-staff', 'e-staff-temp');
+      var date  = staffEditingHours ? '' : document.getElementById('e-date').value;
       var start = document.getElementById('e-start').value;
       var end   = document.getElementById('e-end').value;
-      var notes = document.getElementById('e-notes').value.trim();
+      var notes = staffEditingHours ? '' : document.getElementById('e-notes').value.trim();
 
       var open = editingShiftType === 'part_time';
-      if ((!staff && !open) || !date || !start || !end) {
+      if ((!staffEditingHours && !staff && !open) || (!staffEditingHours && !date) || !start || !end) {
         errEl.textContent = document.getElementById('e-staff').value === 'Temp' && !staff
           ? 'Please enter the temp staff name.'
           : 'Please fill in all required fields.';
@@ -1797,29 +1812,33 @@ import MainLayout from '../../layouts/MainLayout.astro';
       }
 
       var saveBtn = document.getElementById('edit-save-btn');
+      var saveLabel = staffEditingHours ? 'Update Hours' : 'Save Changes';
       saveBtn.disabled = true;
       saveBtn.textContent = 'Saving…';
 
+      var payload = staffEditingHours
+        ? { start_time: start, end_time: end }
+        : {
+            staff_name: staff, date: date, start_time: start, end_time: end,
+            notes: notes, shift_type: editingShiftType
+          };
       apiFetch('/api/schedule/' + editingId, {
         method: 'PATCH',
-        body: JSON.stringify({
-          staff_name: staff, date: date, start_time: start, end_time: end,
-          notes: notes, shift_type: editingShiftType
-        })
+        body: JSON.stringify(payload)
       })
         .then(function (res) { return res.json(); })
         .then(function (data) {
           saveBtn.disabled = false;
-          saveBtn.textContent = 'Save Changes';
+          saveBtn.textContent = saveLabel;
           if (data.error) { errEl.textContent = data.error; errEl.classList.remove('hidden'); return; }
           replaceEntry(data.entry);
           closeEditModal();
           renderCalendar();
-          showToast('Entry updated!');
+          showToast(staffEditingHours ? 'Shift hours updated!' : 'Entry updated!');
         })
         .catch(function (err) {
           saveBtn.disabled = false;
-          saveBtn.textContent = 'Save Changes';
+          saveBtn.textContent = saveLabel;
           errEl.textContent = 'Save failed: ' + err.message;
           errEl.classList.remove('hidden');
         });

@@ -9,6 +9,7 @@ vi.mock('../lib/db', () => ({
 }));
 
 import { signToken } from '../lib/auth';
+import { gymToday } from '../lib/validate';
 import { POST, DELETE } from '../pages/api/schedule/[id]/claim';
 import { POST as schedulePost } from '../pages/api/schedule/index';
 import { PATCH as schedulePatch, DELETE as scheduleDelete } from '../pages/api/schedule/[id]';
@@ -89,6 +90,18 @@ describe('schedule writes are admin-only', () => {
     expect(mockFromFn).not.toHaveBeenCalledWith('schedule_entries');
   });
 
+  it('allows an admin to continue editing the full shift entry', async () => {
+    const builder = makeBuilder({ data: { id: SHIFT_ID, ...shift }, error: null });
+    mockFromFn.mockImplementation(() => builder);
+
+    const res = await schedulePatch({ params: { id: SHIFT_ID }, request: writeReq(adminToken()) } as any);
+
+    expect(res.status).toBe(200);
+    expect(builder.update).toHaveBeenCalledWith(expect.objectContaining({
+      staff_name: 'Kim An', date: '2099-06-15', start_time: '09:00', end_time: '14:00',
+    }));
+  });
+
   it('refuses without a session at all, and says so as 401 not 403', async () => {
     const req = new Request('http://localhost/api/schedule', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(shift),
@@ -108,6 +121,72 @@ describe('schedule writes are admin-only', () => {
     expect(builder.insert).toHaveBeenCalledWith(
       expect.objectContaining({ staff_name: '', shift_type: 'part_time', claimed_by: '' }),
     );
+  });
+});
+
+// ── Part-timer shift-hour edits ───────────────────────────────────────────────
+describe('PATCH /api/schedule/:id for part-timer hours', () => {
+  function editReq(token: string | null, body: unknown): Request {
+    return new Request(`http://localhost/api/schedule/${SHIFT_ID}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+  }
+
+  it('updates only start and end times on a shift claimed by the signed-in account', async () => {
+    const builder = makeBuilder({ data: { ...claimedRow, start_time: '10:00', end_time: '15:00' }, error: null });
+    mockFromFn.mockImplementation(() => builder);
+
+    const res = await schedulePatch({
+      params: { id: SHIFT_ID },
+      request: editReq(partTimerToken(), { start_time: '10:00', end_time: '15:00' }),
+    } as any);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      entry: { start_time: '10:00', end_time: '15:00' },
+    });
+    expect(builder.update).toHaveBeenCalledWith({ start_time: '10:00', end_time: '15:00' });
+    expect(builder.eq).toHaveBeenCalledWith('id', SHIFT_ID);
+    expect(builder.eq).toHaveBeenCalledWith('shift_type', 'part_time');
+    expect(builder.eq).toHaveBeenCalledWith('claimed_by_account', 'parttime');
+    expect(builder.gte).toHaveBeenCalledWith('date', gymToday());
+  });
+
+  it('does not allow part-timers to change the staff name, date, or notes', async () => {
+    const res = await schedulePatch({
+      params: { id: SHIFT_ID },
+      request: editReq(partTimerToken(), {
+        start_time: '10:00', end_time: '15:00', staff_name: 'Someone else',
+      }),
+    } as any);
+
+    expect(res.status).toBe(403);
+    expect(mockFromFn).not.toHaveBeenCalledWith('schedule_entries');
+  });
+
+  it('refuses an unowned, non-part-time, or past shift when no row matches', async () => {
+    stubDb({ data: null, error: null });
+    const res = await schedulePatch({
+      params: { id: SHIFT_ID },
+      request: editReq(partTimerToken(), { start_time: '10:00', end_time: '15:00' }),
+    } as any);
+
+    expect(res.status).toBe(403);
+  });
+
+  it('validates both times before attempting the update', async () => {
+    const res = await schedulePatch({
+      params: { id: SHIFT_ID },
+      request: editReq(partTimerToken(), { start_time: '25:00', end_time: '15:00' }),
+    } as any);
+
+    expect(res.status).toBe(400);
+    expect(mockFromFn).not.toHaveBeenCalledWith('schedule_entries');
   });
 });
 

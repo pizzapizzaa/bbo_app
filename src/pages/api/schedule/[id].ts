@@ -3,15 +3,14 @@ export const prerender = false;
 import type { APIRoute } from 'astro';
 import { db } from '../../../lib/db';
 import { authFromRequest, forbidden, ok, serverError, unauthorized, requireAdmin } from '../../../lib/auth';
-import { isValidUUID, isValidDate, isValidTime, MAX_NAME } from '../../../lib/validate';
+import { isValidUUID, isValidDate, isValidTime, MAX_NAME, gymToday } from '../../../lib/validate';
 import { toShiftType } from '../../../lib/staff';
 
 /**
  * Reject a non-admin without destroying their session.
  *
- * Editing the schedule is the admin's job; a part-timer changes their own
- * standing on it by claiming and releasing slots (POST/DELETE :id/claim), which
- * is guarded separately.
+ * Deleting the schedule is the admin's job; claiming, releasing, and editing
+ * claimed shift hours are guarded separately.
  */
 async function adminOrRefusal(request: Request, action: string): Promise<Response | null> {
   if (await requireAdmin(request)) return null;
@@ -20,20 +19,54 @@ async function adminOrRefusal(request: Request, action: string): Promise<Respons
     : unauthorized();
 }
 
-/** PATCH /api/schedule/:id — update an existing entry (admin only) */
+/** PATCH /api/schedule/:id — admins edit entries; staff may adjust their own shift hours */
 export const PATCH: APIRoute = async ({ params, request }) => {
   const { id } = params;
   if (!id || !isValidUUID(id)) return new Response(JSON.stringify({ error: 'Invalid id' }), { status: 400 });
 
-  const refusal = await adminOrRefusal(request, 'edit');
-  if (refusal) return refusal;
+  const auth = await authFromRequest(request);
+  if (!auth) return unauthorized();
 
   let body: {
     staff_name?: string; date?: string; start_time?: string; end_time?: string;
     notes?: string; shift_type?: string;
   };
-  try { body = await request.json(); }
+  try {
+    const parsed = await request.json();
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return new Response(JSON.stringify({ error: 'Invalid request body' }), { status: 400 });
+    }
+    body = parsed as typeof body;
+  }
   catch { return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400 }); }
+
+  if (auth.role !== 'admin') {
+    const keys = Object.keys(body);
+    if (keys.some((key) => key !== 'start_time' && key !== 'end_time')) {
+      return forbidden('Part-timers can only edit the hours of their own claimed shifts.');
+    }
+    const { start_time, end_time } = body;
+    if (!start_time || !end_time) {
+      return new Response(JSON.stringify({ error: 'Start and end times are required' }), { status: 400 });
+    }
+    if (!isValidTime(String(start_time)) || !isValidTime(String(end_time))) {
+      return new Response(JSON.stringify({ error: 'Invalid time format (expected HH:MM)' }), { status: 400 });
+    }
+
+    const { data, error } = await db
+      .from('schedule_entries')
+      .update({ start_time, end_time })
+      .eq('id', id)
+      .eq('shift_type', 'part_time')
+      .eq('claimed_by_account', auth.username)
+      .gte('date', gymToday())
+      .select()
+      .maybeSingle();
+
+    if (error) return serverError(error.message);
+    if (!data) return forbidden('Only upcoming part-time shifts claimed from your account can be edited.');
+    return ok({ entry: data });
+  }
 
   const { date, start_time, end_time, notes } = body;
   const shift_type = toShiftType(body.shift_type);

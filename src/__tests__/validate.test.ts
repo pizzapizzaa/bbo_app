@@ -83,6 +83,11 @@ describe('isValidTime', () => {
   it('accepts end of day 23:59', () =>
     expect(isValidTime('23:59')).toBe(true));
 
+  it('rejects hours or minutes outside the clock range', () => {
+    expect(isValidTime('24:00')).toBe(false);
+    expect(isValidTime('10:60')).toBe(false);
+  });
+
   it('rejects single-digit hour H:MM', () =>
     expect(isValidTime('9:30')).toBe(false));
 

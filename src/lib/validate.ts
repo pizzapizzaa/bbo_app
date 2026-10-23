@@ -2,7 +2,7 @@
 
 export const UUID_RE  = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-export const HH_MM    = /^\d{2}:\d{2}$/;
+export const HH_MM    = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 
 /** Max field lengths */
 export const MAX_NAME   = 300;
