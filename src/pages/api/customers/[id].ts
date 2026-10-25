@@ -5,7 +5,7 @@ import { db } from '../../../lib/db';
 import { adminOnly, ok, serverError } from '../../../lib/auth';
 import { isValidUUID } from '../../../lib/validate';
 
-/** PATCH /api/customers/:id — update punch card and/or membership info */
+/** PATCH /api/customers/:id — update customer profile, punch card, and/or membership info */
 export const PATCH: APIRoute = async ({ params, request }) => {
   const denied = await adminOnly(request);
   if (denied) return denied;
@@ -15,6 +15,13 @@ export const PATCH: APIRoute = async ({ params, request }) => {
     if (!id || !isValidUUID(id)) return new Response(JSON.stringify({ error: 'Invalid id' }), { status: 400 });
 
     let body: {
+      full_name?: string;
+      dob?: string;
+      email?: string;
+      telephone?: string;
+      emergency_contact?: string;
+      note?: string;
+      waiver_form?: string;
       is_punch_card_holder?: boolean;
       punches_remaining?: number;
       pt_punches_remaining?: number;
@@ -25,24 +32,63 @@ export const PATCH: APIRoute = async ({ params, request }) => {
     try { body = await request.json(); }
     catch { return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400 }); }
 
-    const updates: Record<string, any> = {};
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return new Response(JSON.stringify({ error: 'Invalid request body' }), { status: 400 });
+    }
+
+    const updates: Record<string, string | number | boolean | null> = {};
+
+    const profileFields = [
+      'full_name',
+      'dob',
+      'email',
+      'telephone',
+      'emergency_contact',
+      'note',
+      'waiver_form',
+    ] as const;
+    for (const field of profileFields) {
+      if (!(field in body)) continue;
+      if (typeof body[field] !== 'string') {
+        return new Response(JSON.stringify({ error: `${field} must be a string` }), { status: 400 });
+      }
+      const value = body[field].trim();
+      if (field === 'full_name' && !value) {
+        return new Response(JSON.stringify({ error: 'Full name is required' }), { status: 400 });
+      }
+      updates[field] = value;
+    }
 
     // Punch card fields
     if ('is_punch_card_holder' in body) {
-      const isPunchCardHolder = Boolean(body.is_punch_card_holder);
+      if (typeof body.is_punch_card_holder !== 'boolean') {
+        return new Response(JSON.stringify({ error: 'is_punch_card_holder must be a boolean' }), { status: 400 });
+      }
+      const isPunchCardHolder = body.is_punch_card_holder;
+      const punches = Number(body.punches_remaining ?? 0);
+      if (!Number.isFinite(punches) || punches < 0) {
+        return new Response(JSON.stringify({ error: 'punches_remaining must be a non-negative number' }), { status: 400 });
+      }
       updates.is_punch_card_holder = isPunchCardHolder;
       updates.punches_remaining    = isPunchCardHolder
-        ? Math.max(0, Math.floor(Number(body.punches_remaining) || 0))
+        ? Math.floor(punches)
         : 0;
     }
 
     // PT punch field
     if ('pt_punches_remaining' in body) {
-      updates.pt_punches_remaining = Math.max(0, Math.floor(Number(body.pt_punches_remaining) || 0));
+      const punches = Number(body.pt_punches_remaining);
+      if (!Number.isFinite(punches) || punches < 0) {
+        return new Response(JSON.stringify({ error: 'pt_punches_remaining must be a non-negative number' }), { status: 400 });
+      }
+      updates.pt_punches_remaining = Math.floor(punches);
     }
 
     // Membership fields
     if ('membership_type' in body) {
+      if (typeof body.membership_type !== 'string') {
+        return new Response(JSON.stringify({ error: 'Invalid membership type' }), { status: 400 });
+      }
       const mType = (body.membership_type ?? '').trim();
       const VALID_TYPES = ['', '1 Month', '3 Months', '6 Months', '12 Months'];
       if (!VALID_TYPES.includes(mType)) {
@@ -55,7 +101,7 @@ export const PATCH: APIRoute = async ({ params, request }) => {
         updates.membership_end_date   = null;
       } else {
         const startStr = body.membership_start_date ?? '';
-        if (!startStr) {
+        if (typeof startStr !== 'string' || !startStr) {
           return new Response(JSON.stringify({ error: 'membership_start_date is required' }), { status: 400 });
         }
         const start = new Date(startStr);
@@ -81,7 +127,7 @@ export const PATCH: APIRoute = async ({ params, request }) => {
       .from('customers')
       .update(updates)
       .eq('id', id)
-      .select('id, is_punch_card_holder, punches_remaining, pt_punches_remaining, membership_type, membership_start_date, membership_end_date')
+      .select('id, full_name, dob, email, telephone, emergency_contact, note, waiver_form, is_punch_card_holder, punches_remaining, pt_punches_remaining, membership_type, membership_start_date, membership_end_date')
       .single();
 
     if (error) {

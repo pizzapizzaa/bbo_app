@@ -275,6 +275,81 @@ import MainLayout from '../../layouts/MainLayout.astro';
     </div>
   </div>
 
+  <!-- Edit Customer Details Modal -->
+  <div id="edit-customer-modal"
+       class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+       onclick="if(event.target===this)closeEditCustomer()">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      <div class="sticky top-0 bg-white flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <div>
+          <h2 class="font-semibold text-gray-800 text-lg">Customer Details</h2>
+          <p class="text-xs text-gray-500">View and update this customer’s profile.</p>
+        </div>
+        <button type="button" onclick="closeEditCustomer()" aria-label="Close"
+                class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+      </div>
+      <form id="edit-customer-form" onsubmit="submitEditCustomer(event)" class="px-6 py-5">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label for="edit-customer-full-name" class="block text-xs font-medium text-gray-600 mb-1">Full Name <span class="text-red-400">*</span></label>
+            <input id="edit-customer-full-name" name="full_name" type="text" required
+                   class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+          </div>
+          <div>
+            <label for="edit-customer-dob" class="block text-xs font-medium text-gray-600 mb-1">Date of Birth</label>
+            <input id="edit-customer-dob" name="dob" type="text"
+                   class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+          </div>
+          <div>
+            <label for="edit-customer-email" class="block text-xs font-medium text-gray-600 mb-1">Email</label>
+            <input id="edit-customer-email" name="email" type="email"
+                   class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+          </div>
+          <div>
+            <label for="edit-customer-telephone" class="block text-xs font-medium text-gray-600 mb-1">Telephone</label>
+            <input id="edit-customer-telephone" name="telephone" type="text"
+                   class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+          </div>
+          <div>
+            <label for="edit-customer-emergency-contact" class="block text-xs font-medium text-gray-600 mb-1">Emergency Contact</label>
+            <input id="edit-customer-emergency-contact" name="emergency_contact" type="text"
+                   class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+          </div>
+          <div>
+            <label for="edit-customer-waiver" class="block text-xs font-medium text-gray-600 mb-1">Waiver</label>
+            <input id="edit-customer-waiver" name="waiver_form" type="text"
+                   class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300" />
+          </div>
+          <div class="sm:col-span-2">
+            <label for="edit-customer-note" class="block text-xs font-medium text-gray-600 mb-1">Note</label>
+            <textarea id="edit-customer-note" name="note" rows="3"
+                      class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300"></textarea>
+          </div>
+        </div>
+        <div class="mt-5 border-t border-gray-100 pt-4">
+          <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Account Information</h3>
+          <dl class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+            <div><dt class="text-xs text-gray-400">Created</dt><dd id="edit-customer-created" class="text-gray-700"></dd></div>
+            <div><dt class="text-xs text-gray-400">Registration</dt><dd id="edit-customer-source" class="text-gray-700"></dd></div>
+            <div><dt class="text-xs text-gray-400">Punches</dt><dd id="edit-customer-punches" class="text-gray-700"></dd></div>
+            <div><dt class="text-xs text-gray-400">PT Punches</dt><dd id="edit-customer-pt-punches" class="text-gray-700"></dd></div>
+            <div><dt class="text-xs text-gray-400">Membership</dt><dd id="edit-customer-membership" class="text-gray-700"></dd></div>
+            <div><dt class="text-xs text-gray-400">Member Until</dt><dd id="edit-customer-member-until" class="text-gray-700"></dd></div>
+            <div class="col-span-2 sm:col-span-3"><dt class="text-xs text-gray-400">Referral Codes</dt><dd id="edit-customer-referrals" class="text-gray-700 break-words"></dd></div>
+          </dl>
+        </div>
+        <div id="edit-customer-error"
+             class="hidden mt-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2" role="alert"></div>
+        <div class="flex justify-end gap-3 mt-5">
+          <button type="button" onclick="closeEditCustomer()"
+                  class="bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 font-medium text-sm px-4 py-2 rounded-lg transition">Cancel</button>
+          <button type="submit" id="edit-customer-submit"
+                  class="bg-orange-500 hover:bg-orange-600 text-white font-medium text-sm px-5 py-2 rounded-lg transition">Save Details</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Edit Membership Modal -->
   <div id="edit-membership-modal"
        class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
@@ -873,6 +948,88 @@ import MainLayout from '../../layouts/MainLayout.astro';
       }
     }
 
+    // ── Customer details ──
+    var editCustomerId = null;
+    var CUSTOMER_PROFILE_FIELDS = [
+      ['full_name', 'Full Name'],
+      ['dob', 'DOB'],
+      ['email', 'Email'],
+      ['telephone', 'Telephone no'],
+      ['emergency_contact', 'Emergency contact'],
+      ['note', 'Note'],
+      ['waiver_form', 'Waiver form (old)']
+    ];
+
+    function openEditCustomer(id) {
+      var row = customerRows.find(function (r) { return r._id === id; });
+      if (!row) return;
+      editCustomerId = id;
+      document.getElementById('edit-customer-form').reset();
+      CUSTOMER_PROFILE_FIELDS.forEach(function (field) {
+        document.getElementById('edit-customer-' + field[0].replace(/_/g, '-')).value = row[field[1]] || '';
+      });
+      document.getElementById('edit-customer-created').textContent = row._created_at || '—';
+      document.getElementById('edit-customer-source').textContent = row._registration_source || 'unknown';
+      document.getElementById('edit-customer-punches').textContent =
+        (row._is_punch_card_holder ? 'Holder · ' : '') + (row._punches_remaining || 0);
+      document.getElementById('edit-customer-pt-punches').textContent = row._pt_punches_remaining || 0;
+      document.getElementById('edit-customer-membership').textContent = row._membership_type || 'None';
+      document.getElementById('edit-customer-member-until').textContent = row._membership_end_date || '—';
+      document.getElementById('edit-customer-referrals').textContent =
+        (row._referral_codes || []).map(function (code) {
+          return code.code + ' (' + (code.discount_pct || 0) + '%' + (code.is_active ? '' : ', paused') + ')';
+        }).join(', ') || '—';
+      document.getElementById('edit-customer-error').classList.add('hidden');
+      document.getElementById('edit-customer-modal').classList.remove('hidden');
+      setTimeout(function () { document.getElementById('edit-customer-full-name').focus(); }, 50);
+    }
+
+    function closeEditCustomer() {
+      document.getElementById('edit-customer-modal').classList.add('hidden');
+      editCustomerId = null;
+    }
+
+    function submitEditCustomer(event) {
+      event.preventDefault();
+      if (!editCustomerId) return;
+      var formData = new FormData(document.getElementById('edit-customer-form'));
+      var updates = {};
+      CUSTOMER_PROFILE_FIELDS.forEach(function (field) {
+        updates[field[0]] = formData.get(field[0]) || '';
+      });
+      var errorEl = document.getElementById('edit-customer-error');
+      var submitBtn = document.getElementById('edit-customer-submit');
+      errorEl.classList.add('hidden');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Saving…';
+
+      apiFetch('/api/customers/' + editCustomerId, {
+        method: 'PATCH',
+        body: JSON.stringify(updates)
+      })
+        .then(function (res) { return res.json(); })
+        .then(function (result) {
+          if (result.error) throw new Error(result.error);
+          var row = customerRows.find(function (r) { return r._id === editCustomerId; });
+          if (row) {
+            CUSTOMER_PROFILE_FIELDS.forEach(function (field) {
+              row[field[1]] = result.row[field[0]];
+            });
+          }
+          if (customerTable) { customerTable.clear(); customerTable.rows.add(customerRows).draw(false); }
+          closeEditCustomer();
+          showToast('Customer details updated.', 'success');
+        })
+        .catch(function (err) {
+          errorEl.textContent = 'Failed to save customer details: ' + err.message;
+          errorEl.classList.remove('hidden');
+        })
+        .finally(function () {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Save Details';
+        });
+    }
+
     // ── Edit Membership Modal ──
     var editMembershipId = null;
 
@@ -1340,7 +1497,7 @@ import MainLayout from '../../layouts/MainLayout.astro';
     // ── Load customers from API ──
     var customerLoadPromise = null;
     function customerEditorOpen() {
-      return ['import-confirm-modal', 'add-customer-modal', 'edit-membership-modal', 'edit-punch-modal', 'edit-pt-punch-modal', 'edit-referral-modal'].some(function (id) {
+      return ['import-confirm-modal', 'add-customer-modal', 'edit-customer-modal', 'edit-membership-modal', 'edit-punch-modal', 'edit-pt-punch-modal', 'edit-referral-modal'].some(function (id) {
         return !document.getElementById(id).classList.contains('hidden');
       });
     }
@@ -1804,6 +1961,14 @@ import MainLayout from '../../layouts/MainLayout.astro';
   <div id="row-actions-menu"
       class="hidden fixed z-50 max-h-[calc(100vh-1rem)] overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-xl py-1.5 min-w-44"
        style="min-width:176px">
+    <button onclick="ramAction(openEditCustomer)"
+      class="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-orange-600 hover:bg-orange-50 transition text-left">
+      <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+      </svg>
+      View / Edit Details
+    </button>
     <button onclick="ramAction(openEditMembership)"
       class="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-teal-600 hover:bg-teal-50 transition text-left">
       <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
