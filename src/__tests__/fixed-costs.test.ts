@@ -133,8 +133,9 @@ describe('projectFixedCosts', () => {
 
   it('totals the month with utilities as a range', () => {
     const p = projectFixedCosts(base);
-    // accountant 1M + Shingo setting 3.2M + guests 6M + Duyen 8M + director 7M + utilities 4–4.5M
-    expect(p.total_min).toBe(29_200_000);
-    expect(p.total_max).toBe(29_700_000);
+    // accountant 1M + Shingo setting 3.2M + guests 6M + Duyen 8M + director 7M + rent 17M + utilities 4–4.5M
+    expect(line(p, 'Rent')).toMatchObject({ group: 'Fixed', detail: 'Monthly', amount: 17_000_000 });
+    expect(p.total_min).toBe(46_200_000);
+    expect(p.total_max).toBe(46_700_000);
   });
 });

@@ -49,6 +49,7 @@ export const FULL_TIME_BASE: Record<string, number> = { 'Duyen Ha': 8_000_000 };
 export const FULL_TIME_PROFIT_PCT = 5;
 
 export const DIRECTOR_MONTHLY = 7_000_000;
+export const RENT_MONTHLY = 17_000_000;
 export const UTILITY_MIN = 4_000_000;
 export const UTILITY_MAX = 4_500_000;
 
@@ -232,6 +233,7 @@ export function projectFixedCosts(input: ProjectionInput): Projection {
   }
 
   lines.push({ group: 'Fixed', label: 'Director', detail: 'Monthly', amount: DIRECTOR_MONTHLY });
+  lines.push({ group: 'Fixed', label: 'Rent', detail: 'Monthly', amount: RENT_MONTHLY });
   lines.push({
     group: 'Fixed', label: 'Utilities', detail: 'Estimate',
     amount: UTILITY_MIN, amount_max: UTILITY_MAX,
