@@ -143,7 +143,7 @@ import MainLayout from '../../layouts/MainLayout.astro';
         <!-- Expense stats -->
         <div>
           <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Expenses</p>
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
 
             <div class="bg-gray-800 rounded-xl border border-gray-700 p-4">
               <p class="text-xs text-gray-400 uppercase tracking-wide mb-0.5">All Time</p>
@@ -154,6 +154,12 @@ import MainLayout from '../../layouts/MainLayout.astro';
               <p class="text-xs text-gray-400 uppercase tracking-wide mb-0.5">This Month</p>
               <p id="lbl-month"        class="text-[10px] text-gray-500"></p>
               <p id="stat-exp-month"   class="text-xl font-bold text-red-400 tabular-nums mt-0.5">— ₫</p>
+            </div>
+
+            <div class="bg-gray-800 rounded-xl border border-gray-700 p-4">
+              <p class="text-xs text-gray-400 uppercase tracking-wide mb-0.5">Projected Cost</p>
+              <p class="text-[10px] text-gray-500">Monthly Rent: 17,000,000 ₫</p>
+              <p id="stat-exp-projected" class="text-lg font-bold text-orange-300 tabular-nums mt-0.5">— ₫</p>
             </div>
 
             <div class="bg-gray-800 rounded-xl border border-gray-700 p-4">
@@ -311,6 +317,8 @@ import MainLayout from '../../layouts/MainLayout.astro';
     var trendChart  = null;
     var chartMonths = 12;
     var statsMonth  = null; // Date set to 1st of the selected month
+
+    var PROJECTED_MONTHLY_RENT = 17000000;
 
     var TYPE_COLORS = {
       'Construction Setup':    'bg-blue-100 text-blue-700',
@@ -604,6 +612,8 @@ import MainLayout from '../../layouts/MainLayout.astro';
 
       setExpStat('stat-exp-total',   expTotal);
       setExpStat('stat-exp-month',   expMonth);
+      var projectedEl = document.getElementById('stat-exp-projected');
+      projectedEl.textContent = fmtVND(expMonth + PROJECTED_MONTHLY_RENT);
       setExpStat('stat-exp-quarter', expQuarter);
       setExpStat('stat-exp-year',    expYear);
 
@@ -683,6 +693,7 @@ import MainLayout from '../../layouts/MainLayout.astro';
       var periods = getFinancePeriods(chartMonths);
       var labels  = periods.map(function (p) { return p.label; });
       var expVals = sumByFinancePeriods(expenseData, periods);
+      var projectedVals = expVals.map(function (amount) { return amount + PROJECTED_MONTHLY_RENT; });
       var revVals = sumByFinancePeriods(revenueRows, periods);
       var balVals = revVals.map(function (r, i) { return r - expVals[i]; });
 
@@ -691,8 +702,9 @@ import MainLayout from '../../layouts/MainLayout.astro';
       if (trendChart) {
         trendChart.data.labels             = labels;
         trendChart.data.datasets[0].data   = expVals;
-        trendChart.data.datasets[1].data   = revVals;
-        trendChart.data.datasets[2].data   = balVals;
+        trendChart.data.datasets[1].data   = projectedVals;
+        trendChart.data.datasets[2].data   = revVals;
+        trendChart.data.datasets[3].data   = balVals;
         trendChart.update();
         return;
       }
@@ -708,6 +720,17 @@ import MainLayout from '../../layouts/MainLayout.astro';
               borderColor:     'rgb(248, 113, 113)',
               backgroundColor: 'rgba(248, 113, 113, 0.08)',
               pointBackgroundColor: 'rgb(248, 113, 113)',
+              tension: 0.35,
+              fill: false,
+              pointRadius: 4,
+              pointHoverRadius: 6,
+            },
+            {
+              label: 'Projected Cost (incl. Rent)',
+              data: projectedVals,
+              borderColor:     'rgb(253, 186, 116)',
+              backgroundColor: 'rgba(253, 186, 116, 0.08)',
+              pointBackgroundColor: 'rgb(253, 186, 116)',
               tension: 0.35,
               fill: false,
               pointRadius: 4,
